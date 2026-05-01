@@ -1,7 +1,6 @@
+import { DUMMY_COURSES } from '@/lib/dummy-data'
+import { SearchClient } from './_components/search-client'
+
 export default function SearchPage() {
-  return (
-    <main>
-      <h1>검색 페이지</h1>
-    </main>
-  )
+  return <SearchClient courses={DUMMY_COURSES} />
 }
