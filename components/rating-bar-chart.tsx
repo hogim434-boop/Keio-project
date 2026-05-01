@@ -16,21 +16,34 @@ type Props = {
 
 export function RatingBarChart({ ratings, className }: Props) {
   return (
-    <div className={cn('space-y-3', className)}>
+    <div className={cn('space-y-2.5', className)}>
       {AXES.map(({ key, label }) => {
         const value = ratings[key]
         const percent = (value / 5) * 100
 
         return (
-          <div key={key} className="flex items-center gap-2">
-            <span className="w-20 shrink-0 text-xs text-muted-foreground">{label}</span>
-            <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
+          <div key={key} className="flex items-center gap-3">
+            {/* 평가 항목 라벨 */}
+            <span className="w-[5.5rem] shrink-0 text-xs text-muted-foreground leading-none">
+              {label}
+            </span>
+            {/* 바 차트 트랙 */}
+            <div
+              className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted"
+              role="progressbar"
+              aria-valuenow={value}
+              aria-valuemin={0}
+              aria-valuemax={5}
+              aria-label={`${label}: ${value.toFixed(1)}`}
+            >
+              {/* 바 차트 채움 */}
               <div
-                className="h-full rounded-full bg-primary transition-none"
+                className="h-full rounded-full bg-foreground"
                 style={{ width: `${percent}%` }}
               />
             </div>
-            <span className="w-7 shrink-0 text-right text-xs font-medium">
+            {/* 수치 */}
+            <span className="w-7 shrink-0 text-right text-xs font-semibold tabular-nums">
               {value.toFixed(1)}
             </span>
           </div>
