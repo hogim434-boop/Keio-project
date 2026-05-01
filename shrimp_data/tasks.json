@@ -1,0 +1,718 @@
+{
+  "tasks": [
+    {
+      "id": "4b718575-d2ee-4c1f-80ef-1eacb4391762",
+      "name": "라우트 그룹 디렉토리 및 빈 페이지 파일 생성",
+      "description": "Next.js 16 App Router 라우트 그룹 패턴으로 (public)/(app)/(admin) 디렉토리를 생성하고, 각 경로에 해당하는 빈 page.tsx 파일을 만든다. 기존 app/page.tsx의 /instruments redirect를 /courses로 변경한다.",
+      "notes": "라우트 그룹 폴더명의 괄호는 URL에 포함되지 않음. app/(public)/page.tsx는 / 경로로 접근됨. app/(app)/courses/page.tsx는 /courses 경로.",
+      "status": "completed",
+      "dependencies": [],
+      "createdAt": "2026-05-01T13:51:21.584Z",
+      "updatedAt": "2026-05-01T13:55:00.377Z",
+      "relatedFiles": [
+        {
+          "path": "app/page.tsx",
+          "type": "TO_MODIFY",
+          "description": "redirect 경로를 /courses로 변경"
+        },
+        {
+          "path": "app/(public)/page.tsx",
+          "type": "CREATE",
+          "description": "랜딩 페이지 placeholder"
+        },
+        {
+          "path": "app/(public)/login/page.tsx",
+          "type": "CREATE",
+          "description": "로그인 페이지 placeholder"
+        },
+        {
+          "path": "app/(public)/signup/page.tsx",
+          "type": "CREATE",
+          "description": "회원가입 페이지 placeholder"
+        },
+        {
+          "path": "app/(app)/courses/page.tsx",
+          "type": "CREATE",
+          "description": "강의 목록 페이지 placeholder"
+        },
+        {
+          "path": "app/(app)/courses/[id]/page.tsx",
+          "type": "CREATE",
+          "description": "강의 상세 페이지 placeholder"
+        },
+        {
+          "path": "app/(app)/search/page.tsx",
+          "type": "CREATE",
+          "description": "검색 페이지 placeholder"
+        },
+        {
+          "path": "app/(app)/my/page.tsx",
+          "type": "CREATE",
+          "description": "마이페이지 placeholder"
+        },
+        {
+          "path": "app/(app)/my/profile/page.tsx",
+          "type": "CREATE",
+          "description": "프로필 설정 페이지 placeholder"
+        },
+        {
+          "path": "app/(admin)/page.tsx",
+          "type": "CREATE",
+          "description": "어드민 페이지 placeholder"
+        }
+      ],
+      "implementationGuide": "1. 디렉토리 생성:\n   - app/(public)/ → page.tsx(랜딩), login/page.tsx, signup/page.tsx\n   - app/(app)/ → courses/page.tsx, courses/[id]/page.tsx, search/page.tsx, my/page.tsx, my/profile/page.tsx\n   - app/(admin)/ → page.tsx\n2. 각 page.tsx 내용: export default function PageName() { return <main><h1>페이지명 페이지</h1></main> } 형태의 placeholder\n3. app/page.tsx 수정: redirect('/instruments') → redirect('/courses')\n4. 기존 app/instruments/ 디렉토리는 삭제하지 않고 유지(테스트 참고용)",
+      "verificationCriteria": "npm run dev 실행 후 브라우저에서 /, /login, /signup, /courses, /courses/abc, /search, /my, /my/profile, /admin 각 경로 접근 시 해당 placeholder 텍스트가 표시됨. 타입 에러 없음.",
+      "analysisResult": "Task 002 목표: Next.js 16 App Router에서 (public)/(app)/(admin) 라우트 그룹 3개를 구성하고, 각 그룹별 레이아웃 골격, 빈 페이지 파일, proxy.ts 라우트 보호 로직, 모바일 우선 글로벌 스타일을 추가한다. 실제 기능 구현 없이 골격만 구성하는 것이 목표이며, Phase 2(UI 완성) 작업의 기반이 된다.",
+      "summary": "app/(public), app/(app), app/(admin) 라우트 그룹 디렉토리 생성 완료. login, signup, courses, courses/[id], search, my, my/profile, admin 총 9개 placeholder 페이지 생성. app/page.tsx의 redirect 경로를 /courses로 변경 완료.",
+      "completedAt": "2026-05-01T13:55:00.376Z"
+    },
+    {
+      "id": "15bd9100-eee1-4203-9334-de66e821e5b6",
+      "name": "globals.css 모바일 우선 스타일 및 루트 레이아웃 viewport 메타태그 추가",
+      "description": "Tailwind v4 문법으로 Safe Area 유틸리티(@utility pb-safe)를 정의하고, body에 모바일 중심 기본 스타일(max-width 768px 중앙 정렬)을 적용한다. app/layout.tsx에 viewport-fit=cover 메타태그를 추가한다.",
+      "notes": "Tailwind v4의 @utility는 v3의 @layer utilities와 다름. env(safe-area-inset-bottom)은 iPhone Safari의 홈 인디케이터 영역을 피하기 위해 필요. viewport는 metadata와 별도로 export해야 Next.js 16에서 인식.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "4b718575-d2ee-4c1f-80ef-1eacb4391762"
+        }
+      ],
+      "createdAt": "2026-05-01T13:51:21.584Z",
+      "updatedAt": "2026-05-01T13:56:03.573Z",
+      "relatedFiles": [
+        {
+          "path": "app/globals.css",
+          "type": "TO_MODIFY",
+          "description": "pb-safe 유틸리티 및 body 모바일 스타일 추가"
+        },
+        {
+          "path": "app/layout.tsx",
+          "type": "TO_MODIFY",
+          "description": "viewport export 및 metadata.title 변경"
+        }
+      ],
+      "implementationGuide": "1. app/globals.css 하단에 추가:\n   - @utility pb-safe { padding-bottom: env(safe-area-inset-bottom, 0px); }\n   - body에 기본 스타일: max-width 768px, margin-inline auto, min-height 100dvh\n2. app/layout.tsx에 viewport export 추가:\n   - export const viewport: Viewport = { width: 'device-width', initialScale: 1, viewportFit: 'cover' }\n   - import { Viewport } from 'next' 추가\n3. metadata.title을 'Jukulog'으로 변경",
+      "verificationCriteria": "브라우저 DevTools에서 body max-width: 768px 확인. iPhone Safari 시뮬레이터에서 pb-safe 클래스 적용 시 Safe Area 패딩 적용 확인. TypeScript 에러 없음.",
+      "analysisResult": "Task 002 목표: Next.js 16 App Router에서 (public)/(app)/(admin) 라우트 그룹 3개를 구성하고, 각 그룹별 레이아웃 골격, 빈 페이지 파일, proxy.ts 라우트 보호 로직, 모바일 우선 글로벌 스타일을 추가한다. 실제 기능 구현 없이 골격만 구성하는 것이 목표이며, Phase 2(UI 완성) 작업의 기반이 된다.",
+      "summary": "globals.css에 @utility pb-safe(env(safe-area-inset-bottom)) 추가, body에 max-width 768px/margin-inline auto/min-height 100dvh 적용. app/layout.tsx에 Viewport export 추가(viewportFit: cover), metadata.title을 Jukulog으로 변경.",
+      "completedAt": "2026-05-01T13:56:03.572Z"
+    },
+    {
+      "id": "1110b78b-d0be-4078-9af1-23b4ec67f54a",
+      "name": "(public) 그룹 레이아웃 - 상단 헤더 작성",
+      "description": "비로그인 사용자용 (public) 그룹의 layout.tsx를 작성한다. 로고 텍스트(Jukulog)와 로그인/회원가입 Link 버튼이 있는 상단 헤더를 포함한 Server Component 레이아웃이다.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "4b718575-d2ee-4c1f-80ef-1eacb4391762"
+        }
+      ],
+      "createdAt": "2026-05-01T13:51:21.584Z",
+      "updatedAt": "2026-05-01T13:56:05.707Z",
+      "relatedFiles": [
+        {
+          "path": "app/(public)/layout.tsx",
+          "type": "CREATE",
+          "description": "상단 헤더 포함 public 그룹 레이아웃"
+        },
+        {
+          "path": "components/ui/button.tsx",
+          "type": "REFERENCE",
+          "description": "기존 설치된 shadcn button 컴포넌트 활용"
+        },
+        {
+          "path": "app/(public)/page.tsx",
+          "type": "REFERENCE",
+          "description": "레이아웃 적용 대상 페이지"
+        }
+      ],
+      "implementationGuide": "app/(public)/layout.tsx 생성:\n- Server Component (use client 불필요)\n- header: 로고 Link(/) + 로그인 Link(/login) + 회원가입 Link(/signup)\n- 스타일: header는 sticky top-0, 높이 56px, border-bottom, 배경 흰색\n- children을 main 태그로 감싸기\n- shadcn button.tsx의 variant 활용하여 로그인(ghost), 회원가입(default) 스타일 적용",
+      "verificationCriteria": "/ , /login, /signup 접근 시 상단 헤더(Jukulog 로고 + 로그인/회원가입 버튼)가 표시됨. /courses 등 (app) 그룹 경로에는 이 헤더가 표시되지 않음.",
+      "analysisResult": "Task 002 목표: Next.js 16 App Router에서 (public)/(app)/(admin) 라우트 그룹 3개를 구성하고, 각 그룹별 레이아웃 골격, 빈 페이지 파일, proxy.ts 라우트 보호 로직, 모바일 우선 글로벌 스타일을 추가한다. 실제 기능 구현 없이 골격만 구성하는 것이 목표이며, Phase 2(UI 완성) 작업의 기반이 된다.",
+      "summary": "app/(public)/layout.tsx 생성. sticky top-0 h-14 헤더에 Jukulog 로고 Link(/)와 로그인(ghost)/회원가입(default) Button 컴포넌트 배치. children을 main 태그로 감쌈. Server Component로 구현.",
+      "completedAt": "2026-05-01T13:56:05.706Z"
+    },
+    {
+      "id": "ab327c6f-57ad-458a-97d4-0a9e69a4e26e",
+      "name": "(app) 그룹 레이아웃 - 하단 탭 네비게이션 작성",
+      "description": "로그인 사용자용 (app) 그룹의 layout.tsx와 하단 탭 네비게이션 컴포넌트를 작성한다. 강의(Home)/검색(Search)/마이(User) 3탭으로 구성하며, Safe Area를 대응하고 현재 경로에 따라 활성 탭이 강조된다. (admin) 그룹의 단순 레이아웃도 함께 작성한다.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "4b718575-d2ee-4c1f-80ef-1eacb4391762"
+        },
+        {
+          "taskId": "15bd9100-eee1-4203-9334-de66e821e5b6"
+        }
+      ],
+      "createdAt": "2026-05-01T13:51:21.584Z",
+      "updatedAt": "2026-05-01T13:56:39.902Z",
+      "relatedFiles": [
+        {
+          "path": "components/bottom-tab-bar.tsx",
+          "type": "CREATE",
+          "description": "하단 탭 네비게이션 Client Component"
+        },
+        {
+          "path": "app/(app)/layout.tsx",
+          "type": "CREATE",
+          "description": "하단 탭 포함 app 그룹 레이아웃"
+        },
+        {
+          "path": "app/(admin)/layout.tsx",
+          "type": "CREATE",
+          "description": "어드민 그룹 레이아웃"
+        }
+      ],
+      "implementationGuide": "1. components/bottom-tab-bar.tsx 생성 ('use client'):\n   - usePathname()으로 현재 경로 파악\n   - TAB 배열: [{href:'/courses', icon:Home, label:'강의'}, {href:'/search', icon:Search, label:'검색'}, {href:'/my', icon:User, label:'마이'}]\n   - 각 탭: Link로 감싸고, pathname이 href로 시작하면 primary 색상 활성화\n   - 높이 56px + pb-safe, border-top, 배경 흰색, fixed bottom-0\n   - 아이콘 24px, 터치 영역 44px 이상\n2. app/(app)/layout.tsx 생성 (Server Component):\n   - children을 main으로 감싸되 하단 탭 높이만큼 padding-bottom 추가\n   - BottomTabBar 컴포넌트 import\n3. app/(admin)/layout.tsx 생성:\n   - 단순 래퍼, '어드민' 텍스트 상단 표시",
+      "verificationCriteria": "/courses, /search, /my 접근 시 하단에 3탭 네비게이션이 고정 표시됨. 현재 경로의 탭 아이콘이 활성 색상으로 표시됨. 탭 클릭 시 해당 경로로 이동됨. /admin에는 탭바가 표시되지 않음.",
+      "analysisResult": "Task 002 목표: Next.js 16 App Router에서 (public)/(app)/(admin) 라우트 그룹 3개를 구성하고, 각 그룹별 레이아웃 골격, 빈 페이지 파일, proxy.ts 라우트 보호 로직, 모바일 우선 글로벌 스타일을 추가한다. 실제 기능 구현 없이 골격만 구성하는 것이 목표이며, Phase 2(UI 완성) 작업의 기반이 된다.",
+      "summary": "components/bottom-tab-bar.tsx 생성(use client). usePathname으로 활성 탭 감지, 강의/검색/마이 3탭 구성, fixed bottom-0 + pb-safe Safe Area 대응, 아이콘 24px 터치영역 확보. app/(app)/layout.tsx에서 BottomTabBar 포함 및 pb-[56px] 패딩 적용. app/(admin)/layout.tsx는 탭바 없는 단순 어드민 헤더 레이아웃으로 생성.",
+      "completedAt": "2026-05-01T13:56:39.902Z"
+    },
+    {
+      "id": "02082ea8-cd52-4eb3-9fde-e7086c9bb2b7",
+      "name": "proxy.ts 라우트 보호 로직 추가",
+      "description": "기존 proxy.ts의 세션 갱신 로직을 유지하면서 라우트 보호 로직을 추가한다. 미인증 사용자의 (app)/(admin) 접근을 /login으로 리디렉션하고, 로그인 사용자의 /login, /signup 접근을 /courses로 리디렉션한다.",
+      "notes": "어드민 권한 확인(users.role)은 MVP 범위 초과이므로 이번 태스크에서는 제외. /admin 경로는 미인증 차단만 구현. 기존 쿠키 처리 로직(setAll)과 supabaseResponse 반환 구조를 반드시 유지해야 세션이 정상 동작함.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "4b718575-d2ee-4c1f-80ef-1eacb4391762"
+        }
+      ],
+      "createdAt": "2026-05-01T13:51:21.584Z",
+      "updatedAt": "2026-05-01T13:56:08.998Z",
+      "relatedFiles": [
+        {
+          "path": "proxy.ts",
+          "type": "TO_MODIFY",
+          "description": "라우트 보호 로직 추가 (세션 갱신 로직 유지)"
+        },
+        {
+          "path": "lib/supabase/server.ts",
+          "type": "REFERENCE",
+          "description": "서버 클라이언트 패턴 참고"
+        }
+      ],
+      "implementationGuide": "proxy.ts 수정:\n1. getUser() 반환값을 const { data: { user } } = await supabase.auth.getUser() 로 받기\n2. 경로 상수 정의:\n   - protectedPaths = ['/courses', '/search', '/my', '/admin']\n   - publicOnlyPaths = ['/login', '/signup']\n3. pathname 추출: const pathname = request.nextUrl.pathname\n4. 보호 로직:\n   - !user && protectedPaths.some(p => pathname.startsWith(p)) → redirect('/login')\n   - user && publicOnlyPaths.some(p => pathname.startsWith(p)) → redirect('/courses')\n5. redirect 시 NextResponse.redirect(new URL('/login', request.url)) 사용\n6. 세션 갱신용 supabaseResponse는 반드시 유지하고 return",
+      "verificationCriteria": "비로그인 상태에서 /courses 접근 시 /login으로 리디렉션됨. 로그인 상태에서 /login 접근 시 /courses로 리디렉션됨. 로그인/로그아웃 없이 / 접근은 정상 표시됨. 기존 Supabase 세션 갱신 동작 유지됨.",
+      "analysisResult": "Task 002 목표: Next.js 16 App Router에서 (public)/(app)/(admin) 라우트 그룹 3개를 구성하고, 각 그룹별 레이아웃 골격, 빈 페이지 파일, proxy.ts 라우트 보호 로직, 모바일 우선 글로벌 스타일을 추가한다. 실제 기능 구현 없이 골격만 구성하는 것이 목표이며, Phase 2(UI 완성) 작업의 기반이 된다.",
+      "summary": "proxy.ts에 getUser() 반환값으로 user 추출. protectedPaths([/courses, /search, /my, /admin])와 publicOnlyPaths([/login, /signup]) 정의. 미인증→/login, 인증된 사용자→/courses 리디렉션 로직 추가. 기존 세션 갱신 구조(supabaseResponse) 완전히 유지.",
+      "completedAt": "2026-05-01T13:56:08.997Z"
+    },
+    {
+      "id": "f33abbd7-acb5-46dc-aa5d-b071a4c3799a",
+      "name": "shadcn 컴포넌트 9개 일괄 설치",
+      "description": "npx shadcn add 명령으로 input, label, select, textarea, card, dialog, sheet, form, dropdown-menu 9개 컴포넌트를 설치한다. 설치 후 components/ui/ 하위에 각 컴포넌트 파일이 생성됨을 확인한다.",
+      "notes": "shadcn 버전 4.6.0, style=radix-nova. 설치 중 덮어쓰기 확인 프롬프트가 나오면 기존 button.tsx는 유지(No 선택).",
+      "status": "completed",
+      "dependencies": [],
+      "createdAt": "2026-05-01T14:06:18.555Z",
+      "updatedAt": "2026-05-01T14:09:40.655Z",
+      "relatedFiles": [
+        {
+          "path": "components/ui/button.tsx",
+          "type": "REFERENCE",
+          "description": "기존 설치된 shadcn 버튼 컴포넌트 참조"
+        },
+        {
+          "path": "components/ui/input.tsx",
+          "type": "CREATE",
+          "description": "shadcn input 컴포넌트"
+        },
+        {
+          "path": "components/ui/card.tsx",
+          "type": "CREATE",
+          "description": "shadcn card 컴포넌트"
+        },
+        {
+          "path": "components/ui/dialog.tsx",
+          "type": "CREATE",
+          "description": "shadcn dialog 컴포넌트"
+        },
+        {
+          "path": "components/ui/sheet.tsx",
+          "type": "CREATE",
+          "description": "shadcn sheet 컴포넌트"
+        },
+        {
+          "path": "components/ui/form.tsx",
+          "type": "CREATE",
+          "description": "shadcn form 컴포넌트"
+        },
+        {
+          "path": "components.json",
+          "type": "REFERENCE",
+          "description": "shadcn 설정 파일 (style, aliases 확인)"
+        }
+      ],
+      "implementationGuide": "1. 터미널에서 프로젝트 루트에서 실행: npx shadcn add input label select textarea card dialog sheet form dropdown-menu\n2. 각 파일이 components/ui/ 에 생성되었는지 확인\n3. 기존 button.tsx와 스타일 충돌 없는지 확인",
+      "verificationCriteria": "components/ui/ 에 input.tsx, label.tsx, select.tsx, textarea.tsx, card.tsx, dialog.tsx, sheet.tsx, form.tsx, dropdown-menu.tsx 9개 파일 존재 확인. TypeScript 컴파일 에러 없음.",
+      "analysisResult": "Jukulog 프로젝트 Task 004: 공통 컴포넌트 라이브러리 구현. Next.js 16 App Router, Tailwind v4, shadcn/ui(radix-nova), TypeScript strict 환경. 더미 데이터 기반 UI 완성을 위한 컴포넌트 라이브러리 구축이 목표. components/ui/는 shadcn 자동 생성, components/는 커스텀 컴포넌트 위치.",
+      "summary": "npx shadcn add로 input, label, select, textarea, card, dialog, sheet, dropdown-menu 8개 자동 설치 완료. form.tsx는 react-hook-form 의존성 설치 후 shadcn 패턴에 맞게 수동 생성. react-hook-form, @hookform/resolvers, zod도 함께 설치됨. TypeScript 에러 없음.",
+      "completedAt": "2026-05-01T14:09:40.654Z"
+    },
+    {
+      "id": "138e0a17-9c89-4190-97f3-7b572f3c1f42",
+      "name": "lib/dummy-data.ts 더미 데이터 작성",
+      "description": "게이오대학교 강의 10개와 리뷰 20개(강의당 2개)의 더미 데이터를 작성한다. 5축 평점 타입(종합/출석/시험난이도/학점취득/강의스타일)을 로컬에서 정의하고, 캠퍼스(미타/히요시/SFC) 및 학부 정보를 포함한다.",
+      "notes": "강의명과 교수명은 실제 게이오대 스타일로 작성. 평점은 1.0~5.0 범위. Task 003 완료 전이므로 types/ 폴더 참조 금지, 이 파일 내 로컬 타입만 사용.",
+      "status": "completed",
+      "dependencies": [],
+      "createdAt": "2026-05-01T14:06:18.555Z",
+      "updatedAt": "2026-05-01T14:09:45.796Z",
+      "relatedFiles": [
+        {
+          "path": "lib/dummy-data.ts",
+          "type": "CREATE",
+          "description": "더미 데이터 및 로컬 타입 정의"
+        },
+        {
+          "path": "lib/utils.ts",
+          "type": "REFERENCE",
+          "description": "cn() 유틸리티 참조용"
+        }
+      ],
+      "implementationGuide": "1. lib/dummy-data.ts 생성\n2. 로컬 타입 정의:\n   - type Campus = '三田' | '日吉' | 'SFC'\n   - type DummyCourse = { id, name, professor, campus, department, avgRating, reviewCount, ratings: {overall, attendance, examDifficulty, gradingEase, teachingStyle} }\n   - type DummyReview = { id, courseId, comment, ratings: DummyCourse['ratings'], createdAt }\n3. DUMMY_COURSES 배열 10개 (일본어 강의명/교수명)\n4. DUMMY_REVIEWS 배열 20개 (각 강의당 2개)\n5. 헬퍼 함수: getReviewsByCourseId(courseId: string): DummyReview[]",
+      "verificationCriteria": "lib/dummy-data.ts 파일 존재. DUMMY_COURSES 10개, DUMMY_REVIEWS 20개 export 확인. TypeScript strict 타입 에러 없음. getReviewsByCourseId('course-1') 호출 시 2개 반환.",
+      "analysisResult": "Jukulog 프로젝트 Task 004: 공통 컴포넌트 라이브러리 구현. Next.js 16 App Router, Tailwind v4, shadcn/ui(radix-nova), TypeScript strict 환경. 더미 데이터 기반 UI 완성을 위한 컴포넌트 라이브러리 구축이 목표. components/ui/는 shadcn 자동 생성, components/는 커스텀 컴포넌트 위치.",
+      "summary": "lib/dummy-data.ts 생성. DummyRatings, DummyCourse, DummyReview 로컬 타입 정의. DUMMY_COURSES 10개(게이오대 각 캠퍼스/학부별 일본어 강의명/교수명), DUMMY_REVIEWS 20개(강의당 2개), getReviewsByCourseId 헬퍼 함수 export. TypeScript strict 에러 없음.",
+      "completedAt": "2026-05-01T14:09:45.795Z"
+    },
+    {
+      "id": "2ae579f5-38cc-4463-bb07-bde631dafdac",
+      "name": "CourseCard 컴포넌트 구현",
+      "description": "강의 목록 페이지에서 사용할 강의 카드 컴포넌트를 구현한다. 강의명, 교수명, 캠퍼스, 종합 평점(별점 표시), 리뷰 수를 표시하며 shadcn Card 컴포넌트를 기반으로 한다.",
+      "notes": "클릭 인터랙션은 Link 컴포넌트로만 처리. 별점 표시는 읽기 전용(StarRatingInput과 구별). 터치 영역: 카드 전체가 링크이므로 별도 처리 불필요.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "f33abbd7-acb5-46dc-aa5d-b071a4c3799a"
+        },
+        {
+          "taskId": "138e0a17-9c89-4190-97f3-7b572f3c1f42"
+        }
+      ],
+      "createdAt": "2026-05-01T14:06:18.555Z",
+      "updatedAt": "2026-05-01T14:10:16.859Z",
+      "relatedFiles": [
+        {
+          "path": "components/course-card.tsx",
+          "type": "CREATE",
+          "description": "강의 카드 컴포넌트"
+        },
+        {
+          "path": "components/ui/card.tsx",
+          "type": "DEPENDENCY",
+          "description": "shadcn Card 컴포넌트"
+        },
+        {
+          "path": "lib/dummy-data.ts",
+          "type": "REFERENCE",
+          "description": "DummyCourse 타입 참조"
+        },
+        {
+          "path": "lib/utils.ts",
+          "type": "DEPENDENCY",
+          "description": "cn() 유틸리티"
+        }
+      ],
+      "implementationGuide": "1. components/course-card.tsx 생성 (Server Component, 'use client' 불필요)\n2. Props: { id: string, name: string, professor: string, campus: string, avgRating: number, reviewCount: number }\n3. shadcn Card, CardContent 사용\n4. 레이아웃: Link로 /courses/[id] 감싸기, 카드 내부: 강의명(font-medium) + 교수명/캠퍼스(text-muted-foreground text-sm) + 평점 행(별 아이콘 + 숫자 + 리뷰 수)\n5. 별점 표시: lucide-react Star 아이콘(fill 색상으로 평점 시각화, 정수 반올림)\n6. cn() 유틸리티 사용",
+      "verificationCriteria": "components/course-card.tsx 존재. TypeScript 에러 없음. 강의명/교수명/평점/리뷰 수 props 정상 표시. /courses/[id] 링크 연결 확인.",
+      "analysisResult": "Jukulog 프로젝트 Task 004: 공통 컴포넌트 라이브러리 구현. Next.js 16 App Router, Tailwind v4, shadcn/ui(radix-nova), TypeScript strict 환경. 더미 데이터 기반 UI 완성을 위한 컴포넌트 라이브러리 구축이 목표. components/ui/는 shadcn 자동 생성, components/는 커스텀 컴포넌트 위치.",
+      "summary": "components/course-card.tsx 생성 완료. Server Component, shadcn Card/CardContent 활용, Link로 /courses/[id] 연결, 강의명/교수명/캠퍼스/avgRating 별 표시/reviewCount 렌더링. 정수 반올림 별 아이콘 fill-yellow-400, hover bg-muted/50. TypeScript strict 에러 없음.",
+      "completedAt": "2026-05-01T14:10:16.858Z"
+    },
+    {
+      "id": "69710526-a3ec-4ba1-86c3-6a7879c5fa49",
+      "name": "RatingBarChart 컴포넌트 구현",
+      "description": "5축 평점을 가로 바 차트로 시각화하는 컴포넌트를 구현한다. 종합/출석/시험난이도/학점취득/강의스타일 5개 축을 각각 라벨+바+수치 형태로 표시한다.",
+      "notes": "외부 차트 라이브러리 사용 금지. CSS width % 방식으로 구현. 애니메이션은 이번 태스크 범위 외. Server Component으로 구현하여 번들 크기 최소화.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "138e0a17-9c89-4190-97f3-7b572f3c1f42"
+        }
+      ],
+      "createdAt": "2026-05-01T14:06:18.555Z",
+      "updatedAt": "2026-05-01T14:10:20.006Z",
+      "relatedFiles": [
+        {
+          "path": "components/rating-bar-chart.tsx",
+          "type": "CREATE",
+          "description": "5축 평점 가로 바 차트 컴포넌트"
+        },
+        {
+          "path": "lib/dummy-data.ts",
+          "type": "REFERENCE",
+          "description": "평점 타입 구조 참조"
+        },
+        {
+          "path": "lib/utils.ts",
+          "type": "DEPENDENCY",
+          "description": "cn() 유틸리티"
+        }
+      ],
+      "implementationGuide": "1. components/rating-bar-chart.tsx 생성 (Server Component)\n2. Props: { ratings: { overall: number, attendance: number, examDifficulty: number, gradingEase: number, teachingStyle: number } }\n3. 내부 상수: AXES = [{key, label}] 5개 정의\n4. 각 축 렌더링: div 행(flex) - 라벨(w-20 text-sm) + 바 컨테이너(flex-1 bg-muted rounded) + 바 채움(bg-primary rounded, width: `${(value/5)*100}%`) + 수치(w-8 text-sm text-right)\n5. 바 높이: h-2, 전체 컨테이너: space-y-3\n6. cn() 활용",
+      "verificationCriteria": "components/rating-bar-chart.tsx 존재. 5개 축 라벨(종합평점/출석체크/시험난이도/학점취득/강의스타일) 표시. 평점 3.0 입력 시 바가 60% 너비로 렌더링. TypeScript 에러 없음.",
+      "analysisResult": "Jukulog 프로젝트 Task 004: 공통 컴포넌트 라이브러리 구현. Next.js 16 App Router, Tailwind v4, shadcn/ui(radix-nova), TypeScript strict 환경. 더미 데이터 기반 UI 완성을 위한 컴포넌트 라이브러리 구축이 목표. components/ui/는 shadcn 자동 생성, components/는 커스텀 컴포넌트 위치.",
+      "summary": "components/rating-bar-chart.tsx 생성 완료. Server Component, DummyRatings 타입 import, 5개 축 AXES 배열 정의. div 가로 바(style width: percent%), 라벨 w-20 + 바 flex-1 bg-muted + 수치 w-7 레이아웃. 외부 라이브러리 미사용. TypeScript 에러 없음.",
+      "completedAt": "2026-05-01T14:10:20.001Z"
+    },
+    {
+      "id": "663c44f6-f22f-42a3-8c37-398bf3d94980",
+      "name": "StarRatingInput 컴포넌트 구현",
+      "description": "리뷰 작성 폼에서 사용할 별점 입력 컴포넌트를 구현한다. 1~5 정수 입력, 44px 이상 터치 영역, 클릭/탭으로 별점 선택, 호버 프리뷰 기능을 제공한다.",
+      "notes": "Controlled component 패턴 사용(value/onChange). 모바일 터치를 위해 min-w/h-[44px] 필수. button type='button' 명시(폼 제출 방지).",
+      "status": "completed",
+      "dependencies": [],
+      "createdAt": "2026-05-01T14:06:18.555Z",
+      "updatedAt": "2026-05-01T14:09:49.283Z",
+      "relatedFiles": [
+        {
+          "path": "components/star-rating-input.tsx",
+          "type": "CREATE",
+          "description": "별점 입력 컴포넌트 (클라이언트 컴포넌트)"
+        },
+        {
+          "path": "lib/utils.ts",
+          "type": "DEPENDENCY",
+          "description": "cn() 유틸리티"
+        }
+      ],
+      "implementationGuide": "1. components/star-rating-input.tsx 생성 ('use client' 필수)\n2. Props: { value: number, onChange: (value: number) => void, max?: number (기본 5) }\n3. 내부 state: hoverValue (number | null)\n4. 별 5개 렌더링: Array.from({length: max}).map((_, i) => i+1)\n5. 각 별: button 요소, min-w-[44px] min-h-[44px] flex items-center justify-center\n6. 색상 로직: i <= (hoverValue ?? value) ? text-yellow-400 fill-yellow-400 : text-muted-foreground\n7. 이벤트: onClick → onChange(i), onMouseEnter → setHoverValue(i), onMouseLeave → setHoverValue(null)\n8. lucide-react Star 아이콘 size=28",
+      "verificationCriteria": "components/star-rating-input.tsx 존재. 클릭 시 value 업데이트 콜백 호출. 호버 시 별 색상 프리뷰. 각 별의 터치 영역 44px 이상. TypeScript 에러 없음.",
+      "analysisResult": "Jukulog 프로젝트 Task 004: 공통 컴포넌트 라이브러리 구현. Next.js 16 App Router, Tailwind v4, shadcn/ui(radix-nova), TypeScript strict 환경. 더미 데이터 기반 UI 완성을 위한 컴포넌트 라이브러리 구축이 목표. components/ui/는 shadcn 자동 생성, components/는 커스텀 컴포넌트 위치.",
+      "summary": "components/star-rating-input.tsx 생성. use client, useState로 hoverValue 관리, value/onChange/max props, 각 별 min-w/h-[44px] 터치 영역 확보, lucide-react Star size=28, 활성 시 fill-yellow-400 적용, button type=button 명시. TypeScript 에러 없음.",
+      "completedAt": "2026-05-01T14:09:49.283Z"
+    },
+    {
+      "id": "2d181079-26dc-4b4a-9565-9c60a6ed179a",
+      "name": "BottomTabBar 시각적 완성 및 검증",
+      "description": "기존 BottomTabBar 컴포넌트(components/bottom-tab-bar.tsx)를 검토하고, 활성/비활성 상태 색상, Safe Area 대응, 터치 영역, 레이블 스타일을 최종 완성한다.",
+      "notes": "현재 구현이 대부분 완성되어 있으므로 큰 변경보다는 세부 개선에 집중. 기존 동작하는 로직(usePathname, TABS 배열)은 유지.",
+      "status": "completed",
+      "dependencies": [],
+      "createdAt": "2026-05-01T14:06:18.555Z",
+      "updatedAt": "2026-05-01T14:09:53.343Z",
+      "relatedFiles": [
+        {
+          "path": "components/bottom-tab-bar.tsx",
+          "type": "TO_MODIFY",
+          "description": "하단 탭 네비게이션 컴포넌트 개선"
+        },
+        {
+          "path": "app/(app)/layout.tsx",
+          "type": "REFERENCE",
+          "description": "pb-[56px] 패딩 설정 확인"
+        },
+        {
+          "path": "app/globals.css",
+          "type": "REFERENCE",
+          "description": "@utility pb-safe 정의 확인"
+        }
+      ],
+      "implementationGuide": "1. 현재 bottom-tab-bar.tsx 검토\n2. 확인 항목:\n   - pb-safe 유틸리티 적용 여부 (globals.css에 @utility pb-safe 정의됨)\n   - 각 탭 터치 영역 min 44px 확보\n   - 활성 탭: text-primary, 비활성 탭: text-muted-foreground\n   - fixed bottom-0 + max-w-[768px] + -translate-x-1/2 레이아웃\n3. 필요 시 개선: 비활성 탭 폰트 크기(text-xs), 아이콘/라벨 간격(gap-0.5), 탭 flex-1 균등 분배\n4. app/(app)/layout.tsx의 pb-[56px] padding이 탭바 높이와 맞는지 확인",
+      "verificationCriteria": "브라우저에서 /courses, /search, /my 접근 시 하단 탭바 표시. 현재 경로 탭이 primary 색상으로 활성화. iPhone Safari 시뮬레이터에서 Safe Area 영역 침범 없음. 탭 터치 영역 44px 이상.",
+      "analysisResult": "Jukulog 프로젝트 Task 004: 공통 컴포넌트 라이브러리 구현. Next.js 16 App Router, Tailwind v4, shadcn/ui(radix-nova), TypeScript strict 환경. 더미 데이터 기반 UI 완성을 위한 컴포넌트 라이브러리 구축이 목표. components/ui/는 shadcn 자동 생성, components/는 커스텀 컴포넌트 위치.",
+      "summary": "BottomTabBar 개선 완료. cn() import 추가, bg-white → bg-background로 테마 변수 사용, items-stretch로 탭 전체 높이 터치 영역 확보, 활성 탭 strokeWidth 2.5/비활성 1.8 차별화, 라벨 text-[10px]/font-semibold 적용. pb-safe Safe Area, fixed bottom-0, max-w-[768px] 유지.",
+      "completedAt": "2026-05-01T14:09:53.342Z"
+    },
+    {
+      "id": "631d79b3-6236-46af-811c-65eb78b48e0b",
+      "name": "Task 005-1: 랜딩 페이지 UI 완성",
+      "description": "app/(public)/page.tsx를 서비스 소개 히어로 섹션, 인기 강의 미리보기 카드 3개, 검색창 UI로 완성한다.\n\n수락 기준:\n- 히어로 섹션: 서비스명(塾ログ), 소개 문구, /login 또는 /signup으로 이동하는 CTA 버튼\n- 인기 강의 카드: DUMMY_COURSES에서 avgRating 상위 3개를 CourseCard 컴포넌트로 렌더링\n- 검색창 UI: Input 컴포넌트로 구현, 클릭 시 /search 이동 (실제 검색 기능은 Task 009)\n- 모바일 레이아웃: mx-auto max-w-[768px] px-4 적용\n- 서버 컴포넌트로 구현 (인터랙션 없음)",
+      "notes": "Input에 readOnly + pointer-events-none 처리하여 클릭 시 /search로 이동하는 Link로 감싸기. 서버 컴포넌트이므로 'use client' 불필요.",
+      "status": "in_progress",
+      "dependencies": [],
+      "createdAt": "2026-05-01T14:23:44.380Z",
+      "updatedAt": "2026-05-01T14:24:27.401Z",
+      "relatedFiles": [
+        {
+          "path": "app/(public)/page.tsx",
+          "type": "TO_MODIFY",
+          "description": "랜딩 페이지"
+        },
+        {
+          "path": "components/course-card.tsx",
+          "type": "DEPENDENCY",
+          "description": "강의 카드 컴포넌트"
+        },
+        {
+          "path": "lib/dummy-data.ts",
+          "type": "DEPENDENCY",
+          "description": "더미 강의 데이터"
+        },
+        {
+          "path": "components/ui/button.tsx",
+          "type": "DEPENDENCY",
+          "description": "shadcn Button"
+        },
+        {
+          "path": "components/ui/input.tsx",
+          "type": "DEPENDENCY",
+          "description": "shadcn Input"
+        }
+      ],
+      "implementationGuide": "// app/(public)/page.tsx\nimport DUMMY_COURSES -> avgRating 내림차순 정렬 후 slice(0,3)\nimport CourseCard, Button, Input\n\n// 구조\n<div className='mx-auto max-w-[768px] px-4 py-8'>\n  <section> // 히어로\n    <h1>塾ログ</h1>\n    <p>게이오 재학생 강의 리뷰</p>\n    <Button asChild><Link href='/signup'>시작하기</Link></Button>\n  </section>\n  <section> // 검색창\n    <Link href='/search'><Input placeholder='강의명·교수명으로 검색' readOnly /></Link>\n  </section>\n  <section> // 인기 강의\n    <h2>인기 강의</h2>\n    {topCourses.map(course => <CourseCard key={course.id} {...course} />)}\n  </section>\n</div>",
+      "verificationCriteria": "브라우저에서 / 접속 시 히어로 섹션, 검색창, 인기 강의 카드 3개가 렌더링되며, 회원가입 버튼 클릭 시 /signup으로 이동한다.",
+      "analysisResult": "Task 005는 Jukulog 앱의 9개 페이지 UI를 더미 데이터 기반으로 완성하는 작업이다. 기존 컴포넌트(CourseCard, RatingBarChart, StarRatingInput, BottomTabBar)와 shadcn/ui를 재사용하며, 모바일 우선(max-w-[768px]) 설계를 따른다. 서버 컴포넌트를 기본으로 하되 인터랙션이 필요한 부분만 'use client' 클라이언트 컴포넌트로 분리한다. 모든 데이터는 lib/dummy-data.ts의 DUMMY_COURSES, DUMMY_REVIEWS를 사용하며 실제 Supabase 연동은 이후 Task에서 수행한다."
+    },
+    {
+      "id": "137e53e0-b6b5-4522-b604-f6eb869236b6",
+      "name": "Task 005-2: 로그인 및 회원가입 페이지 UI 완성",
+      "description": "app/(public)/login/page.tsx와 app/(public)/signup/page.tsx를 폼 UI로 완성한다.\n\n수락 기준:\n- 로그인: 이메일 Input + 비밀번호 Input + 로그인 Button + 회원가입 링크\n- 회원가입: 이메일 + 비밀번호 + 캠퍼스(Select: 三田/日吉/SFC) + 학부(Input) + 가입 Button + 로그인 링크\n- 양쪽 모두 shadcn Form/Label/Input/Button/Select 사용\n- 'use client' 클라이언트 컴포넌트로 구현\n- 중앙 정렬 카드 레이아웃 (max-w-sm mx-auto)",
+      "notes": "실제 인증 로직은 Task 006에서 구현. 이 단계에서는 UI/레이아웃만 완성. onSubmit은 preventDefault()만 처리.",
+      "status": "pending",
+      "dependencies": [],
+      "createdAt": "2026-05-01T14:23:44.380Z",
+      "updatedAt": "2026-05-01T14:23:44.380Z",
+      "relatedFiles": [
+        {
+          "path": "app/(public)/login/page.tsx",
+          "type": "TO_MODIFY",
+          "description": "로그인 페이지"
+        },
+        {
+          "path": "app/(public)/signup/page.tsx",
+          "type": "TO_MODIFY",
+          "description": "회원가입 페이지"
+        },
+        {
+          "path": "components/ui/input.tsx",
+          "type": "DEPENDENCY",
+          "description": "shadcn Input"
+        },
+        {
+          "path": "components/ui/label.tsx",
+          "type": "DEPENDENCY",
+          "description": "shadcn Label"
+        },
+        {
+          "path": "components/ui/button.tsx",
+          "type": "DEPENDENCY",
+          "description": "shadcn Button"
+        },
+        {
+          "path": "components/ui/select.tsx",
+          "type": "DEPENDENCY",
+          "description": "shadcn Select (캠퍼스 선택)"
+        }
+      ],
+      "implementationGuide": "// app/(public)/login/page.tsx - 'use client'\nimport { useState } from 'react'\nimport Label, Input, Button, Link\n\n// 구조\n<div className='mx-auto max-w-sm px-4 py-12'>\n  <h1>로그인</h1>\n  <form>\n    <Label>메일 주소</Label><Input type='email' />\n    <Label>비밀번호</Label><Input type='password' />\n    <Button type='submit'>로그인</Button>\n  </form>\n  <Link href='/signup'>회원가입</Link>\n</div>\n\n// app/(public)/signup/page.tsx - 'use client'\n// Select 컴포넌트로 캠퍼스 선택: 三田/日吉/SFC\n// 추가 필드: 학부명 Input",
+      "verificationCriteria": "/login 접속 시 이메일+비밀번호 폼이 보이고, /signup 접속 시 캠퍼스 Select를 포함한 회원가입 폼이 렌더링된다.",
+      "analysisResult": "Task 005는 Jukulog 앱의 9개 페이지 UI를 더미 데이터 기반으로 완성하는 작업이다. 기존 컴포넌트(CourseCard, RatingBarChart, StarRatingInput, BottomTabBar)와 shadcn/ui를 재사용하며, 모바일 우선(max-w-[768px]) 설계를 따른다. 서버 컴포넌트를 기본으로 하되 인터랙션이 필요한 부분만 'use client' 클라이언트 컴포넌트로 분리한다. 모든 데이터는 lib/dummy-data.ts의 DUMMY_COURSES, DUMMY_REVIEWS를 사용하며 실제 Supabase 연동은 이후 Task에서 수행한다."
+    },
+    {
+      "id": "3a6e8c02-7316-42fa-9b3a-66342cb62ad2",
+      "name": "Task 005-3: 강의 목록 페이지 UI 완성",
+      "description": "app/(app)/courses/page.tsx를 캠퍼스 필터 칩 + 강의 카드 목록 UI로 완성한다.\n\n수락 기준:\n- 상단 캠퍼스 필터: 全て/三田/日吉/SFC 4개 탭을 가로 스크롤 칩으로 표시\n- 선택된 캠퍼스에 따라 DUMMY_COURSES 필터링 후 CourseCard 목록 렌더링\n- 필터 상태 관리: CoursesClient 'use client' 컴포넌트로 분리\n- page.tsx는 서버 컴포넌트로 유지, CoursesClient에 courses 데이터 props로 전달\n- 하단 BottomTabBar는 (app)/layout.tsx에 이미 포함됨 (중복 추가 불필요)",
+      "notes": "_components 폴더 패턴 사용. CoursesClient는 app/(app)/courses/_components/courses-client.tsx에 생성.",
+      "status": "pending",
+      "dependencies": [],
+      "createdAt": "2026-05-01T14:23:44.380Z",
+      "updatedAt": "2026-05-01T14:23:44.380Z",
+      "relatedFiles": [
+        {
+          "path": "app/(app)/courses/page.tsx",
+          "type": "TO_MODIFY",
+          "description": "강의 목록 페이지"
+        },
+        {
+          "path": "app/(app)/courses/_components/courses-client.tsx",
+          "type": "CREATE",
+          "description": "캠퍼스 필터 클라이언트 컴포넌트"
+        },
+        {
+          "path": "components/course-card.tsx",
+          "type": "DEPENDENCY",
+          "description": "강의 카드"
+        },
+        {
+          "path": "lib/dummy-data.ts",
+          "type": "DEPENDENCY",
+          "description": "더미 강의 데이터"
+        }
+      ],
+      "implementationGuide": "// app/(app)/courses/page.tsx (서버 컴포넌트)\nimport CoursesClient from './_components/courses-client'\nimport { DUMMY_COURSES } from '@/lib/dummy-data'\nexport default function CoursesPage() {\n  return <CoursesClient courses={DUMMY_COURSES} />\n}\n\n// app/(app)/courses/_components/courses-client.tsx ('use client')\nconst CAMPUSES = ['全て', '三田', '日吉', 'SFC']\nconst [selected, setSelected] = useState('全て')\nconst filtered = selected === '全て' ? courses : courses.filter(c => c.campus === selected)\n// 필터 칩: overflow-x-auto flex gap-2, 각 칩은 Button variant\n// CourseCard 목록: space-y-3",
+      "verificationCriteria": "/courses 접속(로그인 필요) 시 캠퍼스 필터 칩과 강의 목록이 렌더링되고, 캠퍼스 필터 클릭 시 목록이 필터링된다.",
+      "analysisResult": "Task 005는 Jukulog 앱의 9개 페이지 UI를 더미 데이터 기반으로 완성하는 작업이다. 기존 컴포넌트(CourseCard, RatingBarChart, StarRatingInput, BottomTabBar)와 shadcn/ui를 재사용하며, 모바일 우선(max-w-[768px]) 설계를 따른다. 서버 컴포넌트를 기본으로 하되 인터랙션이 필요한 부분만 'use client' 클라이언트 컴포넌트로 분리한다. 모든 데이터는 lib/dummy-data.ts의 DUMMY_COURSES, DUMMY_REVIEWS를 사용하며 실제 Supabase 연동은 이후 Task에서 수행한다."
+    },
+    {
+      "id": "3f18785d-5c7c-49ae-b63f-0ae3bed070af",
+      "name": "Task 005-4: 강의 상세 페이지 UI 완성",
+      "description": "app/(app)/courses/[id]/page.tsx를 강의 상세 정보, 5축 바 차트, 리뷰 목록, FAB 버튼으로 완성한다.\n\n수락 기준:\n- 강의 기본 정보: 강의명, 교수명, 캠퍼스, 학부 표시\n- RatingBarChart로 5축 평점 시각화\n- 스타일 태그: 더미 태그 3~4개 (板書あり, 少人数, 自由参加 등) Badge 형태로 표시\n- 리뷰 목록: getReviewsByCourseId(id)로 가져온 리뷰들을 카드 형태로 표시\n- FAB 버튼: 화면 우하단 fixed, 클릭 시 리뷰 작성 Sheet 오픈\n- ReviewSheet: StarRatingInput(5축) + Textarea(코멘트) + 제출 Button\n- DUMMY_COURSES에 없는 id면 notFound() 호출",
+      "notes": "FAB 버튼 위치: bottom-20(BottomTabBar 56px + 여유)이고 right-4. notFound()는 next/navigation에서 import.",
+      "status": "pending",
+      "dependencies": [
+        {
+          "taskId": "3a6e8c02-7316-42fa-9b3a-66342cb62ad2"
+        }
+      ],
+      "createdAt": "2026-05-01T14:23:44.380Z",
+      "updatedAt": "2026-05-01T14:23:44.380Z",
+      "relatedFiles": [
+        {
+          "path": "app/(app)/courses/[id]/page.tsx",
+          "type": "TO_MODIFY",
+          "description": "강의 상세 페이지"
+        },
+        {
+          "path": "app/(app)/courses/[id]/_components/review-sheet.tsx",
+          "type": "CREATE",
+          "description": "리뷰 작성 Sheet 컴포넌트"
+        },
+        {
+          "path": "components/rating-bar-chart.tsx",
+          "type": "DEPENDENCY",
+          "description": "5축 바 차트"
+        },
+        {
+          "path": "components/star-rating-input.tsx",
+          "type": "DEPENDENCY",
+          "description": "별점 입력"
+        },
+        {
+          "path": "components/ui/sheet.tsx",
+          "type": "DEPENDENCY",
+          "description": "shadcn Sheet"
+        },
+        {
+          "path": "components/ui/textarea.tsx",
+          "type": "DEPENDENCY",
+          "description": "shadcn Textarea"
+        },
+        {
+          "path": "lib/dummy-data.ts",
+          "type": "DEPENDENCY",
+          "description": "더미 데이터"
+        }
+      ],
+      "implementationGuide": "// app/(app)/courses/[id]/page.tsx (서버 컴포넌트)\nimport { DUMMY_COURSES, getReviewsByCourseId } from '@/lib/dummy-data'\nimport { notFound } from 'next/navigation'\nimport ReviewSheet from './_components/review-sheet'\nconst course = DUMMY_COURSES.find(c => c.id === params.id)\nif (!course) notFound()\nconst reviews = getReviewsByCourseId(params.id)\n\n// 레이아웃:\n// 1. 강의 헤더 (이름, 교수, 캠퍼스 배지)\n// 2. RatingBarChart 섹션\n// 3. 스타일 태그 섹션 (더미 배열)\n// 4. 리뷰 목록 섹션\n// 5. ReviewSheet 컴포넌트 (FAB + Sheet)\n\n// app/(app)/courses/[id]/_components/review-sheet.tsx ('use client')\n// Sheet trigger: Button fixed bottom-20 right-4\n// Sheet content: 5축별 StarRatingInput + Textarea + 제출 Button\n// 상태: ratings(5개) + comment useState",
+      "verificationCriteria": "/courses/course-1 접속 시 강의 정보, 5축 바 차트, 리뷰 목록이 표시되고, FAB 버튼 클릭 시 리뷰 작성 Sheet가 열린다.",
+      "analysisResult": "Task 005는 Jukulog 앱의 9개 페이지 UI를 더미 데이터 기반으로 완성하는 작업이다. 기존 컴포넌트(CourseCard, RatingBarChart, StarRatingInput, BottomTabBar)와 shadcn/ui를 재사용하며, 모바일 우선(max-w-[768px]) 설계를 따른다. 서버 컴포넌트를 기본으로 하되 인터랙션이 필요한 부분만 'use client' 클라이언트 컴포넌트로 분리한다. 모든 데이터는 lib/dummy-data.ts의 DUMMY_COURSES, DUMMY_REVIEWS를 사용하며 실제 Supabase 연동은 이후 Task에서 수행한다."
+    },
+    {
+      "id": "4b8dae7a-8810-4872-b83b-890c53af550e",
+      "name": "Task 005-5: 검색 페이지 UI 완성",
+      "description": "app/(app)/search/page.tsx를 자동 포커스 검색창 + 실시간 필터 결과 리스트 UI로 완성한다.\n\n수락 기준:\n- 페이지 진입 시 검색창 자동 포커스\n- 검색어 입력에 따라 DUMMY_COURSES에서 강의명·교수명 포함 필터링\n- 필터된 결과를 CourseCard 목록으로 표시\n- 검색어 없을 때: 전체 DUMMY_COURSES 표시 또는 '검색어를 입력하세요' 안내\n- 빈 결과 상태: '검색 결과가 없습니다' 메시지\n- SearchClient 'use client' 컴포넌트로 전체 구현",
+      "notes": "일본어 IME 입력 처리: onChange 이벤트 사용 (onInput 아님). 디바운스는 이 단계에서 생략 가능 (더미 데이터라 성능 이슈 없음).",
+      "status": "pending",
+      "dependencies": [],
+      "createdAt": "2026-05-01T14:23:44.380Z",
+      "updatedAt": "2026-05-01T14:23:44.380Z",
+      "relatedFiles": [
+        {
+          "path": "app/(app)/search/page.tsx",
+          "type": "TO_MODIFY",
+          "description": "검색 페이지"
+        },
+        {
+          "path": "app/(app)/search/_components/search-client.tsx",
+          "type": "CREATE",
+          "description": "검색 클라이언트 컴포넌트"
+        },
+        {
+          "path": "components/course-card.tsx",
+          "type": "DEPENDENCY",
+          "description": "강의 카드"
+        },
+        {
+          "path": "lib/dummy-data.ts",
+          "type": "DEPENDENCY",
+          "description": "더미 강의 데이터"
+        }
+      ],
+      "implementationGuide": "// app/(app)/search/page.tsx (서버 컴포넌트 wrapper)\nimport SearchClient from './_components/search-client'\nexport default function SearchPage() {\n  return <SearchClient courses={DUMMY_COURSES} />\n}\n\n// app/(app)/search/_components/search-client.tsx ('use client')\nconst inputRef = useRef<HTMLInputElement>(null)\nuseEffect(() => { inputRef.current?.focus() }, [])\nconst [query, setQuery] = useState('')\nconst results = query ? courses.filter(c =>\n  c.name.includes(query) || c.professor.includes(query)\n) : courses\n\n// UI: Input(ref=inputRef) + CourseCard 목록 또는 빈 상태 메시지",
+      "verificationCriteria": "/search 접속 시 Input에 자동 포커스되고, 검색어 입력 시 강의명·교수명 기준으로 CourseCard 목록이 실시간 필터링된다.",
+      "analysisResult": "Task 005는 Jukulog 앱의 9개 페이지 UI를 더미 데이터 기반으로 완성하는 작업이다. 기존 컴포넌트(CourseCard, RatingBarChart, StarRatingInput, BottomTabBar)와 shadcn/ui를 재사용하며, 모바일 우선(max-w-[768px]) 설계를 따른다. 서버 컴포넌트를 기본으로 하되 인터랙션이 필요한 부분만 'use client' 클라이언트 컴포넌트로 분리한다. 모든 데이터는 lib/dummy-data.ts의 DUMMY_COURSES, DUMMY_REVIEWS를 사용하며 실제 Supabase 연동은 이후 Task에서 수행한다."
+    },
+    {
+      "id": "5cf2e0f3-435f-457a-bcd2-3d3015ce0a34",
+      "name": "Task 005-6: 마이페이지 및 프로필 설정 페이지 UI 완성",
+      "description": "app/(app)/my/page.tsx와 app/(app)/my/profile/page.tsx UI를 완성한다.\n\n수락 기준:\n[마이페이지]\n- 더미 유저 정보: 이름(匿名ユーザー), 캠퍼스(三田), 학부(経済学部) 표시\n- 내 리뷰 목록: DUMMY_REVIEWS에서 courseId가 course-1인 리뷰 2개를 카드로 표시\n- 로그아웃 버튼 (클릭 이벤트만, 실제 로직은 Task 006)\n- 프로필 설정 이동 링크\n\n[프로필 설정 페이지]\n- 캠퍼스 Select (三田/日吉/SFC) + 학부 Input + 저장 Button\n- 'use client' 컴포넌트로 구현",
+      "notes": "로그아웃 버튼은 LogoutButton.tsx 클라이언트 컴포넌트로 분리하면 마이페이지를 서버 컴포넌트로 유지 가능.",
+      "status": "pending",
+      "dependencies": [],
+      "createdAt": "2026-05-01T14:23:44.380Z",
+      "updatedAt": "2026-05-01T14:23:44.380Z",
+      "relatedFiles": [
+        {
+          "path": "app/(app)/my/page.tsx",
+          "type": "TO_MODIFY",
+          "description": "마이페이지"
+        },
+        {
+          "path": "app/(app)/my/profile/page.tsx",
+          "type": "TO_MODIFY",
+          "description": "프로필 설정 페이지"
+        },
+        {
+          "path": "app/(app)/my/_components/logout-button.tsx",
+          "type": "CREATE",
+          "description": "로그아웃 버튼 클라이언트 컴포넌트"
+        },
+        {
+          "path": "lib/dummy-data.ts",
+          "type": "DEPENDENCY",
+          "description": "더미 리뷰 데이터"
+        },
+        {
+          "path": "components/ui/select.tsx",
+          "type": "DEPENDENCY",
+          "description": "shadcn Select"
+        }
+      ],
+      "implementationGuide": "// app/(app)/my/page.tsx\n// 더미 유저 정보 객체 정의\n// DUMMY_REVIEWS.filter(r => r.courseId === 'course-1') 으로 내 리뷰 표시\n// 리뷰 카드: 날짜, 코멘트, 별점(overall) 표시\n// 로그아웃 Button: variant='outline' + 'use client' 필요 (onClick)\n\n// app/(app)/my/profile/page.tsx ('use client')\n// Select로 캠퍼스, Input으로 학부 수정\n// 저장 Button (실제 저장 로직은 Task 006)\n\n// 마이페이지에서 onClick이 필요하므로 'use client' 처리 또는\n// LogoutButton 별도 클라이언트 컴포넌트로 분리",
+      "verificationCriteria": "/my 접속 시 더미 유저 정보와 리뷰 목록이 표시되고, /my/profile 접속 시 캠퍼스/학부 수정 폼이 렌더링된다.",
+      "analysisResult": "Task 005는 Jukulog 앱의 9개 페이지 UI를 더미 데이터 기반으로 완성하는 작업이다. 기존 컴포넌트(CourseCard, RatingBarChart, StarRatingInput, BottomTabBar)와 shadcn/ui를 재사용하며, 모바일 우선(max-w-[768px]) 설계를 따른다. 서버 컴포넌트를 기본으로 하되 인터랙션이 필요한 부분만 'use client' 클라이언트 컴포넌트로 분리한다. 모든 데이터는 lib/dummy-data.ts의 DUMMY_COURSES, DUMMY_REVIEWS를 사용하며 실제 Supabase 연동은 이후 Task에서 수행한다."
+    },
+    {
+      "id": "09725301-2fba-4028-8128-9a59ceb55431",
+      "name": "Task 005-7: 어드민 페이지 UI 완성",
+      "description": "app/(admin)/admin/page.tsx를 강의 등록 폼 + 관리 테이블 + CSV 임포트 버튼 UI로 완성한다.\n\n수락 기준:\n- 페이지 상단: 어드민 헤더 (로고 + '관리자 패널' 표시)\n- 강의 등록 폼: 강의명/교수명/캠퍼스(Select)/학부 Input + 등록 Button\n- 강의 관리 테이블: DUMMY_COURSES를 테이블로 표시 (강의명/교수/캠퍼스/리뷰수/수정버튼/삭제버튼)\n- CSV 임포트 버튼: Input type=file + 업로드 Button (실제 파싱은 Task 010)\n- 'use client' 클라이언트 컴포넌트로 구현 (폼 인터랙션)\n- (admin)/layout.tsx에 별도 어드민 헤더 레이아웃 적용",
+      "notes": "테이블은 shadcn Table 컴포넌트가 없으므로 Tailwind로 직접 구현 또는 overflow-x-auto 래퍼 사용. app/(admin)/layout.tsx가 이미 존재하는지 확인 후 수정.",
+      "status": "pending",
+      "dependencies": [],
+      "createdAt": "2026-05-01T14:23:44.380Z",
+      "updatedAt": "2026-05-01T14:23:44.380Z",
+      "relatedFiles": [
+        {
+          "path": "app/(admin)/admin/page.tsx",
+          "type": "TO_MODIFY",
+          "description": "어드민 페이지"
+        },
+        {
+          "path": "app/(admin)/layout.tsx",
+          "type": "TO_MODIFY",
+          "description": "어드민 레이아웃"
+        },
+        {
+          "path": "lib/dummy-data.ts",
+          "type": "DEPENDENCY",
+          "description": "더미 강의 데이터"
+        },
+        {
+          "path": "components/ui/select.tsx",
+          "type": "DEPENDENCY",
+          "description": "shadcn Select"
+        },
+        {
+          "path": "components/ui/input.tsx",
+          "type": "DEPENDENCY",
+          "description": "shadcn Input"
+        },
+        {
+          "path": "components/ui/button.tsx",
+          "type": "DEPENDENCY",
+          "description": "shadcn Button"
+        }
+      ],
+      "implementationGuide": "// app/(admin)/layout.tsx 확인 후 어드민 전용 헤더 추가\n// app/(admin)/admin/page.tsx ('use client')\n\n// 섹션 1: 강의 등록 폼\n<form> name/professor Input + Select(캠퍼스) + department Input + Button </form>\n\n// 섹션 2: CSV 임포트\n<Input type='file' accept='.csv' /> <Button>임포트</Button>\n\n// 섹션 3: 강의 관리 테이블\n<table>\n  <thead> 강의명/교수/캠퍼스/리뷰수/액션 </thead>\n  <tbody> DUMMY_COURSES.map -> <tr> </tbody>\n</table>\n// 수정/삭제 버튼은 UI만 (실제 로직은 Task 010)",
+      "verificationCriteria": "/admin 접속 시 강의 등록 폼, CSV 임포트 버튼, DUMMY_COURSES 10개가 표시된 관리 테이블이 렌더링된다.",
+      "analysisResult": "Task 005는 Jukulog 앱의 9개 페이지 UI를 더미 데이터 기반으로 완성하는 작업이다. 기존 컴포넌트(CourseCard, RatingBarChart, StarRatingInput, BottomTabBar)와 shadcn/ui를 재사용하며, 모바일 우선(max-w-[768px]) 설계를 따른다. 서버 컴포넌트를 기본으로 하되 인터랙션이 필요한 부분만 'use client' 클라이언트 컴포넌트로 분리한다. 모든 데이터는 lib/dummy-data.ts의 DUMMY_COURSES, DUMMY_REVIEWS를 사용하며 실제 Supabase 연동은 이후 Task에서 수행한다."
+    }
+  ]
+}
