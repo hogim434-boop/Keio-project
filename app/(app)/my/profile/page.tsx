@@ -20,9 +20,22 @@ export default function ProfilePage() {
 
   return (
     <div className="mx-auto max-w-[768px] px-4 py-6 space-y-6">
-      <h1 className="text-lg font-semibold">프로필 설정</h1>
 
-      <form onSubmit={(e) => e.preventDefault()} className="space-y-4">
+      {/* 페이지 헤더 */}
+      <div className="space-y-0.5">
+        <h1 className="text-lg font-semibold">프로필 설정</h1>
+        <p className="text-sm text-muted-foreground">
+          캠퍼스와 학부 정보를 수정할 수 있습니다
+        </p>
+      </div>
+
+      {/* 구분선 */}
+      <div className="h-px bg-border" />
+
+      {/* 프로필 수정 폼 */}
+      <form onSubmit={(e) => e.preventDefault()} className="space-y-5">
+
+        {/* 캠퍼스 선택 */}
         <div className="space-y-2">
           <Label>캠퍼스</Label>
           <Select value={campus} onValueChange={setCampus}>
@@ -31,14 +44,13 @@ export default function ProfilePage() {
             </SelectTrigger>
             <SelectContent>
               {CAMPUSES.map((c) => (
-                <SelectItem key={c} value={c}>
-                  {c}
-                </SelectItem>
+                <SelectItem key={c} value={c}>{c}</SelectItem>
               ))}
             </SelectContent>
           </Select>
         </div>
 
+        {/* 학부 입력 */}
         <div className="space-y-2">
           <Label htmlFor="department">학부</Label>
           <Input
@@ -49,10 +61,12 @@ export default function ProfilePage() {
           />
         </div>
 
+        {/* 저장 버튼 */}
         <Button type="submit" className="w-full">
           저장
         </Button>
       </form>
+
     </div>
   )
 }
