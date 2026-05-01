@@ -5,8 +5,11 @@ export default function AdminLayout({
 }) {
   return (
     <>
-      <header className="border-b px-4 py-3 text-sm font-medium text-muted-foreground">
-        어드민
+      <header className="sticky top-0 z-50 flex h-14 items-center justify-between border-b bg-white px-4">
+        <span className="text-lg font-bold">塾ログ</span>
+        <span className="text-xs text-muted-foreground font-medium bg-muted px-2 py-0.5 rounded">
+          관리자 패널
+        </span>
       </header>
       <main>{children}</main>
     </>
