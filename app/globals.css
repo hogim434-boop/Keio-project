@@ -123,8 +123,15 @@
   }
   body {
     @apply bg-background text-foreground;
+    max-width: 768px;
+    margin-inline: auto;
+    min-height: 100dvh;
   }
   html {
     @apply font-sans;
   }
+}
+
+@utility pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
 }
