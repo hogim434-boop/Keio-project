@@ -1,7 +1,6 @@
+import { DUMMY_COURSES } from '@/lib/dummy-data'
+import { CoursesClient } from './_components/courses-client'
+
 export default function CoursesPage() {
-  return (
-    <main>
-      <h1>강의 목록 페이지</h1>
-    </main>
-  )
+  return <CoursesClient courses={DUMMY_COURSES} />
 }
