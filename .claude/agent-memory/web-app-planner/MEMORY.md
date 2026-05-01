@@ -1,0 +1,11 @@
+- [User Profile](user_profile.md) — 코딩 초보, Z세대 타겟. 1회성·자랑형 모델은 폐기됨 (2026-04-30)
+- [Project: Star Deed (폐기됨)](project_star_deed.md) — 1회성 자랑형 컨셉, 2026-04-30 폐기. 다시 추천 금지
+- [Project: Pivot to efficiency](project_pivot_to_efficiency.md) — 효율형 웹앱 방향. 1회성·자랑형 가정 제거됨
+- [Project: Efficiency concepts round](project_efficiency_concepts_round.md) — 2026-04-30 5개 컨셉 라운드. TOP2: 구독 정리장 / 누적 더치페이. 다음은 PRD
+- [Project: University round](project_university_round.md) — 2026-05-01 한국 대학생 타겟으로 재라운드. 강자 영역과 빈틈 가설 정리
+- [Project: University round 2](project_university_round2.md) — 2026-04-30 1차 7개 폐기 후 다양 카테고리 15개 라운드. TOP3×3축 정리됨
+- [Project: University round 3](project_university_round3.md) — 2026-04-30 다양 카테고리 15개. 취향질문 3개 대기중
+- [Project: Jokbo Guild deep-dive](project_jokbo_guild_deepdive.md) — 2026-04-30 족보길드 추천(빈틈 명확), 구독N빵 폐기(레드오션). 다음은 검증/PRD/코드 선택
+- [Project: Keio round](project_keio_round.md) — 2026-04-30 게이오 단일학교 기획. Penmark 80% 점유 발견, 풀클론은 어려움. 한국인 유학생 다리 포지션이 현실적 빈틈
+- [Feedback: Tone](feedback_tone.md) — 협업형, 가이드형 톤 선호 (단호한 추천 X)
+- [Feedback: Market research](feedback_market_research.md) — "없다"고 추천할 땐 반드시 WebSearch로 검증하고 쿼리·링크 노출
