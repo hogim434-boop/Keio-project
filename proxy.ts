@@ -26,7 +26,19 @@ export async function proxy(request: NextRequest) {
   )
 
   // 세션 갱신 (이 줄을 지우면 안 됩니다)
-  await supabase.auth.getUser()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  const pathname = request.nextUrl.pathname
+  const protectedPaths = ['/courses', '/search', '/my', '/admin']
+  const publicOnlyPaths = ['/login', '/signup']
+
+  if (!user && protectedPaths.some(p => pathname.startsWith(p))) {
+    return NextResponse.redirect(new URL('/login', request.url))
+  }
+
+  if (user && publicOnlyPaths.some(p => pathname.startsWith(p))) {
+    return NextResponse.redirect(new URL('/courses', request.url))
+  }
 
   return supabaseResponse
 }
