@@ -425,10 +425,10 @@
       "name": "Task 005-1: 랜딩 페이지 UI 완성",
       "description": "app/(public)/page.tsx를 서비스 소개 히어로 섹션, 인기 강의 미리보기 카드 3개, 검색창 UI로 완성한다.\n\n수락 기준:\n- 히어로 섹션: 서비스명(塾ログ), 소개 문구, /login 또는 /signup으로 이동하는 CTA 버튼\n- 인기 강의 카드: DUMMY_COURSES에서 avgRating 상위 3개를 CourseCard 컴포넌트로 렌더링\n- 검색창 UI: Input 컴포넌트로 구현, 클릭 시 /search 이동 (실제 검색 기능은 Task 009)\n- 모바일 레이아웃: mx-auto max-w-[768px] px-4 적용\n- 서버 컴포넌트로 구현 (인터랙션 없음)",
       "notes": "Input에 readOnly + pointer-events-none 처리하여 클릭 시 /search로 이동하는 Link로 감싸기. 서버 컴포넌트이므로 'use client' 불필요.",
-      "status": "in_progress",
+      "status": "completed",
       "dependencies": [],
       "createdAt": "2026-05-01T14:23:44.380Z",
-      "updatedAt": "2026-05-01T14:24:27.401Z",
+      "updatedAt": "2026-05-01T14:34:05.414Z",
       "relatedFiles": [
         {
           "path": "app/(public)/page.tsx",
@@ -458,17 +458,19 @@
       ],
       "implementationGuide": "// app/(public)/page.tsx\nimport DUMMY_COURSES -> avgRating 내림차순 정렬 후 slice(0,3)\nimport CourseCard, Button, Input\n\n// 구조\n<div className='mx-auto max-w-[768px] px-4 py-8'>\n  <section> // 히어로\n    <h1>塾ログ</h1>\n    <p>게이오 재학생 강의 리뷰</p>\n    <Button asChild><Link href='/signup'>시작하기</Link></Button>\n  </section>\n  <section> // 검색창\n    <Link href='/search'><Input placeholder='강의명·교수명으로 검색' readOnly /></Link>\n  </section>\n  <section> // 인기 강의\n    <h2>인기 강의</h2>\n    {topCourses.map(course => <CourseCard key={course.id} {...course} />)}\n  </section>\n</div>",
       "verificationCriteria": "브라우저에서 / 접속 시 히어로 섹션, 검색창, 인기 강의 카드 3개가 렌더링되며, 회원가입 버튼 클릭 시 /signup으로 이동한다.",
-      "analysisResult": "Task 005는 Jukulog 앱의 9개 페이지 UI를 더미 데이터 기반으로 완성하는 작업이다. 기존 컴포넌트(CourseCard, RatingBarChart, StarRatingInput, BottomTabBar)와 shadcn/ui를 재사용하며, 모바일 우선(max-w-[768px]) 설계를 따른다. 서버 컴포넌트를 기본으로 하되 인터랙션이 필요한 부분만 'use client' 클라이언트 컴포넌트로 분리한다. 모든 데이터는 lib/dummy-data.ts의 DUMMY_COURSES, DUMMY_REVIEWS를 사용하며 실제 Supabase 연동은 이후 Task에서 수행한다."
+      "analysisResult": "Task 005는 Jukulog 앱의 9개 페이지 UI를 더미 데이터 기반으로 완성하는 작업이다. 기존 컴포넌트(CourseCard, RatingBarChart, StarRatingInput, BottomTabBar)와 shadcn/ui를 재사용하며, 모바일 우선(max-w-[768px]) 설계를 따른다. 서버 컴포넌트를 기본으로 하되 인터랙션이 필요한 부분만 'use client' 클라이언트 컴포넌트로 분리한다. 모든 데이터는 lib/dummy-data.ts의 DUMMY_COURSES, DUMMY_REVIEWS를 사용하며 실제 Supabase 연동은 이후 Task에서 수행한다.",
+      "summary": "랜딩 페이지 구현 완료. 히어로 섹션(塾ログ 제목, 소개 문구, 시작하기/로그인 CTA), 검색창(Link로 /search 연결), 인기 강의 상위 3개 CourseCard 렌더링. 서버 컴포넌트로 구현하여 HTTP 200 정상 응답 확인.",
+      "completedAt": "2026-05-01T14:34:05.413Z"
     },
     {
       "id": "137e53e0-b6b5-4522-b604-f6eb869236b6",
       "name": "Task 005-2: 로그인 및 회원가입 페이지 UI 완성",
       "description": "app/(public)/login/page.tsx와 app/(public)/signup/page.tsx를 폼 UI로 완성한다.\n\n수락 기준:\n- 로그인: 이메일 Input + 비밀번호 Input + 로그인 Button + 회원가입 링크\n- 회원가입: 이메일 + 비밀번호 + 캠퍼스(Select: 三田/日吉/SFC) + 학부(Input) + 가입 Button + 로그인 링크\n- 양쪽 모두 shadcn Form/Label/Input/Button/Select 사용\n- 'use client' 클라이언트 컴포넌트로 구현\n- 중앙 정렬 카드 레이아웃 (max-w-sm mx-auto)",
       "notes": "실제 인증 로직은 Task 006에서 구현. 이 단계에서는 UI/레이아웃만 완성. onSubmit은 preventDefault()만 처리.",
-      "status": "pending",
+      "status": "completed",
       "dependencies": [],
       "createdAt": "2026-05-01T14:23:44.380Z",
-      "updatedAt": "2026-05-01T14:23:44.380Z",
+      "updatedAt": "2026-05-01T14:34:21.616Z",
       "relatedFiles": [
         {
           "path": "app/(public)/login/page.tsx",
@@ -503,17 +505,19 @@
       ],
       "implementationGuide": "// app/(public)/login/page.tsx - 'use client'\nimport { useState } from 'react'\nimport Label, Input, Button, Link\n\n// 구조\n<div className='mx-auto max-w-sm px-4 py-12'>\n  <h1>로그인</h1>\n  <form>\n    <Label>메일 주소</Label><Input type='email' />\n    <Label>비밀번호</Label><Input type='password' />\n    <Button type='submit'>로그인</Button>\n  </form>\n  <Link href='/signup'>회원가입</Link>\n</div>\n\n// app/(public)/signup/page.tsx - 'use client'\n// Select 컴포넌트로 캠퍼스 선택: 三田/日吉/SFC\n// 추가 필드: 학부명 Input",
       "verificationCriteria": "/login 접속 시 이메일+비밀번호 폼이 보이고, /signup 접속 시 캠퍼스 Select를 포함한 회원가입 폼이 렌더링된다.",
-      "analysisResult": "Task 005는 Jukulog 앱의 9개 페이지 UI를 더미 데이터 기반으로 완성하는 작업이다. 기존 컴포넌트(CourseCard, RatingBarChart, StarRatingInput, BottomTabBar)와 shadcn/ui를 재사용하며, 모바일 우선(max-w-[768px]) 설계를 따른다. 서버 컴포넌트를 기본으로 하되 인터랙션이 필요한 부분만 'use client' 클라이언트 컴포넌트로 분리한다. 모든 데이터는 lib/dummy-data.ts의 DUMMY_COURSES, DUMMY_REVIEWS를 사용하며 실제 Supabase 연동은 이후 Task에서 수행한다."
+      "analysisResult": "Task 005는 Jukulog 앱의 9개 페이지 UI를 더미 데이터 기반으로 완성하는 작업이다. 기존 컴포넌트(CourseCard, RatingBarChart, StarRatingInput, BottomTabBar)와 shadcn/ui를 재사용하며, 모바일 우선(max-w-[768px]) 설계를 따른다. 서버 컴포넌트를 기본으로 하되 인터랙션이 필요한 부분만 'use client' 클라이언트 컴포넌트로 분리한다. 모든 데이터는 lib/dummy-data.ts의 DUMMY_COURSES, DUMMY_REVIEWS를 사용하며 실제 Supabase 연동은 이후 Task에서 수행한다.",
+      "summary": "로그인/회원가입 페이지 구현 완료. login: 이메일+비밀번호 폼+회원가입 링크, signup: 이메일+비밀번호+캠퍼스 Select(三田/日吉/SFC)+학부 Input+로그인 링크. use client 클라이언트 컴포넌트, HTTP 200 응답 확인.",
+      "completedAt": "2026-05-01T14:34:21.607Z"
     },
     {
       "id": "3a6e8c02-7316-42fa-9b3a-66342cb62ad2",
       "name": "Task 005-3: 강의 목록 페이지 UI 완성",
       "description": "app/(app)/courses/page.tsx를 캠퍼스 필터 칩 + 강의 카드 목록 UI로 완성한다.\n\n수락 기준:\n- 상단 캠퍼스 필터: 全て/三田/日吉/SFC 4개 탭을 가로 스크롤 칩으로 표시\n- 선택된 캠퍼스에 따라 DUMMY_COURSES 필터링 후 CourseCard 목록 렌더링\n- 필터 상태 관리: CoursesClient 'use client' 컴포넌트로 분리\n- page.tsx는 서버 컴포넌트로 유지, CoursesClient에 courses 데이터 props로 전달\n- 하단 BottomTabBar는 (app)/layout.tsx에 이미 포함됨 (중복 추가 불필요)",
       "notes": "_components 폴더 패턴 사용. CoursesClient는 app/(app)/courses/_components/courses-client.tsx에 생성.",
-      "status": "pending",
+      "status": "completed",
       "dependencies": [],
       "createdAt": "2026-05-01T14:23:44.380Z",
-      "updatedAt": "2026-05-01T14:23:44.380Z",
+      "updatedAt": "2026-05-01T14:34:30.464Z",
       "relatedFiles": [
         {
           "path": "app/(app)/courses/page.tsx",
@@ -538,21 +542,23 @@
       ],
       "implementationGuide": "// app/(app)/courses/page.tsx (서버 컴포넌트)\nimport CoursesClient from './_components/courses-client'\nimport { DUMMY_COURSES } from '@/lib/dummy-data'\nexport default function CoursesPage() {\n  return <CoursesClient courses={DUMMY_COURSES} />\n}\n\n// app/(app)/courses/_components/courses-client.tsx ('use client')\nconst CAMPUSES = ['全て', '三田', '日吉', 'SFC']\nconst [selected, setSelected] = useState('全て')\nconst filtered = selected === '全て' ? courses : courses.filter(c => c.campus === selected)\n// 필터 칩: overflow-x-auto flex gap-2, 각 칩은 Button variant\n// CourseCard 목록: space-y-3",
       "verificationCriteria": "/courses 접속(로그인 필요) 시 캠퍼스 필터 칩과 강의 목록이 렌더링되고, 캠퍼스 필터 클릭 시 목록이 필터링된다.",
-      "analysisResult": "Task 005는 Jukulog 앱의 9개 페이지 UI를 더미 데이터 기반으로 완성하는 작업이다. 기존 컴포넌트(CourseCard, RatingBarChart, StarRatingInput, BottomTabBar)와 shadcn/ui를 재사용하며, 모바일 우선(max-w-[768px]) 설계를 따른다. 서버 컴포넌트를 기본으로 하되 인터랙션이 필요한 부분만 'use client' 클라이언트 컴포넌트로 분리한다. 모든 데이터는 lib/dummy-data.ts의 DUMMY_COURSES, DUMMY_REVIEWS를 사용하며 실제 Supabase 연동은 이후 Task에서 수행한다."
+      "analysisResult": "Task 005는 Jukulog 앱의 9개 페이지 UI를 더미 데이터 기반으로 완성하는 작업이다. 기존 컴포넌트(CourseCard, RatingBarChart, StarRatingInput, BottomTabBar)와 shadcn/ui를 재사용하며, 모바일 우선(max-w-[768px]) 설계를 따른다. 서버 컴포넌트를 기본으로 하되 인터랙션이 필요한 부분만 'use client' 클라이언트 컴포넌트로 분리한다. 모든 데이터는 lib/dummy-data.ts의 DUMMY_COURSES, DUMMY_REVIEWS를 사용하며 실제 Supabase 연동은 이후 Task에서 수행한다.",
+      "summary": "강의 목록 페이지 구현 완료. page.tsx(서버)→CoursesClient(use client) 패턴, 全て/三田/日吉/SFC 필터 칩, DUMMY_COURSES CourseCard 목록. _components 폴더 분리. proxy.ts 인증 보호로 307 리다이렉트 정상 동작.",
+      "completedAt": "2026-05-01T14:34:30.463Z"
     },
     {
       "id": "3f18785d-5c7c-49ae-b63f-0ae3bed070af",
       "name": "Task 005-4: 강의 상세 페이지 UI 완성",
       "description": "app/(app)/courses/[id]/page.tsx를 강의 상세 정보, 5축 바 차트, 리뷰 목록, FAB 버튼으로 완성한다.\n\n수락 기준:\n- 강의 기본 정보: 강의명, 교수명, 캠퍼스, 학부 표시\n- RatingBarChart로 5축 평점 시각화\n- 스타일 태그: 더미 태그 3~4개 (板書あり, 少人数, 自由参加 등) Badge 형태로 표시\n- 리뷰 목록: getReviewsByCourseId(id)로 가져온 리뷰들을 카드 형태로 표시\n- FAB 버튼: 화면 우하단 fixed, 클릭 시 리뷰 작성 Sheet 오픈\n- ReviewSheet: StarRatingInput(5축) + Textarea(코멘트) + 제출 Button\n- DUMMY_COURSES에 없는 id면 notFound() 호출",
       "notes": "FAB 버튼 위치: bottom-20(BottomTabBar 56px + 여유)이고 right-4. notFound()는 next/navigation에서 import.",
-      "status": "pending",
+      "status": "completed",
       "dependencies": [
         {
           "taskId": "3a6e8c02-7316-42fa-9b3a-66342cb62ad2"
         }
       ],
       "createdAt": "2026-05-01T14:23:44.380Z",
-      "updatedAt": "2026-05-01T14:23:44.380Z",
+      "updatedAt": "2026-05-01T14:34:50.158Z",
       "relatedFiles": [
         {
           "path": "app/(app)/courses/[id]/page.tsx",
@@ -592,17 +598,19 @@
       ],
       "implementationGuide": "// app/(app)/courses/[id]/page.tsx (서버 컴포넌트)\nimport { DUMMY_COURSES, getReviewsByCourseId } from '@/lib/dummy-data'\nimport { notFound } from 'next/navigation'\nimport ReviewSheet from './_components/review-sheet'\nconst course = DUMMY_COURSES.find(c => c.id === params.id)\nif (!course) notFound()\nconst reviews = getReviewsByCourseId(params.id)\n\n// 레이아웃:\n// 1. 강의 헤더 (이름, 교수, 캠퍼스 배지)\n// 2. RatingBarChart 섹션\n// 3. 스타일 태그 섹션 (더미 배열)\n// 4. 리뷰 목록 섹션\n// 5. ReviewSheet 컴포넌트 (FAB + Sheet)\n\n// app/(app)/courses/[id]/_components/review-sheet.tsx ('use client')\n// Sheet trigger: Button fixed bottom-20 right-4\n// Sheet content: 5축별 StarRatingInput + Textarea + 제출 Button\n// 상태: ratings(5개) + comment useState",
       "verificationCriteria": "/courses/course-1 접속 시 강의 정보, 5축 바 차트, 리뷰 목록이 표시되고, FAB 버튼 클릭 시 리뷰 작성 Sheet가 열린다.",
-      "analysisResult": "Task 005는 Jukulog 앱의 9개 페이지 UI를 더미 데이터 기반으로 완성하는 작업이다. 기존 컴포넌트(CourseCard, RatingBarChart, StarRatingInput, BottomTabBar)와 shadcn/ui를 재사용하며, 모바일 우선(max-w-[768px]) 설계를 따른다. 서버 컴포넌트를 기본으로 하되 인터랙션이 필요한 부분만 'use client' 클라이언트 컴포넌트로 분리한다. 모든 데이터는 lib/dummy-data.ts의 DUMMY_COURSES, DUMMY_REVIEWS를 사용하며 실제 Supabase 연동은 이후 Task에서 수행한다."
+      "analysisResult": "Task 005는 Jukulog 앱의 9개 페이지 UI를 더미 데이터 기반으로 완성하는 작업이다. 기존 컴포넌트(CourseCard, RatingBarChart, StarRatingInput, BottomTabBar)와 shadcn/ui를 재사용하며, 모바일 우선(max-w-[768px]) 설계를 따른다. 서버 컴포넌트를 기본으로 하되 인터랙션이 필요한 부분만 'use client' 클라이언트 컴포넌트로 분리한다. 모든 데이터는 lib/dummy-data.ts의 DUMMY_COURSES, DUMMY_REVIEWS를 사용하며 실제 Supabase 연동은 이후 Task에서 수행한다.",
+      "summary": "강의 상세 페이지 구현 완료. 강의 기본 정보, RatingBarChart 5축 시각화, 스타일 태그(板書あり 등 4개), 리뷰 목록(getReviewsByCourseId), FAB 버튼(bottom-20 right-4), ReviewSheet(5축 StarRatingInput + Textarea + 제출). notFound() 처리 포함. TypeScript 오류 없음.",
+      "completedAt": "2026-05-01T14:34:50.155Z"
     },
     {
       "id": "4b8dae7a-8810-4872-b83b-890c53af550e",
       "name": "Task 005-5: 검색 페이지 UI 완성",
       "description": "app/(app)/search/page.tsx를 자동 포커스 검색창 + 실시간 필터 결과 리스트 UI로 완성한다.\n\n수락 기준:\n- 페이지 진입 시 검색창 자동 포커스\n- 검색어 입력에 따라 DUMMY_COURSES에서 강의명·교수명 포함 필터링\n- 필터된 결과를 CourseCard 목록으로 표시\n- 검색어 없을 때: 전체 DUMMY_COURSES 표시 또는 '검색어를 입력하세요' 안내\n- 빈 결과 상태: '검색 결과가 없습니다' 메시지\n- SearchClient 'use client' 컴포넌트로 전체 구현",
       "notes": "일본어 IME 입력 처리: onChange 이벤트 사용 (onInput 아님). 디바운스는 이 단계에서 생략 가능 (더미 데이터라 성능 이슈 없음).",
-      "status": "pending",
+      "status": "completed",
       "dependencies": [],
       "createdAt": "2026-05-01T14:23:44.380Z",
-      "updatedAt": "2026-05-01T14:23:44.380Z",
+      "updatedAt": "2026-05-01T14:35:04.196Z",
       "relatedFiles": [
         {
           "path": "app/(app)/search/page.tsx",
@@ -627,17 +635,19 @@
       ],
       "implementationGuide": "// app/(app)/search/page.tsx (서버 컴포넌트 wrapper)\nimport SearchClient from './_components/search-client'\nexport default function SearchPage() {\n  return <SearchClient courses={DUMMY_COURSES} />\n}\n\n// app/(app)/search/_components/search-client.tsx ('use client')\nconst inputRef = useRef<HTMLInputElement>(null)\nuseEffect(() => { inputRef.current?.focus() }, [])\nconst [query, setQuery] = useState('')\nconst results = query ? courses.filter(c =>\n  c.name.includes(query) || c.professor.includes(query)\n) : courses\n\n// UI: Input(ref=inputRef) + CourseCard 목록 또는 빈 상태 메시지",
       "verificationCriteria": "/search 접속 시 Input에 자동 포커스되고, 검색어 입력 시 강의명·교수명 기준으로 CourseCard 목록이 실시간 필터링된다.",
-      "analysisResult": "Task 005는 Jukulog 앱의 9개 페이지 UI를 더미 데이터 기반으로 완성하는 작업이다. 기존 컴포넌트(CourseCard, RatingBarChart, StarRatingInput, BottomTabBar)와 shadcn/ui를 재사용하며, 모바일 우선(max-w-[768px]) 설계를 따른다. 서버 컴포넌트를 기본으로 하되 인터랙션이 필요한 부분만 'use client' 클라이언트 컴포넌트로 분리한다. 모든 데이터는 lib/dummy-data.ts의 DUMMY_COURSES, DUMMY_REVIEWS를 사용하며 실제 Supabase 연동은 이후 Task에서 수행한다."
+      "analysisResult": "Task 005는 Jukulog 앱의 9개 페이지 UI를 더미 데이터 기반으로 완성하는 작업이다. 기존 컴포넌트(CourseCard, RatingBarChart, StarRatingInput, BottomTabBar)와 shadcn/ui를 재사용하며, 모바일 우선(max-w-[768px]) 설계를 따른다. 서버 컴포넌트를 기본으로 하되 인터랙션이 필요한 부분만 'use client' 클라이언트 컴포넌트로 분리한다. 모든 데이터는 lib/dummy-data.ts의 DUMMY_COURSES, DUMMY_REVIEWS를 사용하며 실제 Supabase 연동은 이후 Task에서 수행한다.",
+      "summary": "검색 페이지 구현 완료. page.tsx(서버)→SearchClient(use client) 패턴. useRef+useEffect로 자동 포커스, onChange로 강의명·교수명 실시간 필터링, 빈 결과 메시지, Search 아이콘 포함 Input. TypeScript 오류 없음.",
+      "completedAt": "2026-05-01T14:35:04.195Z"
     },
     {
       "id": "5cf2e0f3-435f-457a-bcd2-3d3015ce0a34",
       "name": "Task 005-6: 마이페이지 및 프로필 설정 페이지 UI 완성",
       "description": "app/(app)/my/page.tsx와 app/(app)/my/profile/page.tsx UI를 완성한다.\n\n수락 기준:\n[마이페이지]\n- 더미 유저 정보: 이름(匿名ユーザー), 캠퍼스(三田), 학부(経済学部) 표시\n- 내 리뷰 목록: DUMMY_REVIEWS에서 courseId가 course-1인 리뷰 2개를 카드로 표시\n- 로그아웃 버튼 (클릭 이벤트만, 실제 로직은 Task 006)\n- 프로필 설정 이동 링크\n\n[프로필 설정 페이지]\n- 캠퍼스 Select (三田/日吉/SFC) + 학부 Input + 저장 Button\n- 'use client' 컴포넌트로 구현",
       "notes": "로그아웃 버튼은 LogoutButton.tsx 클라이언트 컴포넌트로 분리하면 마이페이지를 서버 컴포넌트로 유지 가능.",
-      "status": "pending",
+      "status": "completed",
       "dependencies": [],
       "createdAt": "2026-05-01T14:23:44.380Z",
-      "updatedAt": "2026-05-01T14:23:44.380Z",
+      "updatedAt": "2026-05-01T14:35:11.847Z",
       "relatedFiles": [
         {
           "path": "app/(app)/my/page.tsx",
@@ -667,17 +677,19 @@
       ],
       "implementationGuide": "// app/(app)/my/page.tsx\n// 더미 유저 정보 객체 정의\n// DUMMY_REVIEWS.filter(r => r.courseId === 'course-1') 으로 내 리뷰 표시\n// 리뷰 카드: 날짜, 코멘트, 별점(overall) 표시\n// 로그아웃 Button: variant='outline' + 'use client' 필요 (onClick)\n\n// app/(app)/my/profile/page.tsx ('use client')\n// Select로 캠퍼스, Input으로 학부 수정\n// 저장 Button (실제 저장 로직은 Task 006)\n\n// 마이페이지에서 onClick이 필요하므로 'use client' 처리 또는\n// LogoutButton 별도 클라이언트 컴포넌트로 분리",
       "verificationCriteria": "/my 접속 시 더미 유저 정보와 리뷰 목록이 표시되고, /my/profile 접속 시 캠퍼스/학부 수정 폼이 렌더링된다.",
-      "analysisResult": "Task 005는 Jukulog 앱의 9개 페이지 UI를 더미 데이터 기반으로 완성하는 작업이다. 기존 컴포넌트(CourseCard, RatingBarChart, StarRatingInput, BottomTabBar)와 shadcn/ui를 재사용하며, 모바일 우선(max-w-[768px]) 설계를 따른다. 서버 컴포넌트를 기본으로 하되 인터랙션이 필요한 부분만 'use client' 클라이언트 컴포넌트로 분리한다. 모든 데이터는 lib/dummy-data.ts의 DUMMY_COURSES, DUMMY_REVIEWS를 사용하며 실제 Supabase 연동은 이후 Task에서 수행한다."
+      "analysisResult": "Task 005는 Jukulog 앱의 9개 페이지 UI를 더미 데이터 기반으로 완성하는 작업이다. 기존 컴포넌트(CourseCard, RatingBarChart, StarRatingInput, BottomTabBar)와 shadcn/ui를 재사용하며, 모바일 우선(max-w-[768px]) 설계를 따른다. 서버 컴포넌트를 기본으로 하되 인터랙션이 필요한 부분만 'use client' 클라이언트 컴포넌트로 분리한다. 모든 데이터는 lib/dummy-data.ts의 DUMMY_COURSES, DUMMY_REVIEWS를 사용하며 실제 Supabase 연동은 이후 Task에서 수행한다.",
+      "summary": "마이페이지/프로필 설정 구현 완료. 마이페이지: 더미 유저(匿名ユーザー/三田/経済学部), course-1 리뷰 2개, LogoutButton 클라이언트 분리로 서버 컴포넌트 유지. 프로필 설정: 캠퍼스 Select+학부 Input+저장 Button. TypeScript 오류 없음.",
+      "completedAt": "2026-05-01T14:35:11.846Z"
     },
     {
       "id": "09725301-2fba-4028-8128-9a59ceb55431",
       "name": "Task 005-7: 어드민 페이지 UI 완성",
       "description": "app/(admin)/admin/page.tsx를 강의 등록 폼 + 관리 테이블 + CSV 임포트 버튼 UI로 완성한다.\n\n수락 기준:\n- 페이지 상단: 어드민 헤더 (로고 + '관리자 패널' 표시)\n- 강의 등록 폼: 강의명/교수명/캠퍼스(Select)/학부 Input + 등록 Button\n- 강의 관리 테이블: DUMMY_COURSES를 테이블로 표시 (강의명/교수/캠퍼스/리뷰수/수정버튼/삭제버튼)\n- CSV 임포트 버튼: Input type=file + 업로드 Button (실제 파싱은 Task 010)\n- 'use client' 클라이언트 컴포넌트로 구현 (폼 인터랙션)\n- (admin)/layout.tsx에 별도 어드민 헤더 레이아웃 적용",
       "notes": "테이블은 shadcn Table 컴포넌트가 없으므로 Tailwind로 직접 구현 또는 overflow-x-auto 래퍼 사용. app/(admin)/layout.tsx가 이미 존재하는지 확인 후 수정.",
-      "status": "pending",
+      "status": "completed",
       "dependencies": [],
       "createdAt": "2026-05-01T14:23:44.380Z",
-      "updatedAt": "2026-05-01T14:23:44.380Z",
+      "updatedAt": "2026-05-01T14:35:32.878Z",
       "relatedFiles": [
         {
           "path": "app/(admin)/admin/page.tsx",
@@ -712,7 +724,9 @@
       ],
       "implementationGuide": "// app/(admin)/layout.tsx 확인 후 어드민 전용 헤더 추가\n// app/(admin)/admin/page.tsx ('use client')\n\n// 섹션 1: 강의 등록 폼\n<form> name/professor Input + Select(캠퍼스) + department Input + Button </form>\n\n// 섹션 2: CSV 임포트\n<Input type='file' accept='.csv' /> <Button>임포트</Button>\n\n// 섹션 3: 강의 관리 테이블\n<table>\n  <thead> 강의명/교수/캠퍼스/리뷰수/액션 </thead>\n  <tbody> DUMMY_COURSES.map -> <tr> </tbody>\n</table>\n// 수정/삭제 버튼은 UI만 (실제 로직은 Task 010)",
       "verificationCriteria": "/admin 접속 시 강의 등록 폼, CSV 임포트 버튼, DUMMY_COURSES 10개가 표시된 관리 테이블이 렌더링된다.",
-      "analysisResult": "Task 005는 Jukulog 앱의 9개 페이지 UI를 더미 데이터 기반으로 완성하는 작업이다. 기존 컴포넌트(CourseCard, RatingBarChart, StarRatingInput, BottomTabBar)와 shadcn/ui를 재사용하며, 모바일 우선(max-w-[768px]) 설계를 따른다. 서버 컴포넌트를 기본으로 하되 인터랙션이 필요한 부분만 'use client' 클라이언트 컴포넌트로 분리한다. 모든 데이터는 lib/dummy-data.ts의 DUMMY_COURSES, DUMMY_REVIEWS를 사용하며 실제 Supabase 연동은 이후 Task에서 수행한다."
+      "analysisResult": "Task 005는 Jukulog 앱의 9개 페이지 UI를 더미 데이터 기반으로 완성하는 작업이다. 기존 컴포넌트(CourseCard, RatingBarChart, StarRatingInput, BottomTabBar)와 shadcn/ui를 재사용하며, 모바일 우선(max-w-[768px]) 설계를 따른다. 서버 컴포넌트를 기본으로 하되 인터랙션이 필요한 부분만 'use client' 클라이언트 컴포넌트로 분리한다. 모든 데이터는 lib/dummy-data.ts의 DUMMY_COURSES, DUMMY_REVIEWS를 사용하며 실제 Supabase 연동은 이후 Task에서 수행한다.",
+      "summary": "어드민 페이지 구현 완료. layout.tsx에 塾ログ+관리자 패널 헤더 추가. admin/page.tsx: 강의 등록 폼(강의명/교수/캠퍼스 Select/학부), CSV Input[type=file]+업로드 버튼, DUMMY_COURSES 10개 관리 테이블(수정/삭제 버튼 UI). use client. TypeScript 오류 없음.",
+      "completedAt": "2026-05-01T14:35:32.877Z"
     }
   ]
 }
