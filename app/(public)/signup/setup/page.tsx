@@ -110,6 +110,14 @@ export default function SetupPage() {
       setErrorMsg('캠퍼스를 선택해 주세요')
       return
     }
+    if (!grade) {
+      setErrorMsg('학년을 선택해 주세요')
+      return
+    }
+    if (!department.trim()) {
+      setErrorMsg('학부를 입력해 주세요')
+      return
+    }
 
     setSubmitting(true)
     const supabase = createClient()
