@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Home, Search, User, MessageSquare } from 'lucide-react'
+import { motion, useReducedMotion } from 'framer-motion'
 import { cn } from '@/lib/utils'
 
 // 하단 탭 목록 (4탭: 강의 · 검색 · 커뮤니티 · 마이)
@@ -15,9 +16,11 @@ const TABS = [
 
 export function BottomTabBar() {
   const pathname = usePathname()
+  // 사용자가 시스템 설정에서 "모션 줄이기"를 활성화한 경우 애니메이션 비활성화
+  const shouldReduce = useReducedMotion()
 
   return (
-    /* 하단 고정 내비게이션 바 */
+    /* 하단 고정 내비게이션 바 — body의 max-w-[768px] 제약 안에서 fixed 배치 */
     <nav
       className="pb-safe fixed bottom-0 left-1/2 w-full max-w-[768px] -translate-x-1/2 border-t bg-background/95 backdrop-blur-sm"
       aria-label="하단 탭 내비게이션"
@@ -29,21 +32,46 @@ export function BottomTabBar() {
             <Link
               key={href}
               href={href}
-              className="flex flex-1 flex-col items-center justify-center gap-0.5 min-h-[44px] transition-opacity active:opacity-60"
+              // relative — 활성 인디케이터(absolute 요소)의 기준점
+              className="relative flex flex-1 flex-col items-center justify-center gap-1 min-h-[44px] transition-opacity active:opacity-60"
               aria-label={label}
               aria-current={isActive ? 'page' : undefined}
             >
-              <Icon
-                size={22}
-                className={cn(
-                  'transition-colors',
-                  isActive ? 'text-foreground' : 'text-muted-foreground'
-                )}
-                strokeWidth={isActive ? 2.5 : 1.8}
-              />
+              {/* 활성 탭 슬라이딩 인디케이터 — 상단에 얇은 바 형태로 표시 */}
+              {isActive && (
+                <motion.span
+                  // layoutId를 통해 탭 전환 시 인디케이터가 슬라이드 이동
+                  layoutId="tab-indicator"
+                  className="absolute inset-x-2 top-0 h-0.5 rounded-full bg-foreground"
+                  // 스프링 물리 기반 전환 — 자연스러운 슬라이딩 느낌
+                  transition={
+                    shouldReduce
+                      ? { duration: 0 }
+                      : { type: 'spring', stiffness: 450, damping: 30 }
+                  }
+                />
+              )}
+
+              {/* 아이콘 — whileTap으로 탭 시 살짝 수축하는 마이크로인터랙션 */}
+              <motion.div
+                whileTap={shouldReduce ? {} : { scale: 0.82 }}
+                transition={{ duration: 0.15 }}
+              >
+                <Icon
+                  size={22}
+                  className={cn(
+                    'transition-colors',
+                    isActive ? 'text-foreground' : 'text-muted-foreground'
+                  )}
+                  // 활성 탭은 굵게, 비활성은 조금 얇게
+                  strokeWidth={isActive ? 2.5 : 2}
+                />
+              </motion.div>
+
+              {/* 탭 레이블 — text-xs로 가독성 향상 */}
               <span
                 className={cn(
-                  'text-[10px] transition-colors',
+                  'text-xs transition-colors',
                   isActive ? 'text-foreground font-semibold' : 'text-muted-foreground'
                 )}
               >
