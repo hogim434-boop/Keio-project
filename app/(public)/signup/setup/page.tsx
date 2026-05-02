@@ -138,7 +138,8 @@ export default function SetupPage() {
       return
     }
 
-    router.replace('/courses')
+    await supabase.auth.signOut()
+    router.replace('/login')
   }
 
   // 세션 확인 중 로딩 스피너
