@@ -81,14 +81,18 @@ export default function LoginPage() {
     setGoogleLoading(true)
     setErrorMsg('')
     const supabase = createClient()
-    await supabase.auth.signInWithOAuth({
+    const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
         redirectTo: `${window.location.origin}/auth/callback`,
         queryParams: { hd: 'keio.jp' },
       },
     })
-    // OAuth 리다이렉트 후 실행되지 않음
+    // 실패 시에만 도달 (성공하면 리다이렉트로 페이지를 떠남)
+    if (error) {
+      setErrorMsg('Google 로그인 중 오류가 발생했습니다. 다시 시도해 주세요')
+      setGoogleLoading(false)
+    }
   }
 
   return (
