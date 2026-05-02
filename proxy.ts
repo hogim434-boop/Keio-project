@@ -36,7 +36,10 @@ export async function proxy(request: NextRequest) {
   const isSetupPath = pathname === '/signup/setup' || pathname.startsWith('/signup/setup/')
   const isLoginPath = pathname === '/login'
   const isSignupPath = pathname === '/signup' && !isSetupPath
-  const protectedPaths = ['/my']
+
+  // 공개 경로 화이트리스트 — 나열된 경로 외에는 모두 로그인 필요
+  const PUBLIC_PATHS = ['/login', '/signup', '/auth/']
+  const isPublicPath = PUBLIC_PATHS.some((p) => pathname.startsWith(p))
 
   if (user) {
     // Google OAuth로 로그인했지만 비밀번호를 아직 설정하지 않은 사용자
@@ -63,8 +66,8 @@ export async function proxy(request: NextRequest) {
     if (isSetupPath) {
       return NextResponse.redirect(new URL('/signup', request.url))
     }
-    // 보호된 경로 접근 → 로그인으로
-    if (protectedPaths.some((p) => pathname.startsWith(p))) {
+    // 공개 경로 외 모든 경로 → 로그인으로
+    if (!isPublicPath) {
       return NextResponse.redirect(new URL('/login', request.url))
     }
   }
