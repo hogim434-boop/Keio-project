@@ -68,6 +68,7 @@ export default function SetupPage() {
   const [campus, setCampus] = useState('')
   const [grade, setGrade] = useState('')
   const [department, setDepartment] = useState('')
+  const [nickname, setNickname] = useState('')
   const [errorMsg, setErrorMsg] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [initializing, setInitializing] = useState(true)
@@ -106,6 +107,10 @@ export default function SetupPage() {
       setErrorMsg('비밀번호가 일치하지 않습니다')
       return
     }
+    if (!nickname.trim()) {
+      setErrorMsg('닉네임을 입력해 주세요')
+      return
+    }
     if (!campus) {
       setErrorMsg('캠퍼스를 선택해 주세요')
       return
@@ -126,6 +131,7 @@ export default function SetupPage() {
       password,
       data: {
         password_set: true,
+        nickname,
         campus,
         grade,
         department,
@@ -189,6 +195,19 @@ export default function SetupPage() {
               <CheckCircle2 size={16} className="shrink-0 text-green-500" />
               <span className="truncate text-sm font-medium">{verifiedEmail}</span>
             </div>
+          </motion.div>
+
+          {/* 닉네임 설정 */}
+          <motion.div variants={shouldReduce ? {} : field} className="space-y-2">
+            <Label htmlFor="nickname">닉네임</Label>
+            <Input
+              id="nickname"
+              placeholder="앱에서 표시될 이름"
+              value={nickname}
+              onChange={(e) => setNickname(e.target.value)}
+              autoComplete="nickname"
+              className="rounded-full bg-muted border-0 h-12 px-5 focus-visible:ring-1 focus-visible:ring-ring"
+            />
           </motion.div>
 
           {/* 비밀번호 설정 */}
