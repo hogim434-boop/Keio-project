@@ -2,7 +2,7 @@
   "mcpServers": {
     "supabase": {
       "type": "http",
-      "url": "https://mcp.supabase.com/mcp?project_ref=ajzywercxjkafpxnxwgm"
+      "url": "https://mcp.supabase.com/mcp?project_ref=vvguixcyhdaklgekbooj"
     },
     "playwright": {
       "type": "stdio",
