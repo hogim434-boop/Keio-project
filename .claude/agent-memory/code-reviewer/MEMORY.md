@@ -1,0 +1,3 @@
+- [User Profile](user_profile.md) — Next.js 초보자, 한국어 응답 선호, 상세 설명 필요
+- [Project Overview](project_overview.md) — Next.js 16 + Supabase + Tailwind v4 + framer-motion 구조
+- [Recurring Issues](recurring_issues.md) — 반복적으로 발견되는 코드 패턴 문제
