@@ -32,6 +32,43 @@ type: project
 | 팝/뱃지 | `[0.34, 1.56, 0.64, 1]` | back out — 살짝 오버슈팅하는 스프링 |
 | 마이크로인터랙션 | duration: 0.15s | 버튼 hover/tap |
 
+## 공유 motion-variants 라이브러리
+
+`lib/motion-variants.ts` 에 5개의 공유 Variants 정의 (2026-05-02):
+
+| variant 이름 | 용도 | 핵심 효과 |
+|---|---|---|
+| `listContainer` | 리스트 부모 | staggerChildren: 0.06, delayChildren: 0.05 |
+| `listItem` | 리스트 아이템 | opacity+y:12, duration:0.4, ease:[0.22,1,0.36,1] |
+| `pageHeader` | 페이지 제목 | opacity+y:-8, duration:0.35 |
+| `fabEntrance` | FAB 버튼 진입 | scale:0→1+y:8, delay:0.3, back-out ease |
+| `emptyState` | 빈 상태 UI | scale:0.95→1+opacity, back-out ease |
+
+## 앱 내부 애니메이션 패턴 (2026-05-02 구현)
+
+### layoutId 3종 분리 규칙
+- `"tab-indicator"` — BottomTabBar 상단 슬라이딩 바
+- `"campus-pill"` — courses-client 캠퍼스 필터 배경
+- `"community-tab-pill"` — community-client 탭 필터 배경
+
+### FAB (Floating Action Button) 패턴
+- `motion.div`가 `Sheet` 전체를 감쌈 (`post-compose-sheet`, `review-sheet`)
+- `fixed bottom-20 right-4 z-50`를 motion.div에 적용
+- SheetContent는 Portal 렌더링이므로 wrapper 위치 무관
+- `fabEntrance` variant + `whileHover={{ scale: 1.08 }}` + `whileTap={{ scale: 0.92 }}`
+
+### AnimatePresence 사용 패턴
+- 필터/탭 변경 시 목록 재등장: `AnimatePresence mode="wait"` + `key={filterValue}`
+- 빈 상태 ↔ 결과 목록 전환: 동일 패턴
+
+### whileHover boxShadow 값
+- `boxShadow: '0 4px 20px oklch(0 0 0 / 0.08)'` — Framer Motion은 CSS 변수 보간 불가, OKLCH 직접값 사용
+- `borderColor: 'oklch(0.708 0 0)'` — 카드 hover 시 테두리 강조
+
+### CourseCard / PostCard 공통 구조
+- 외부: `motion.div variants={listItem}` (stagger 상속)
+- 내부: `motion.div whileHover={{ y:-2, boxShadow, borderColor }} whileTap={{ scale: 0.985 }}`
+
 ## 컴포넌트별 적용 패턴
 
 ### `app/(public)/layout.tsx`
