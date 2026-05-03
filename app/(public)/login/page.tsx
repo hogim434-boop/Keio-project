@@ -2,13 +2,15 @@
 
 import { motion, useReducedMotion } from 'framer-motion'
 import Link from 'next/link'
-import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { AuthHeader } from '../_components/auth-header'
 import { createClient } from '@/lib/supabase/client'
+import { LoginFormSchema, type LoginFormData } from '@/types/auth'
 
 const pageContainer = {
   hidden: {},
@@ -42,22 +44,30 @@ export default function LoginPage() {
   const router = useRouter()
   const shouldReduce = useReducedMotion()
 
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [errorMsg, setErrorMsg] = useState('')
-  const [loading, setLoading] = useState(false)
+  // RHF + zodResolver — LoginFormSchema 검증 (keio.jp 도메인 + 비밀번호 필수)
+  const form = useForm<LoginFormData>({
+    resolver: zodResolver(LoginFormSchema),
+    defaultValues: { email: '', password: '' },
+    mode: 'onSubmit',
+  })
 
-  async function handleLogin(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault()
-    setErrorMsg('')
-    setLoading(true)
+  const {
+    register,
+    handleSubmit,
+    setError,
+    formState: { errors, isSubmitting },
+  } = form
 
+  async function onSubmit(values: LoginFormData) {
     const supabase = createClient()
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    const { error } = await supabase.auth.signInWithPassword(values)
 
     if (error) {
-      setErrorMsg('이메일 또는 비밀번호가 올바르지 않습니다')
-      setLoading(false)
+      // Supabase 인증 실패 → 폼 전체 에러로 표시
+      setError('root', {
+        type: 'manual',
+        message: '이메일 또는 비밀번호가 올바르지 않습니다',
+      })
       return
     }
 
@@ -85,8 +95,9 @@ export default function LoginPage() {
         {/* 이메일 + 비밀번호 폼 */}
         <motion.form
           variants={shouldReduce ? {} : formContainer}
-          onSubmit={handleLogin}
+          onSubmit={handleSubmit(onSubmit)}
           className="space-y-4"
+          noValidate
         >
           <motion.div variants={shouldReduce ? {} : field} className="space-y-2">
             <Label htmlFor="email">메일 주소</Label>
@@ -94,11 +105,17 @@ export default function LoginPage() {
               id="email"
               type="email"
               placeholder="xxx@keio.jp"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
               autoComplete="email"
+              aria-invalid={!!errors.email}
               className="rounded-full bg-muted border-0 h-12 px-5 focus-visible:ring-1 focus-visible:ring-ring"
+              {...register('email')}
             />
+            {/* 필드별 인라인 에러 */}
+            {errors.email?.message && (
+              <p role="alert" className="px-2 text-xs text-destructive">
+                {errors.email.message}
+              </p>
+            )}
           </motion.div>
 
           <motion.div variants={shouldReduce ? {} : field} className="space-y-2">
@@ -107,21 +124,27 @@ export default function LoginPage() {
               id="password"
               type="password"
               placeholder="비밀번호 입력"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
               autoComplete="current-password"
+              aria-invalid={!!errors.password}
               className="rounded-full bg-muted border-0 h-12 px-5 focus-visible:ring-1 focus-visible:ring-ring"
+              {...register('password')}
             />
+            {errors.password?.message && (
+              <p role="alert" className="px-2 text-xs text-destructive">
+                {errors.password.message}
+              </p>
+            )}
           </motion.div>
 
-          {/* 에러 메시지 */}
-          {errorMsg && (
+          {/* 폼 전체 에러 (서버 인증 실패 등) */}
+          {errors.root?.message && (
             <motion.p
+              role="alert"
               initial={shouldReduce ? false : { opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
               className="rounded-xl bg-destructive/10 px-5 py-3 text-center text-sm text-destructive"
             >
-              {errorMsg}
+              {errors.root.message}
             </motion.p>
           )}
 
@@ -133,10 +156,10 @@ export default function LoginPage() {
             >
               <Button
                 type="submit"
-                disabled={loading}
+                disabled={isSubmitting}
                 className="w-full rounded-full h-12 mt-2"
               >
-                {loading ? '로그인 중…' : '로그인'}
+                {isSubmitting ? '로그인 중…' : '로그인'}
               </Button>
             </motion.div>
           </motion.div>
