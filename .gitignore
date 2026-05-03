@@ -39,3 +39,16 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# 강의 데이터 캐시 (PDF 파싱 결과 - 大용량, MVP Task 010에서 사용)
+/docs/data/*.json
+/docs/data/raw/
+
+# Playwright MCP 임시 로그/스냅샷 (개발 중 자동 생성)
+.playwright-mcp/
+
+# 루트 스크린샷 (개발 중 임시 캡처 — public/ 이나 컴포넌트의 이미지는 영향 없음)
+/*.png
+
+# Shrimp Task Manager 메모리 백업 (자동 생성, tasks.json 은 추적)
+/shrimp_data/memory/
