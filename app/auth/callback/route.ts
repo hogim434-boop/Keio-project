@@ -1,8 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server'
-import { createServerClient } from '@supabase/ssr'
-import { cookies } from 'next/headers'
-
-const KEIO_DOMAINS = ['@keio.jp', '@g.keio.ac.jp', '@sfc.keio.ac.jp']
+import { createClient } from '@/lib/supabase/server'
+import { KEIO_EMAIL_DOMAINS } from '@/types/auth'
 
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url)
@@ -12,25 +10,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(new URL('/signup?error=auth', origin))
   }
 
-  const cookieStore = await cookies()
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll()
-        },
-        setAll(cookiesToSet) {
-          try {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
-            )
-          } catch {}
-        },
-      },
-    }
-  )
+  const supabase = await createClient()
 
   const { error } = await supabase.auth.exchangeCodeForSession(code)
   if (error) {
@@ -39,7 +19,7 @@ export async function GET(request: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser()
   const email = user?.email ?? ''
-  const isKeio = KEIO_DOMAINS.some((domain) => email.endsWith(domain))
+  const isKeio = KEIO_EMAIL_DOMAINS.some((domain) => email.endsWith(domain))
 
   if (!isKeio) {
     await supabase.auth.signOut()
