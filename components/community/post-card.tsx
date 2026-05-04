@@ -21,6 +21,7 @@ import { toast } from 'sonner'
 import type { PostListItem } from '@/lib/community/posts'
 import type { ReactionKind, CategorySlug } from '@/types/community'
 import { getCategoryEmoji } from '@/lib/community/categories'
+import { useReportSheet } from '@/lib/stores/report-sheet-store'
 import { cn } from '@/lib/utils'
 
 /** PostCard 컴포넌트 props */
@@ -40,6 +41,7 @@ export function PostCard({
   const router = useRouter()
   /** 접근성: prefers-reduced-motion 감지 */
   const reduce = useReducedMotion()
+  const openReport = useReportSheet((s) => s.open)
 
   // 인라인 반응 상태 (낙관적 업데이트)
   const [myReaction, setMyReaction] = useState<ReactionKind | null>(initialMyReaction)
@@ -132,10 +134,10 @@ export function PostCard({
     }
   }
 
-  /** ⋯ 메뉴 핸들러 — Task 016 에서 신고 Sheet 구현 예정 */
+  /** ⋯ 메뉴 핸들러 — 신고 Sheet 열기 */
   function handleMenu(e: React.MouseEvent) {
     e.stopPropagation()
-    toast('準備中', { description: 'メニューは Task 016 で実装予定' })
+    openReport({ type: 'post', id: post.id, preview: post.title })
   }
 
   /** 게시글 상세 페이지로 이동 */
