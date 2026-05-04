@@ -80,13 +80,25 @@ export async function fetchPosts(
 
   if (opts.sort === 'latest') {
     q = q.order('created_at', { ascending: false }).order('id', { ascending: false })
-    if (cur) q = q.lt('created_at', cur.created_at)
+    // (created_at, id) 복합 커서: 동일 ms 작성된 게시글 중복/누락 방지
+    if (cur) {
+      q = q.or(
+        `created_at.lt.${cur.created_at},and(created_at.eq.${cur.created_at},id.lt.${cur.id})`,
+      )
+    }
   } else {
     q = q
       .order('reaction_up', { ascending: false })
       .order('created_at', { ascending: false })
       .order('id', { ascending: false })
-    if (cur && typeof cur.reaction_up === 'number') q = q.lte('reaction_up', cur.reaction_up).lt('created_at', cur.created_at)
+    // (reaction_up, created_at, id) 3-key 복합 커서
+    if (cur && typeof cur.reaction_up === 'number') {
+      q = q.or(
+        `reaction_up.lt.${cur.reaction_up},` +
+          `and(reaction_up.eq.${cur.reaction_up},created_at.lt.${cur.created_at}),` +
+          `and(reaction_up.eq.${cur.reaction_up},created_at.eq.${cur.created_at},id.lt.${cur.id})`,
+      )
+    }
   }
 
   const { data, error } = await q
