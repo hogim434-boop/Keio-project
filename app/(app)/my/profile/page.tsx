@@ -1,6 +1,9 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useForm, Controller } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { z } from 'zod'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -12,139 +15,105 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { createClient } from '@/lib/supabase/client'
+import { CAMPUS_VALUES, GRADE_VALUES, type Campus, type Grade } from '@/types/domain'
+import { NicknameSchema, PasswordSchema } from '@/types/auth'
+import { getCampusLabel, getGradeLabel } from '@/lib/locale/labels'
 
-const CAMPUSES = ['三田', '日吉', 'SFC'] as const
-const GRADES = ['1학년', '2학년', '3학년', '4학년'] as const
+const ProfileFormSchema = z.object({
+  nickname: NicknameSchema,
+  campus: z.enum(CAMPUS_VALUES),
+  grade: z.enum(GRADE_VALUES),
+  department: z.string().min(1, '学部を入力してください').trim(),
+})
+type ProfileFormData = z.infer<typeof ProfileFormSchema>
+
+const PasswordChangeSchema = z
+  .object({
+    newPassword: PasswordSchema,
+    confirmPassword: z.string().min(1, 'パスワード確認を入力してください'),
+  })
+  .refine((d) => d.newPassword === d.confirmPassword, {
+    message: 'パスワードが一致しません',
+    path: ['confirmPassword'],
+  })
+type PasswordChangeData = z.infer<typeof PasswordChangeSchema>
 
 export default function ProfilePage() {
-  // 초기 로딩 상태
   const [initializing, setInitializing] = useState(true)
-
-  // 사용자 기본 정보 (읽기 전용)
   const [email, setEmail] = useState('')
-
-  // 프로필 수정 상태
-  const [nickname, setNickname] = useState('')
-  const [campus, setCampus] = useState('')
-  const [grade, setGrade] = useState('')
-  const [department, setDepartment] = useState('')
-  const [profileSaving, setProfileSaving] = useState(false)
-  const [profileError, setProfileError] = useState('')
   const [profileSuccess, setProfileSuccess] = useState(false)
-
-  // 비밀번호 변경 상태
-  const [currentPassword, setCurrentPassword] = useState('')
-  const [newPassword, setNewPassword] = useState('')
-  const [confirmPassword, setConfirmPassword] = useState('')
-  const [passwordSaving, setPasswordSaving] = useState(false)
-  const [passwordError, setPasswordError] = useState('')
   const [passwordSuccess, setPasswordSuccess] = useState(false)
 
-  // 페이지 진입 시 현재 사용자 정보 로드
+  const profileForm = useForm<ProfileFormData>({
+    resolver: zodResolver(ProfileFormSchema),
+    defaultValues: {
+      nickname: '',
+      campus: undefined,
+      grade: undefined,
+      department: '',
+    },
+    mode: 'onSubmit',
+  })
+
+  const passwordForm = useForm<PasswordChangeData>({
+    resolver: zodResolver(PasswordChangeSchema),
+    defaultValues: { newPassword: '', confirmPassword: '' },
+    mode: 'onSubmit',
+  })
+
   useEffect(() => {
     async function loadUser() {
       const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
 
       if (user) {
         setEmail(user.email ?? '')
-        setNickname(user.user_metadata?.nickname ?? '')
-        setCampus(user.user_metadata?.campus ?? '')
-        setGrade(user.user_metadata?.grade ?? '')
-        setDepartment(user.user_metadata?.department ?? '')
+        profileForm.reset({
+          nickname: (user.user_metadata?.nickname as string) ?? '',
+          campus: (user.user_metadata?.campus as Campus | undefined),
+          grade: (user.user_metadata?.grade as Grade | undefined),
+          department: (user.user_metadata?.department as string) ?? '',
+        })
       }
 
       setInitializing(false)
     }
-
     loadUser()
-  }, [])
+  }, [profileForm])
 
-  // 프로필 저장 핸들러
-  async function handleProfileSave(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault()
-    setProfileError('')
+  async function onProfileSubmit(values: ProfileFormData) {
     setProfileSuccess(false)
-
-    if (!nickname.trim()) {
-      setProfileError('닉네임을 입력해 주세요')
-      return
-    }
-    if (!campus) {
-      setProfileError('캠퍼스를 선택해 주세요')
-      return
-    }
-    if (!grade) {
-      setProfileError('학년을 선택해 주세요')
-      return
-    }
-    if (!department.trim()) {
-      setProfileError('학부를 입력해 주세요')
-      return
-    }
-
-    setProfileSaving(true)
     const supabase = createClient()
-    const { error } = await supabase.auth.updateUser({
-      data: { nickname, campus, grade, department },
-    })
+    const { error } = await supabase.auth.updateUser({ data: values })
 
     if (error) {
-      setProfileError('저장 중 오류가 발생했습니다. 다시 시도해 주세요')
-    } else {
-      setProfileSuccess(true)
+      profileForm.setError('root', {
+        type: 'manual',
+        message: '保存中にエラーが発生しました。もう一度お試しください',
+      })
+      return
     }
-    setProfileSaving(false)
+    setProfileSuccess(true)
   }
 
-  // 비밀번호 변경 핸들러
-  async function handlePasswordChange(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault()
-    setPasswordError('')
+  async function onPasswordSubmit(values: PasswordChangeData) {
     setPasswordSuccess(false)
-
-    if (!currentPassword) {
-      setPasswordError('현재 비밀번호를 입력해 주세요')
-      return
-    }
-    if (newPassword.length < 8) {
-      setPasswordError('새 비밀번호는 8자 이상이어야 합니다')
-      return
-    }
-    if (newPassword !== confirmPassword) {
-      setPasswordError('새 비밀번호가 일치하지 않습니다')
-      return
-    }
-
-    setPasswordSaving(true)
     const supabase = createClient()
-
-    // 현재 비밀번호 검증 — 재로그인으로 확인
-    const { error: signInError } = await supabase.auth.signInWithPassword({
-      email,
-      password: currentPassword,
-    })
-
-    if (signInError) {
-      setPasswordError('현재 비밀번호가 올바르지 않습니다')
-      setPasswordSaving(false)
-      return
-    }
-
-    const { error } = await supabase.auth.updateUser({ password: newPassword })
+    const { error } = await supabase.auth.updateUser({ password: values.newPassword })
 
     if (error) {
-      setPasswordError('비밀번호 변경 중 오류가 발생했습니다. 다시 시도해 주세요')
-    } else {
-      setPasswordSuccess(true)
-      setCurrentPassword('')
-      setNewPassword('')
-      setConfirmPassword('')
+      passwordForm.setError('root', {
+        type: 'manual',
+        message: 'パスワードの変更に失敗しました。再度ログインしてからお試しください',
+      })
+      return
     }
-    setPasswordSaving(false)
+    setPasswordSuccess(true)
+    passwordForm.reset({ newPassword: '', confirmPassword: '' })
   }
 
-  // 초기 로딩 중 스피너 표시
   if (initializing) {
     return (
       <div className="flex min-h-[50dvh] items-center justify-center">
@@ -155,21 +124,17 @@ export default function ProfilePage() {
 
   return (
     <div className="mx-auto max-w-[768px] px-4 py-6 space-y-6">
-
-      {/* 페이지 헤더 */}
       <div className="space-y-0.5">
-        <h1 className="text-lg font-semibold">프로필 설정</h1>
+        <h1 className="text-lg font-semibold">プロフィール設定</h1>
         <p className="text-sm text-muted-foreground">
-          닉네임, 캠퍼스, 학부 정보를 수정할 수 있습니다
+          ニックネーム・キャンパス・学部などを変更できます
         </p>
       </div>
 
-      {/* 구분선 */}
       <div className="h-px bg-border" />
 
-      {/* 이메일 — 읽기 전용 */}
       <div className="space-y-2">
-        <Label>인증된 이메일</Label>
+        <Label>認証済みメールアドレス</Label>
         <Input
           value={email}
           readOnly
@@ -178,154 +143,180 @@ export default function ProfilePage() {
         />
       </div>
 
-      {/* 프로필 수정 폼 */}
-      <form onSubmit={handleProfileSave} className="space-y-5">
-
-        {/* 닉네임 */}
+      <form onSubmit={profileForm.handleSubmit(onProfileSubmit)} className="space-y-5" noValidate>
         <div className="space-y-2">
-          <Label htmlFor="nickname">닉네임</Label>
+          <Label htmlFor="nickname">ニックネーム</Label>
           <Input
             id="nickname"
-            value={nickname}
-            onChange={(e) => setNickname(e.target.value)}
-            placeholder="앱에서 표시될 이름"
+            placeholder="アプリ上で表示される名前"
             autoComplete="nickname"
+            aria-invalid={!!profileForm.formState.errors.nickname}
+            {...profileForm.register('nickname')}
           />
+          {profileForm.formState.errors.nickname?.message && (
+            <p role="alert" className="px-2 text-xs text-destructive">
+              {profileForm.formState.errors.nickname.message}
+            </p>
+          )}
         </div>
 
-        {/* 캠퍼스 선택 */}
         <div className="space-y-2">
-          <Label htmlFor="campus-select">캠퍼스</Label>
-          <Select value={campus} onValueChange={setCampus}>
-            <SelectTrigger id="campus-select">
-              <SelectValue placeholder="캠퍼스 선택" />
-            </SelectTrigger>
-            <SelectContent>
-              {CAMPUSES.map((c) => (
-                <SelectItem key={c} value={c}>{c}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <Label htmlFor="campus-select">キャンパス</Label>
+          <Controller
+            name="campus"
+            control={profileForm.control}
+            render={({ field: f }) => (
+              <Select value={f.value ?? ''} onValueChange={f.onChange}>
+                <SelectTrigger
+                  id="campus-select"
+                  aria-invalid={!!profileForm.formState.errors.campus}
+                >
+                  <SelectValue placeholder="キャンパスを選択" />
+                </SelectTrigger>
+                <SelectContent>
+                  {CAMPUS_VALUES.map((c) => (
+                    <SelectItem key={c} value={c}>
+                      {getCampusLabel(c)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          />
+          {profileForm.formState.errors.campus?.message && (
+            <p role="alert" className="px-2 text-xs text-destructive">
+              {profileForm.formState.errors.campus.message}
+            </p>
+          )}
         </div>
 
-        {/* 학년 선택 */}
         <div className="space-y-2">
-          <Label htmlFor="grade-select">학년</Label>
-          <Select value={grade} onValueChange={setGrade}>
-            <SelectTrigger id="grade-select">
-              <SelectValue placeholder="학년 선택" />
-            </SelectTrigger>
-            <SelectContent>
-              {GRADES.map((g) => (
-                <SelectItem key={g} value={g}>{g}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <Label htmlFor="grade-select">学年</Label>
+          <Controller
+            name="grade"
+            control={profileForm.control}
+            render={({ field: f }) => (
+              <Select value={f.value ?? ''} onValueChange={f.onChange}>
+                <SelectTrigger
+                  id="grade-select"
+                  aria-invalid={!!profileForm.formState.errors.grade}
+                >
+                  <SelectValue placeholder="学年を選択" />
+                </SelectTrigger>
+                <SelectContent>
+                  {GRADE_VALUES.map((g) => (
+                    <SelectItem key={g} value={g}>
+                      {getGradeLabel(g)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          />
+          {profileForm.formState.errors.grade?.message && (
+            <p role="alert" className="px-2 text-xs text-destructive">
+              {profileForm.formState.errors.grade.message}
+            </p>
+          )}
         </div>
 
-        {/* 학부 입력 */}
         <div className="space-y-2">
-          <Label htmlFor="department">학부</Label>
+          <Label htmlFor="department">学部</Label>
           <Input
             id="department"
-            value={department}
-            onChange={(e) => setDepartment(e.target.value)}
-            placeholder="예: 経済学部"
+            placeholder="例: 経済学部"
+            aria-invalid={!!profileForm.formState.errors.department}
+            {...profileForm.register('department')}
           />
+          {profileForm.formState.errors.department?.message && (
+            <p role="alert" className="px-2 text-xs text-destructive">
+              {profileForm.formState.errors.department.message}
+            </p>
+          )}
         </div>
 
-        {/* 프로필 에러 메시지 */}
-        {profileError && (
+        {profileForm.formState.errors.root?.message && (
           <p className="rounded-xl bg-destructive/10 px-4 py-3 text-sm text-destructive">
-            {profileError}
+            {profileForm.formState.errors.root.message}
           </p>
         )}
 
-        {/* 프로필 저장 성공 메시지 */}
         {profileSuccess && (
           <p className="rounded-xl bg-green-500/10 px-4 py-3 text-sm text-green-600">
-            프로필이 저장되었습니다
+            プロフィールを保存しました
           </p>
         )}
 
-        {/* 프로필 저장 버튼 */}
-        <Button type="submit" className="w-full" disabled={profileSaving}>
-          {profileSaving ? '저장 중…' : '프로필 저장'}
+        <Button type="submit" className="w-full" disabled={profileForm.formState.isSubmitting}>
+          {profileForm.formState.isSubmitting ? '保存中…' : 'プロフィールを保存'}
         </Button>
       </form>
 
-      {/* 구분선 */}
       <div className="h-px bg-border" />
 
-      {/* 비밀번호 변경 섹션 */}
       <div className="space-y-0.5">
-        <h2 className="text-base font-semibold">비밀번호 변경</h2>
+        <h2 className="text-base font-semibold">パスワード変更</h2>
         <p className="text-sm text-muted-foreground">
-          새 비밀번호는 8자 이상이어야 합니다
+          新しいパスワードは8文字以上、英数字を含めてください
         </p>
       </div>
 
-      <form onSubmit={handlePasswordChange} className="space-y-5">
-
-        {/* 현재 비밀번호 */}
+      <form onSubmit={passwordForm.handleSubmit(onPasswordSubmit)} className="space-y-5" noValidate>
         <div className="space-y-2">
-          <Label htmlFor="currentPassword">현재 비밀번호</Label>
-          <Input
-            id="currentPassword"
-            type="password"
-            value={currentPassword}
-            onChange={(e) => setCurrentPassword(e.target.value)}
-            placeholder="현재 비밀번호 입력"
-            autoComplete="current-password"
-          />
-        </div>
-
-        {/* 새 비밀번호 */}
-        <div className="space-y-2">
-          <Label htmlFor="newPassword">새 비밀번호</Label>
+          <Label htmlFor="newPassword">新しいパスワード</Label>
           <Input
             id="newPassword"
             type="password"
-            value={newPassword}
-            onChange={(e) => setNewPassword(e.target.value)}
-            placeholder="8자 이상 입력"
+            placeholder="8文字以上、英数字を含む"
             autoComplete="new-password"
+            aria-invalid={!!passwordForm.formState.errors.newPassword}
+            {...passwordForm.register('newPassword')}
           />
+          {passwordForm.formState.errors.newPassword?.message && (
+            <p role="alert" className="px-2 text-xs text-destructive">
+              {passwordForm.formState.errors.newPassword.message}
+            </p>
+          )}
         </div>
 
-        {/* 새 비밀번호 확인 */}
         <div className="space-y-2">
-          <Label htmlFor="confirmPassword">비밀번호 확인</Label>
+          <Label htmlFor="confirmPassword">パスワード確認</Label>
           <Input
             id="confirmPassword"
             type="password"
-            value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
-            placeholder="비밀번호 재입력"
+            placeholder="もう一度入力"
             autoComplete="new-password"
+            aria-invalid={!!passwordForm.formState.errors.confirmPassword}
+            {...passwordForm.register('confirmPassword')}
           />
+          {passwordForm.formState.errors.confirmPassword?.message && (
+            <p role="alert" className="px-2 text-xs text-destructive">
+              {passwordForm.formState.errors.confirmPassword.message}
+            </p>
+          )}
         </div>
 
-        {/* 비밀번호 에러 메시지 */}
-        {passwordError && (
+        {passwordForm.formState.errors.root?.message && (
           <p className="rounded-xl bg-destructive/10 px-4 py-3 text-sm text-destructive">
-            {passwordError}
+            {passwordForm.formState.errors.root.message}
           </p>
         )}
 
-        {/* 비밀번호 변경 성공 메시지 */}
         {passwordSuccess && (
           <p className="rounded-xl bg-green-500/10 px-4 py-3 text-sm text-green-600">
-            비밀번호가 변경되었습니다
+            パスワードを変更しました
           </p>
         )}
 
-        {/* 비밀번호 변경 버튼 */}
-        <Button type="submit" variant="outline" className="w-full" disabled={passwordSaving}>
-          {passwordSaving ? '변경 중…' : '비밀번호 변경'}
+        <Button
+          type="submit"
+          variant="outline"
+          className="w-full"
+          disabled={passwordForm.formState.isSubmitting}
+        >
+          {passwordForm.formState.isSubmitting ? '変更中…' : 'パスワードを変更'}
         </Button>
       </form>
-
     </div>
   )
 }
