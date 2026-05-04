@@ -108,7 +108,7 @@ export default function SetupPage() {
       }
       // 이미 설정 완료된 사용자
       if (user.user_metadata?.password_set === true) {
-        router.replace('/courses')
+        router.replace('/')
         return
       }
 

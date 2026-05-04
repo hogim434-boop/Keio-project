@@ -71,7 +71,7 @@ export default function LoginPage() {
       return
     }
 
-    router.replace('/courses')
+    router.replace('/')
   }
 
   return (
