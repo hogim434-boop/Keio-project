@@ -1237,6 +1237,143 @@
       "implementationGuide": "1) Edit app/(app)/page.tsx:\n   import { PostFeed } from '@/components/community/post-feed'\n   5층 section:\n   <section className='px-4 py-4'>\n     <PostFeed\n       key={`${sort}-${categorySlug ?? 'all'}`}\n       initial={list}\n       sort={sort}\n       categorySlug={categorySlug}\n     />\n   </section>\n   기존 인라인 article map 제거. 빈 상태 placeholder 도 PostFeed 내부에서 처리되므로 page.tsx 의 빈 분기 제거.\n2) npm run build (timeout 5분) — 17 라우트 컴파일, /(app) 페이지 동적 ƒ 유지\n3) Edit docs/ROADMAP.md Task 014 ✅ + nested bullet 5~7줄:\n   - components/community/{post-card(role=button + 낙관적 ❤/🔖 + ⋯ placeholder), post-feed(IntersectionObserver 200px + AbortController + cursor 페이징)}\n   - 카드 ❤ 클릭 → /api/reactions POST + 낙관적 업데이트 + 실패 시 롤백 + toast\n   - 🔖 동일 패턴 + /api/bookmarks 토글\n   - 무한 스크롤 — sentinel 200px 전 트리거, race 차단\n   - page.tsx 의 5층 인라인 article → <PostFeed key=...> 교체, key 로 sort/categorySlug 변경 시 자동 reset\n   - npm run build 회귀 0건\n   - Task 015 진입 — /posts/[id] 페이지 + 댓글 트리",
       "verificationCriteria": "app/(app)/page.tsx 의 5층이 <PostFeed key=...> 만 렌더, npm run build 회귀 0건, ROADMAP Task 014 ✅ + nested bullet.",
       "analysisResult": "Task 014 — Phase 4 카드 피드 본격 구축. components/community/{post-card, post-feed} 신규 + app/(app)/page.tsx 의 인라인 article 영역 교체. PostCard: 'use client' + Framer Motion whileTap 0.92 + 낙관적 ❤/🔖 토글(useState 4개) + /api/reactions·/api/bookmarks fetch + 401 redirect + 실패 시 롤백 + sonner toast 에러 + role='button' + ⋯ placeholder. PostFeed: IntersectionObserver(rootMargin '200px 0px') + cursor 페이징 + AbortController + props 변경 시 key 재마운트. page.tsx 5층 인라인 → <PostFeed key={`${sort}-${categorySlug}`} initial={list} sort={sort} categorySlug={categorySlug} />. 일본어 카피(W1: 匿名 / 推薦する / ブックマーク / 準備中 / 投稿の読み込みに失敗しました / 反応に失敗しました / まだ投稿がありません). 사전 확인: FetchPostsResult export + /api/posts GET 응답 envelope. 3 서브태스크."
+    },
+    {
+      "id": "5a3f29a5-3212-4699-b669-a4877e26d560",
+      "name": "Task 015-1: app/api/comments/[id]/route.ts (DELETE soft delete)",
+      "description": "댓글 본인/admin soft delete 라우트 신규. Next.js 16 params Promise 시그니처. withAuth + UPDATE comments SET is_deleted=true. RLS 가 본인/admin 만 통과. 영향 0행이면 403.\n\n파일: app/api/comments/[id]/route.ts",
+      "notes": "트리거 comments_apply_post_counter 가 is_deleted=true → posts.comment_count 자동 -1. 별도 갱신 불필요.",
+      "status": "pending",
+      "dependencies": [],
+      "createdAt": "2026-05-04T08:08:44.157Z",
+      "updatedAt": "2026-05-04T08:08:44.157Z",
+      "relatedFiles": [
+        {
+          "path": "app/api/comments/[id]/route.ts",
+          "type": "CREATE",
+          "description": "DELETE soft delete"
+        },
+        {
+          "path": "app/api/posts/[id]/route.ts",
+          "type": "REFERENCE",
+          "description": "DELETE 패턴 참조"
+        },
+        {
+          "path": "lib/community/api-helpers.ts",
+          "type": "DEPENDENCY",
+          "description": "withAuth/err"
+        }
+      ],
+      "implementationGuide": "1) Write app/api/comments/[id]/route.ts:\n   import { NextResponse } from 'next/server'\n   import { withAuth, err } from '@/lib/community/api-helpers'\n   import { z } from 'zod'\n\n   const ParamsSchema = z.object({ id: z.string().uuid() })\n\n   export async function DELETE(_req: Request, ctx: { params: Promise<{ id: string }> }): Promise<NextResponse> {\n     const { id } = await ctx.params\n     const parsed = ParamsSchema.safeParse({ id })\n     if (!parsed.success) return err('VALIDATION', 'IDが正しくありません', 422)\n\n     return withAuth(async (supabase) => {\n       const { data, error } = await supabase\n         .from('comments')\n         .update({ is_deleted: true })\n         .eq('id', parsed.data.id)\n         .select('id')\n       if (error) throw error\n       if (!data || data.length === 0) throw new Error('FORBIDDEN_OR_NOT_FOUND')\n       return { id: parsed.data.id }\n     })\n   }\n2) tsc --noEmit",
+      "verificationCriteria": "DELETE 라우트 정상 응답 (200/422/403/500), tsc 0건. /api/comments/[id] 라우트 npm run build 시 ƒ 추가.",
+      "analysisResult": "Task 015 — Phase 4 게시글 상세 + 댓글 (W2). app/(app)/posts/[id]/page.tsx Server Component 가 fetchPostWithComments 를 호출하여 post + 카테고리 + 작성자 + 1단계 대댓글 트리 + myReaction + myBookmark 를 SSR. 본인 판정은 Server Component 에서 supabase.auth.getUser() 로 currentUserId 추출 → Client 컴포넌트 props 전달. 컴포넌트 4개: post-detail-actions(Client, 낙관적 ❤👎🔖 + 본인 글 削除 + ⋯ placeholder) / post-detail-thread(Client wrapper, replyTo state 보유) / comment-list(Client, 1단계 대댓글 트리 + 본인 댓글 削除) / comment-form(Client, RHF + zodResolver(CommentFormSchema) + 하단 fixed + 返信 모드). 신규 라우트 1개: app/api/comments/[id]/route.ts DELETE (withAuth + soft delete). 댓글 즉시 반영은 router.refresh(). 댓글 추천 토글은 Phase 7+ 로 미룸 (read-only 카운트도 본 Task 에선 미노출, 단순화). FAB 와 댓글 폼 z-index 충돌은 미해결 (Task 020 통합 시 결정). 일본어 카피 W2 1:1 (戻る / 削除 / 返信 / 送信 / コメントを入力 / まだコメントがありません / 投稿を削除しました / 投稿が見つかりません 등). 4 서브태스크."
+    },
+    {
+      "id": "65166ead-3813-4a48-806f-a780e2be8c99",
+      "name": "Task 015-2: components/community/post-detail-actions.tsx (❤👎🔖 + 본인 글 削除 + ⋯)",
+      "description": "게시글 상세 액션 바. 'use client'. PostCard 와 동일한 낙관적 ❤👎🔖 토글 패턴 + 본인이면 [削除] confirm dialog + ⋯ menu placeholder.\n\n파일: components/community/post-detail-actions.tsx",
+      "notes": "PostCard 의 낙관적 패턴 거의 동일 — 일관 톤 유지. min-h-[44px] 모바일 터치. Loader2 disabled spinner.",
+      "status": "pending",
+      "dependencies": [
+        {
+          "taskId": "5a3f29a5-3212-4699-b669-a4877e26d560"
+        }
+      ],
+      "createdAt": "2026-05-04T08:08:44.157Z",
+      "updatedAt": "2026-05-04T08:08:44.157Z",
+      "relatedFiles": [
+        {
+          "path": "components/community/post-detail-actions.tsx",
+          "type": "CREATE",
+          "description": "상세 액션 바"
+        },
+        {
+          "path": "components/community/post-card.tsx",
+          "type": "REFERENCE",
+          "description": "낙관적 패턴 참조"
+        },
+        {
+          "path": "types/community.ts",
+          "type": "DEPENDENCY",
+          "description": "ReactionKind"
+        }
+      ],
+      "implementationGuide": "1) imports: useState, useRouter, motion/useReducedMotion, Heart/ThumbsDown/Bookmark/Trash2/MoreHorizontal/Loader2, toast(sonner), ReactionKind, cn\n2) interface PostDetailActionsProps { postId: string; ownerUserId: string; currentUserId: string|null; reactionUp: number; reactionDown: number; commentCount: number; initialMyReaction: ReactionKind|null; initialMyBookmark: boolean }\n3) isOwner = currentUserId === ownerUserId\n4) useState 4개 — myReaction / reactionUp / reactionDown / bookmarked / 3 isBusy 플래그\n5) handleReaction(kind: ReactionKind):\n   const before = myReaction; const next = before === kind ? null : kind\n   낙관적: setMyReaction(next), 카운터 분기:\n     · before==null && next==='up' → up+1\n     · before==null && next==='down' → down+1\n     · before==='up' && next==null → up-1\n     · before==='down' && next==null → down-1\n     · before==='up' && next==='down' → up-1, down+1\n     · before==='down' && next==='up' → down-1, up+1\n   fetch /api/reactions POST { targetType:'post', targetId: postId, kind }\n   401 → /login, 실패 → 롤백 + toast.error\n6) handleBookmark — fetch /api/bookmarks POST { postId }, 응답 data.bookmarked\n7) handleDelete (isOwner only):\n   if (!confirm('この投稿を削除しますか?')) return\n   fetch DELETE /api/posts/[id]\n   ok → toast.success('投稿を削除しました') + router.replace('/')\n   실패 → toast.error('削除に失敗しました')\n8) handleMenu — toast('準備中', { description: 'メニューは Task 016 で実装予定' })\n9) JSX flex justify-between gap-2 items-center px-4 py-3 border-y bg-background\n   좌측 그룹: ❤ button + 👎 button + 💬 div(read-only count)\n   우측 그룹: 🔖 button + isOwner && 🗑 button + ⋯ button\n10) tsc --noEmit",
+      "verificationCriteria": "❤/👎/🔖 낙관적 토글 + 401 redirect + 실패 롤백 + 본인 글 [削除] confirm → router.replace('/'), tsc 0건.",
+      "analysisResult": "Task 015 — Phase 4 게시글 상세 + 댓글 (W2). app/(app)/posts/[id]/page.tsx Server Component 가 fetchPostWithComments 를 호출하여 post + 카테고리 + 작성자 + 1단계 대댓글 트리 + myReaction + myBookmark 를 SSR. 본인 판정은 Server Component 에서 supabase.auth.getUser() 로 currentUserId 추출 → Client 컴포넌트 props 전달. 컴포넌트 4개: post-detail-actions(Client, 낙관적 ❤👎🔖 + 본인 글 削除 + ⋯ placeholder) / post-detail-thread(Client wrapper, replyTo state 보유) / comment-list(Client, 1단계 대댓글 트리 + 본인 댓글 削除) / comment-form(Client, RHF + zodResolver(CommentFormSchema) + 하단 fixed + 返信 모드). 신규 라우트 1개: app/api/comments/[id]/route.ts DELETE (withAuth + soft delete). 댓글 즉시 반영은 router.refresh(). 댓글 추천 토글은 Phase 7+ 로 미룸 (read-only 카운트도 본 Task 에선 미노출, 단순화). FAB 와 댓글 폼 z-index 충돌은 미해결 (Task 020 통합 시 결정). 일본어 카피 W2 1:1 (戻る / 削除 / 返信 / 送信 / コメントを入力 / まだコメントがありません / 投稿を削除しました / 投稿が見つかりません 등). 4 서브태스크."
+    },
+    {
+      "id": "aeb571a0-5949-4710-b23d-e740d50389da",
+      "name": "Task 015-3: comment-list.tsx + comment-form.tsx + post-detail-thread.tsx (wrapper)",
+      "description": "댓글 트리 + 댓글 폼 + Client wrapper(replyTo state 공유).\n\n파일:\n- components/community/comment-list.tsx — 1단계 대댓글 트리 렌더 + 본인 댓글 삭제 + 返信 버튼\n- components/community/comment-form.tsx — 하단 fixed RHF + zodResolver(CommentFormSchema) + replyTo 모드\n- components/community/post-detail-thread.tsx — 'use client' wrapper, replyTo state",
+      "notes": "댓글 추천 카운트 노출 미구현 — body 옆에 reactions count 표시 안 함. ⋯ 메뉴는 본인이면 削除 만 노출, 신고는 Task 016 별도. preview = c.body.slice(0, 30).",
+      "status": "pending",
+      "dependencies": [
+        {
+          "taskId": "65166ead-3813-4a48-806f-a780e2be8c99"
+        }
+      ],
+      "createdAt": "2026-05-04T08:08:44.157Z",
+      "updatedAt": "2026-05-04T08:08:44.157Z",
+      "relatedFiles": [
+        {
+          "path": "components/community/comment-list.tsx",
+          "type": "CREATE",
+          "description": "댓글 트리 + 삭제"
+        },
+        {
+          "path": "components/community/comment-form.tsx",
+          "type": "CREATE",
+          "description": "하단 fixed 폼"
+        },
+        {
+          "path": "components/community/post-detail-thread.tsx",
+          "type": "CREATE",
+          "description": "client wrapper"
+        },
+        {
+          "path": "types/community.ts",
+          "type": "DEPENDENCY",
+          "description": "CommentFormSchema"
+        },
+        {
+          "path": "lib/community/post-detail.ts",
+          "type": "DEPENDENCY",
+          "description": "CommentNode 타입"
+        }
+      ],
+      "implementationGuide": "1) comment-list.tsx ('use client'):\n   props: { comments: CommentNode[]; currentUserId: string|null; onReply: (parent: { id: string; preview: string }) => void }\n   if (comments.length===0) return <div className='py-8 text-center text-sm text-muted-foreground'>まだコメントがありません</div>\n   comments.map(top => (\n     <div key={top.id} className='space-y-2'>\n       <CommentItem c={top} canReply currentUserId onReply />\n       {top.replies?.map(r => <div className='ml-6 border-l pl-4'><CommentItem c={r} canReply={false} ... /></div>)}\n     </div>\n   ))\n   CommentItem (내부 함수): 작성자(c.is_anonymous? '匿名' : c.author?.nickname) + 시간 + body + (canReply && [返信]) + (currentUserId === c.user_id && [⋯ menu → 削除])\n   handleDelete: confirm + fetch DELETE /api/comments/[id] + ok → router.refresh() + toast.success('コメントを削除しました')\n\n2) comment-form.tsx ('use client'):\n   props: { postId: string; replyTo: { id: string; preview: string } | null; onSubmitted: () => void; onCancelReply: () => void }\n   const form = useForm<CommentFormData>({ resolver: zodResolver(CommentFormSchema), defaultValues: { postId, parentId: null, body:'', isAnonymous: true } })\n   useEffect on replyTo: form.setValue('parentId', replyTo?.id ?? null)\n   onSubmit: fetch POST /api/comments → ok → form.reset(...) + router.refresh() + onSubmitted() / 401 → /login / 422 → setError / 기타 → toast.error\n   JSX: fixed bottom-[calc(56px+env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 w-full max-w-[768px] z-30 bg-background border-t px-4 py-2 space-y-2\n     replyTo && <div className='text-xs text-muted-foreground flex items-center gap-2'>返信先: {preview} <button onClick={onCancelReply}><X size=14 /></button></div>\n     <div className='flex gap-2 items-end'>\n       <Textarea rows=2 minHeight={40} maxLength=1000 + auto-grow\n       <Button onClick={form.handleSubmit(onSubmit)} disabled={!form.formState.isValid || form.formState.isSubmitting}>送信</Button>\n     </div>\n     <Controller name='isAnonymous' ... 匿名으로 게시 / ニックネーム表示 — small radio inline>\n   visualViewport 키보드 자동 스크롤은 brief\n\n3) post-detail-thread.tsx ('use client'):\n   props: { comments, postId, currentUserId }\n   const [replyTo, setReplyTo] = useState<{ id, preview } | null>(null)\n   return <>\n     <CommentList comments currentUserId onReply={(r) => setReplyTo(r)} />\n     <CommentForm postId replyTo onSubmitted={() => setReplyTo(null)} onCancelReply={() => setReplyTo(null)} />\n   </>\n\n4) tsc --noEmit",
+      "verificationCriteria": "빈 상태 placeholder, 댓글 작성 시 router.refresh + 즉시 목록 반영, 返信 모드 → parent_id 세팅, 본인 댓글 削除 confirm → soft delete, 1단계 대댓글 인덴트, tsc 0건.",
+      "analysisResult": "Task 015 — Phase 4 게시글 상세 + 댓글 (W2). app/(app)/posts/[id]/page.tsx Server Component 가 fetchPostWithComments 를 호출하여 post + 카테고리 + 작성자 + 1단계 대댓글 트리 + myReaction + myBookmark 를 SSR. 본인 판정은 Server Component 에서 supabase.auth.getUser() 로 currentUserId 추출 → Client 컴포넌트 props 전달. 컴포넌트 4개: post-detail-actions(Client, 낙관적 ❤👎🔖 + 본인 글 削除 + ⋯ placeholder) / post-detail-thread(Client wrapper, replyTo state 보유) / comment-list(Client, 1단계 대댓글 트리 + 본인 댓글 削除) / comment-form(Client, RHF + zodResolver(CommentFormSchema) + 하단 fixed + 返信 모드). 신규 라우트 1개: app/api/comments/[id]/route.ts DELETE (withAuth + soft delete). 댓글 즉시 반영은 router.refresh(). 댓글 추천 토글은 Phase 7+ 로 미룸 (read-only 카운트도 본 Task 에선 미노출, 단순화). FAB 와 댓글 폼 z-index 충돌은 미해결 (Task 020 통합 시 결정). 일본어 카피 W2 1:1 (戻る / 削除 / 返信 / 送信 / コメントを入力 / まだコメントがありません / 投稿を削除しました / 投稿が見つかりません 등). 4 서브태스크."
+    },
+    {
+      "id": "bb406658-eeda-42d1-af6d-c0a3979c5063",
+      "name": "Task 015-4: app/(app)/posts/[id]/page.tsx Server Component + npm run build + ROADMAP ✅",
+      "description": "Server Component 페이지 신규 + 통합 검증.\n\n파일: app/(app)/posts/[id]/page.tsx",
+      "notes": "FAB 와 댓글 폼 z-index 충돌은 본 Task 미해결 (Task 020 결정). 댓글 추천 토글은 Phase 7+. comment_count 캐시 컬럼 사용 (트리거 자동 갱신).",
+      "status": "pending",
+      "dependencies": [
+        {
+          "taskId": "aeb571a0-5949-4710-b23d-e740d50389da"
+        }
+      ],
+      "createdAt": "2026-05-04T08:08:44.157Z",
+      "updatedAt": "2026-05-04T08:08:44.157Z",
+      "relatedFiles": [
+        {
+          "path": "app/(app)/posts/[id]/page.tsx",
+          "type": "CREATE",
+          "description": "상세 Server Component"
+        },
+        {
+          "path": "docs/ROADMAP.md",
+          "type": "TO_MODIFY",
+          "description": "Task 015 ✅"
+        }
+      ],
+      "implementationGuide": "1) Write app/(app)/posts/[id]/page.tsx:\n   import { notFound } from 'next/navigation'\n   import Link from 'next/link'\n   import { ChevronLeft } from 'lucide-react'\n   import { createClient } from '@/lib/supabase/server'\n   import { fetchPostWithComments } from '@/lib/community/post-detail'\n   import { getCategoryEmoji } from '@/lib/community/categories'\n   import type { CategorySlug } from '@/types/community'\n   import { PostDetailActions } from '@/components/community/post-detail-actions'\n   import { PostDetailThread } from '@/components/community/post-detail-thread'\n\n   export default async function PostDetailPage({ params }: { params: Promise<{ id: string }> }) {\n     const { id } = await params\n     const supabase = await createClient()\n     const result = await fetchPostWithComments(supabase, id)\n     if (!result) notFound()\n     const { data: { user } } = await supabase.auth.getUser()\n     const currentUserId = user?.id ?? null\n     const { post, comments, myReaction, myBookmark } = result\n\n     return (\n       <div>\n         <header className='sticky top-0 z-30 bg-background/95 backdrop-blur border-b px-2 h-14 flex items-center'>\n           <Link href='/' aria-label='戻る' className='p-2 rounded-md hover:bg-muted'><ChevronLeft className='size-5' /></Link>\n         </header>\n         <article className='px-4 py-4 space-y-3 border-b'>\n           <div className='flex items-center gap-2'>\n             <span className='inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-secondary text-secondary-foreground text-xs'>\n               {post.category && getCategoryEmoji(post.category.slug as CategorySlug)} {post.category?.name ?? '—'}\n             </span>\n             <span className='text-xs text-muted-foreground'>\n               {post.author?.nickname ?? '匿名'} · {new Date(post.created_at).toLocaleString('ja-JP')}\n             </span>\n           </div>\n           <h1 className='text-xl font-bold'>{post.title}</h1>\n           <p className='whitespace-pre-wrap text-sm leading-relaxed'>{post.body}</p>\n         </article>\n         <PostDetailActions\n           postId={post.id} ownerUserId={post.user_id} currentUserId={currentUserId}\n           reactionUp={post.reaction_up} reactionDown={post.reaction_down} commentCount={post.comment_count}\n           initialMyReaction={myReaction} initialMyBookmark={myBookmark}\n         />\n         <section className='px-4 py-4'>\n           <h2 className='text-sm font-semibold text-muted-foreground mb-3'>コメント ({post.comment_count})</h2>\n           <PostDetailThread comments={comments} postId={post.id} currentUserId={currentUserId} />\n         </section>\n         <div className='h-32' aria-hidden />\n       </div>\n     )\n   }\n\n2) npm run build (timeout 5분) — /posts/[id] 신규 ƒ 라우트 + /api/comments/[id] 신규 ƒ 라우트 추가, 총 18~19 라우트 컴파일 통과 확인\n3) Edit docs/ROADMAP.md Task 015 ✅ + nested bullet 5~7줄",
+      "verificationCriteria": "/posts/[id] 라우트 정상 SSR, fetchPostWithComments null → 404, 본인 글 삭제·댓글 작성·返信·삭제 모두 동작, npm run build 회귀 0건, ROADMAP ✅.",
+      "analysisResult": "Task 015 — Phase 4 게시글 상세 + 댓글 (W2). app/(app)/posts/[id]/page.tsx Server Component 가 fetchPostWithComments 를 호출하여 post + 카테고리 + 작성자 + 1단계 대댓글 트리 + myReaction + myBookmark 를 SSR. 본인 판정은 Server Component 에서 supabase.auth.getUser() 로 currentUserId 추출 → Client 컴포넌트 props 전달. 컴포넌트 4개: post-detail-actions(Client, 낙관적 ❤👎🔖 + 본인 글 削除 + ⋯ placeholder) / post-detail-thread(Client wrapper, replyTo state 보유) / comment-list(Client, 1단계 대댓글 트리 + 본인 댓글 削除) / comment-form(Client, RHF + zodResolver(CommentFormSchema) + 하단 fixed + 返信 모드). 신규 라우트 1개: app/api/comments/[id]/route.ts DELETE (withAuth + soft delete). 댓글 즉시 반영은 router.refresh(). 댓글 추천 토글은 Phase 7+ 로 미룸 (read-only 카운트도 본 Task 에선 미노출, 단순화). FAB 와 댓글 폼 z-index 충돌은 미해결 (Task 020 통합 시 결정). 일본어 카피 W2 1:1 (戻る / 削除 / 返信 / 送信 / コメントを入力 / まだコメントがありません / 投稿を削除しました / 投稿が見つかりません 등). 4 서브태스크."
     }
   ]
 }
