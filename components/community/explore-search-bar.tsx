@@ -43,8 +43,8 @@ export function ExploreSearchBar() {
   // URL 외부 변경(브라우저 뒤로가기 등) → local 동기화
   useEffect(() => {
     const urlQ = sp.get('q') ?? ''
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLocal((prev) => (prev === urlQ ? prev : urlQ))
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sp])
 
   // unmount 시 진행 중 디바운스 cleanup
