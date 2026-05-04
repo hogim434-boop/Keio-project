@@ -25,6 +25,7 @@ import { X, Loader2, Check } from 'lucide-react'
 import {
   Sheet,
   SheetContent,
+  SheetDescription,
   SheetHeader,
   SheetTitle,
   SheetClose,
@@ -281,6 +282,10 @@ export function WriteBottomSheet() {
           <SheetTitle className="flex-1 text-center text-base font-semibold">
             投稿する
           </SheetTitle>
+          {/* 접근성용 설명 — 시각적으로 숨기지만 aria 에 노출 */}
+          <SheetDescription className="sr-only">
+            カテゴリーを選び、タイトルと本文を入力して投稿してください。
+          </SheetDescription>
 
           {/* 제출 버튼 */}
           <Button
