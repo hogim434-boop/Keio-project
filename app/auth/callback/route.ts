@@ -32,5 +32,5 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(new URL('/signup/setup', origin))
   }
 
-  return NextResponse.redirect(new URL('/courses', origin))
+  return NextResponse.redirect(new URL('/', origin))
 }
