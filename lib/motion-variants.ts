@@ -94,3 +94,107 @@ export const emptyState: Variants = {
     },
   },
 }
+
+// ============================================================
+// 보강 transition / variants
+// (랜딩·report-sheet·explore-search-bar·my-tabs 등이 직접 import)
+// ============================================================
+
+/** 빠른 spring tap — 버튼/칩의 즉각 반응 */
+export const springTap = {
+  type: 'spring' as const,
+  stiffness: 500,
+  damping: 30,
+  mass: 0.6,
+}
+
+/** 탭 인디케이터 layoutId 슬라이딩 transition */
+export const tabIndicator = {
+  type: 'spring' as const,
+  stiffness: 450,
+  damping: 30,
+}
+
+/** 빠른 stagger 컨테이너 — 0.04s 간격 (listContainer 의 0.06 보다 타이트) */
+export const staggerFast: Variants = {
+  hidden: {},
+  visible: {
+    transition: {
+      staggerChildren: 0.04,
+      delayChildren: 0.05,
+    },
+  },
+}
+
+/** 일반 fade + y:16 등장 — listItem 보다 범용 */
+export const fadeInUp: Variants = {
+  hidden: { opacity: 0, y: 16 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: {
+      duration: 0.4,
+      ease: [0.22, 1, 0.36, 1] as [number, number, number, number],
+    },
+  },
+}
+
+/** 랜딩 hero 거대 등장 — y:32 + blur(8px) → 0 */
+export const heroFadeUp: Variants = {
+  hidden: { opacity: 0, y: 32, filter: 'blur(8px)' },
+  visible: {
+    opacity: 1,
+    y: 0,
+    filter: 'blur(0px)',
+    transition: {
+      duration: 0.7,
+      ease: [0.22, 1, 0.36, 1] as [number, number, number, number],
+    },
+  },
+}
+
+/** 카드 hover lift — initial="rest" whileHover="hover" 패턴 */
+export const cardLift: Variants = {
+  rest: {
+    y: 0,
+    scale: 1,
+    transition: { type: 'spring', stiffness: 300, damping: 28 },
+  },
+  hover: {
+    y: -2,
+    scale: 1.005,
+    transition: { type: 'spring', stiffness: 400, damping: 30 },
+  },
+}
+
+/**
+ * 글자 단위 reveal 컨테이너 — 워드마크/타이틀의 한 글자씩 등장 효과용 부모
+ * staggerChildren: 0.06s — 글자가 한 자씩 또렷하게 떠오르는 리듬
+ * delayChildren: 0.1s — 페이지 마운트 직후 약간의 호흡 후 시작
+ */
+export const letterContainer: Variants = {
+  hidden: {},
+  visible: {
+    transition: { staggerChildren: 0.06, delayChildren: 0.1 },
+  },
+}
+
+/**
+ * 글자 단위 reveal 자식 — letterContainer 의 자식으로 사용
+ * y:80 + blur(12px) + rotateX:-45° → 0 (입체적인 떠오름)
+ * 부모에 perspective:1000 / transform-style:preserve-3d 필요
+ * duration: 0.9s — 거대 타이포에 맞는 무게감 있는 시간
+ */
+export const letterReveal: Variants = {
+  hidden: { opacity: 0, y: 80, filter: 'blur(12px)', rotateX: -45 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    filter: 'blur(0px)',
+    rotateX: 0,
+    transition: {
+      duration: 0.9,
+      ease: [0.22, 1, 0.36, 1] as [number, number, number, number],
+    },
+  },
+}
