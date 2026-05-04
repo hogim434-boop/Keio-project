@@ -1,10 +1,11 @@
 'use client'
 
 /**
- * 커뮤니티 하단 내비게이션 바 — 3탭 + 중앙 FAB 슬롯
+ * 커뮤니티 하단 내비게이션 바 — 3탭 균등 분배 (1:1:1)
  *
  * 레이아웃:
- *   [掲示板] [  FAB 슬롯(w-14 숨김)  ] [探索] [マイ]
+ *   [ 掲示板 ][ 探索 ][ マイ ]   ← 각 1/3 씩 차지
+ *   FAB 는 fixed z-40 으로 가로 정중앙(探索 위치) 에 별도 부유
  *
  * - layoutId='tab-indicator' 슬라이딩 인디케이터 (Framer Motion)
  * - whileTap scale 0.82 마이크로인터랙션
@@ -19,15 +20,11 @@ import { Home, Search, User } from 'lucide-react'
 import { motion, useReducedMotion } from 'framer-motion'
 import { cn } from '@/lib/utils'
 
-/** 좌측 탭 — 掲示板(홈) */
-const TABS_LEFT = [
-  { href: '/', icon: Home, label: '掲示板' },
-] as const
-
-/** 우측 탭 — 探索 / マイ */
-const TABS_RIGHT = [
-  { href: '/explore', icon: Search, label: '探索' },
-  { href: '/my',     icon: User,   label: 'マイ'  },
+/** 3탭 — 掲示板 / 探索 / マイ. 각자 화면 1/3 씩 균등 분배 */
+const TABS = [
+  { href: '/',        icon: Home,   label: '掲示板' },
+  { href: '/explore', icon: Search, label: '探索'   },
+  { href: '/my',      icon: User,   label: 'マイ'   },
 ] as const
 
 type TabItem = { href: string; icon: React.ComponentType<{ size?: number; strokeWidth?: number; className?: string }>; label: string }
@@ -100,21 +97,8 @@ export function BottomTabBar() {
       aria-label="タブナビゲーション"
     >
       <div className="flex h-14 items-stretch">
-        {/* 좌측: 掲示板 탭 */}
-        {TABS_LEFT.map((tab) => (
-          <TabItem
-            key={tab.href}
-            {...tab}
-            pathname={pathname}
-            shouldReduce={shouldReduce}
-          />
-        ))}
-
-        {/* 중앙 FAB 슬롯 — WriteFab이 fixed로 이 위에 float */}
-        <div className="w-14 shrink-0" aria-hidden="true" />
-
-        {/* 우측: 探索 + マイ 탭 */}
-        {TABS_RIGHT.map((tab) => (
+        {/* 3탭 균등 분배 — 각 link 의 flex-1 로 1/3 씩 차지 */}
+        {TABS.map((tab) => (
           <TabItem
             key={tab.href}
             {...tab}
