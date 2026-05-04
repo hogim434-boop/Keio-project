@@ -361,6 +361,20 @@ export type Database = {
       is_admin: { Args: never; Returns: boolean }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
+      soft_delete_comment: {
+        Args: { p_id: string }
+        Returns: {
+          body: string
+          created_at: string
+          id: string
+          is_anonymous: boolean
+          is_deleted: boolean
+          parent_id: string | null
+          post_id: string
+          updated_at: string
+          user_id: string
+        }
+      }
     }
     Enums: {
       [_ in never]: never
