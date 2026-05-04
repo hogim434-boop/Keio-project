@@ -9,36 +9,15 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { AuthHeader } from '../_components/auth-header'
+import {
+  AUTH_INPUT_CLASS,
+  authFadeUp,
+  authField,
+  authFormContainer,
+  authPageContainer,
+} from '../_components/auth-styles'
 import { createClient } from '@/lib/supabase/client'
 import { LoginFormSchema, type LoginFormData } from '@/types/auth'
-
-const pageContainer = {
-  hidden: {},
-  visible: { transition: { staggerChildren: 0.08, delayChildren: 0.15 } },
-}
-
-const fadeUp = {
-  hidden: { opacity: 0, y: 16 },
-  visible: {
-    opacity: 1,
-    y: 0,
-    transition: { duration: 0.5, ease: [0.22, 1, 0.36, 1] as const },
-  },
-}
-
-const formContainer = {
-  hidden: {},
-  visible: { transition: { staggerChildren: 0.07 } },
-}
-
-const field = {
-  hidden: { opacity: 0, y: 10 },
-  visible: {
-    opacity: 1,
-    y: 0,
-    transition: { duration: 0.4, ease: [0.22, 1, 0.36, 1] as const },
-  },
-}
 
 export default function LoginPage() {
   const router = useRouter()
@@ -63,10 +42,9 @@ export default function LoginPage() {
     const { error } = await supabase.auth.signInWithPassword(values)
 
     if (error) {
-      // Supabase 인증 실패 → 폼 전체 에러로 표시
       setError('root', {
         type: 'manual',
-        message: '이메일 또는 비밀번호가 올바르지 않습니다',
+        message: 'メールアドレスまたはパスワードが正しくありません',
       })
       return
     }
@@ -79,38 +57,35 @@ export default function LoginPage() {
       <AuthHeader />
 
       <motion.div
-        variants={shouldReduce ? {} : pageContainer}
+        variants={shouldReduce ? {} : authPageContainer}
         initial="hidden"
         animate="visible"
         className="flex-1 flex flex-col justify-center mx-auto max-w-sm w-full px-6 py-8"
       >
-        {/* 제목 */}
         <motion.h1
-          variants={shouldReduce ? {} : fadeUp}
+          variants={shouldReduce ? {} : authFadeUp}
           className="text-3xl font-bold mb-8"
         >
-          로그인
+          ログイン
         </motion.h1>
 
-        {/* 이메일 + 비밀번호 폼 */}
         <motion.form
-          variants={shouldReduce ? {} : formContainer}
+          variants={shouldReduce ? {} : authFormContainer}
           onSubmit={handleSubmit(onSubmit)}
           className="space-y-4"
           noValidate
         >
-          <motion.div variants={shouldReduce ? {} : field} className="space-y-2">
-            <Label htmlFor="email">메일 주소</Label>
+          <motion.div variants={shouldReduce ? {} : authField} className="space-y-2">
+            <Label htmlFor="email">メールアドレス</Label>
             <Input
               id="email"
               type="email"
               placeholder="xxx@keio.jp"
               autoComplete="email"
               aria-invalid={!!errors.email}
-              className="rounded-full bg-muted border-0 h-12 px-5 focus-visible:ring-1 focus-visible:ring-ring"
+              className={AUTH_INPUT_CLASS}
               {...register('email')}
             />
-            {/* 필드별 인라인 에러 */}
             {errors.email?.message && (
               <p role="alert" className="px-2 text-xs text-destructive">
                 {errors.email.message}
@@ -118,15 +93,15 @@ export default function LoginPage() {
             )}
           </motion.div>
 
-          <motion.div variants={shouldReduce ? {} : field} className="space-y-2">
-            <Label htmlFor="password">비밀번호</Label>
+          <motion.div variants={shouldReduce ? {} : authField} className="space-y-2">
+            <Label htmlFor="password">パスワード</Label>
             <Input
               id="password"
               type="password"
-              placeholder="비밀번호 입력"
+              placeholder="パスワードを入力"
               autoComplete="current-password"
               aria-invalid={!!errors.password}
-              className="rounded-full bg-muted border-0 h-12 px-5 focus-visible:ring-1 focus-visible:ring-ring"
+              className={AUTH_INPUT_CLASS}
               {...register('password')}
             />
             {errors.password?.message && (
@@ -136,7 +111,6 @@ export default function LoginPage() {
             )}
           </motion.div>
 
-          {/* 폼 전체 에러 (서버 인증 실패 등) */}
           {errors.root?.message && (
             <motion.p
               role="alert"
@@ -148,7 +122,7 @@ export default function LoginPage() {
             </motion.p>
           )}
 
-          <motion.div variants={shouldReduce ? {} : field}>
+          <motion.div variants={shouldReduce ? {} : authField}>
             <motion.div
               whileHover={shouldReduce ? {} : { scale: 1.02 }}
               whileTap={shouldReduce ? {} : { scale: 0.98 }}
@@ -159,23 +133,22 @@ export default function LoginPage() {
                 disabled={isSubmitting}
                 className="w-full rounded-full h-12 mt-2"
               >
-                {isSubmitting ? '로그인 중…' : '로그인'}
+                {isSubmitting ? 'ログイン中…' : 'ログイン'}
               </Button>
             </motion.div>
           </motion.div>
         </motion.form>
 
-        {/* 회원가입 링크 */}
         <motion.p
-          variants={shouldReduce ? {} : fadeUp}
+          variants={shouldReduce ? {} : authFadeUp}
           className="mt-6 text-center text-sm text-muted-foreground"
         >
-          계정이 없으신가요?{' '}
+          アカウントをお持ちでない方は{' '}
           <Link
             href="/signup"
             className="font-medium text-foreground underline underline-offset-4 hover:text-foreground/80 transition-colors"
           >
-            회원가입
+            新規登録
           </Link>
         </motion.p>
       </motion.div>
