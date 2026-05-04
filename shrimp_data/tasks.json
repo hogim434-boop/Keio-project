@@ -1374,6 +1374,367 @@
       "implementationGuide": "1) Write app/(app)/posts/[id]/page.tsx:\n   import { notFound } from 'next/navigation'\n   import Link from 'next/link'\n   import { ChevronLeft } from 'lucide-react'\n   import { createClient } from '@/lib/supabase/server'\n   import { fetchPostWithComments } from '@/lib/community/post-detail'\n   import { getCategoryEmoji } from '@/lib/community/categories'\n   import type { CategorySlug } from '@/types/community'\n   import { PostDetailActions } from '@/components/community/post-detail-actions'\n   import { PostDetailThread } from '@/components/community/post-detail-thread'\n\n   export default async function PostDetailPage({ params }: { params: Promise<{ id: string }> }) {\n     const { id } = await params\n     const supabase = await createClient()\n     const result = await fetchPostWithComments(supabase, id)\n     if (!result) notFound()\n     const { data: { user } } = await supabase.auth.getUser()\n     const currentUserId = user?.id ?? null\n     const { post, comments, myReaction, myBookmark } = result\n\n     return (\n       <div>\n         <header className='sticky top-0 z-30 bg-background/95 backdrop-blur border-b px-2 h-14 flex items-center'>\n           <Link href='/' aria-label='戻る' className='p-2 rounded-md hover:bg-muted'><ChevronLeft className='size-5' /></Link>\n         </header>\n         <article className='px-4 py-4 space-y-3 border-b'>\n           <div className='flex items-center gap-2'>\n             <span className='inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-secondary text-secondary-foreground text-xs'>\n               {post.category && getCategoryEmoji(post.category.slug as CategorySlug)} {post.category?.name ?? '—'}\n             </span>\n             <span className='text-xs text-muted-foreground'>\n               {post.author?.nickname ?? '匿名'} · {new Date(post.created_at).toLocaleString('ja-JP')}\n             </span>\n           </div>\n           <h1 className='text-xl font-bold'>{post.title}</h1>\n           <p className='whitespace-pre-wrap text-sm leading-relaxed'>{post.body}</p>\n         </article>\n         <PostDetailActions\n           postId={post.id} ownerUserId={post.user_id} currentUserId={currentUserId}\n           reactionUp={post.reaction_up} reactionDown={post.reaction_down} commentCount={post.comment_count}\n           initialMyReaction={myReaction} initialMyBookmark={myBookmark}\n         />\n         <section className='px-4 py-4'>\n           <h2 className='text-sm font-semibold text-muted-foreground mb-3'>コメント ({post.comment_count})</h2>\n           <PostDetailThread comments={comments} postId={post.id} currentUserId={currentUserId} />\n         </section>\n         <div className='h-32' aria-hidden />\n       </div>\n     )\n   }\n\n2) npm run build (timeout 5분) — /posts/[id] 신규 ƒ 라우트 + /api/comments/[id] 신규 ƒ 라우트 추가, 총 18~19 라우트 컴파일 통과 확인\n3) Edit docs/ROADMAP.md Task 015 ✅ + nested bullet 5~7줄",
       "verificationCriteria": "/posts/[id] 라우트 정상 SSR, fetchPostWithComments null → 404, 본인 글 삭제·댓글 작성·返信·삭제 모두 동작, npm run build 회귀 0건, ROADMAP ✅.",
       "analysisResult": "Task 015 — Phase 4 게시글 상세 + 댓글 (W2). app/(app)/posts/[id]/page.tsx Server Component 가 fetchPostWithComments 를 호출하여 post + 카테고리 + 작성자 + 1단계 대댓글 트리 + myReaction + myBookmark 를 SSR. 본인 판정은 Server Component 에서 supabase.auth.getUser() 로 currentUserId 추출 → Client 컴포넌트 props 전달. 컴포넌트 4개: post-detail-actions(Client, 낙관적 ❤👎🔖 + 본인 글 削除 + ⋯ placeholder) / post-detail-thread(Client wrapper, replyTo state 보유) / comment-list(Client, 1단계 대댓글 트리 + 본인 댓글 削除) / comment-form(Client, RHF + zodResolver(CommentFormSchema) + 하단 fixed + 返信 모드). 신규 라우트 1개: app/api/comments/[id]/route.ts DELETE (withAuth + soft delete). 댓글 즉시 반영은 router.refresh(). 댓글 추천 토글은 Phase 7+ 로 미룸 (read-only 카운트도 본 Task 에선 미노출, 단순화). FAB 와 댓글 폼 z-index 충돌은 미해결 (Task 020 통합 시 결정). 일본어 카피 W2 1:1 (戻る / 削除 / 返信 / 送信 / コメントを入力 / まだコメントがありません / 投稿を削除しました / 投稿が見つかりません 등). 4 서브태스크."
+    },
+    {
+      "id": "10d6dd7f-0390-4b55-88f3-68f4d8f11214",
+      "name": "Task 016-1: lib/stores/report-sheet-store.ts (Zustand, target 보유)",
+      "description": "Zustand store 신규. write-sheet-store 와 동일 패턴 + target 페이로드 (type/id/preview).\n\n시그니처:\n- isOpen: boolean\n- target: { type:'post'|'comment'; id:string; preview?:string } | null\n- open(target): void — isOpen=true, target=...\n- close(): void — isOpen=false, target=null",
+      "notes": "기존 lib/stores/write-sheet-store.ts 와 100% 동일 패턴 + target 추가.",
+      "status": "pending",
+      "dependencies": [],
+      "createdAt": "2026-05-04T12:06:22.783Z",
+      "updatedAt": "2026-05-04T12:06:22.783Z",
+      "relatedFiles": [
+        {
+          "path": "lib/stores/report-sheet-store.ts",
+          "type": "CREATE",
+          "description": "Zustand store"
+        },
+        {
+          "path": "lib/stores/write-sheet-store.ts",
+          "type": "REFERENCE",
+          "description": "동일 패턴 출처"
+        }
+      ],
+      "implementationGuide": "Write lib/stores/report-sheet-store.ts:\nimport { create } from 'zustand'\nexport type ReportTarget = { type: 'post' | 'comment'; id: string; preview?: string }\ninterface State { isOpen: boolean; target: ReportTarget | null; open: (t: ReportTarget) => void; close: () => void }\nexport const useReportSheet = create<State>((set) => ({\n  isOpen: false,\n  target: null,\n  open: (target) => set({ isOpen: true, target }),\n  close: () => set({ isOpen: false, target: null }),\n}))\n\ntsc --noEmit 검증",
+      "verificationCriteria": "useReportSheet export, isOpen/target/open/close 시그니처 일치, tsc 0건.",
+      "analysisResult": "Task 016 — F008 신고 기능 (W6 와이어프레임). lib/stores/report-sheet-store.ts(Zustand, target 보유) + components/community/report-sheet.tsx(50vh + RHF + zodResolver(ReportFormSchema) + 사유 라디오 4건 + 보충 0/500 + UNIQUE 409 처리) + 3곳 ⋯ placeholder 통합(post-card / post-detail-actions / comment-list — 댓글은 본인이면 削除, 타인이면 通報) + (app)/layout.tsx 에 마운트. /api/reports POST 라우트 + reports 테이블 + UNIQUE 제약 + RLS 정책 모두 Task 011 에서 완료. 일본어 카피 W6 1:1. write-bottom-sheet 와 동일 패턴 (Sheet/RHF/sonner). 4 서브태스크."
+    },
+    {
+      "id": "386b54f2-f9fc-4923-b681-45b609bf4bcc",
+      "name": "Task 016-2: components/community/report-sheet.tsx (50vh + RHF + ReportFormSchema)",
+      "description": "W6 와이어프레임 1:1 구현. 'use client'. shadcn Sheet(side='bottom') 50vh + 헤더(X/通報/送信) + 안내(target.type 분기) + RadioGroup 사유 4건 + Textarea 보충 0/500 + 重複 안내 + RHF + zodResolver(ReportFormSchema) + envelope 처리 (200/409/422/401/기타).\n\n파일: components/community/report-sheet.tsx",
+      "notes": "target null 시 SheetContent 안의 target?.type 분기에서 fallback 처리. form.formState.isValid 가 reason 미선택 시 false → 제출 disabled. write-bottom-sheet 와 톤 일관.",
+      "status": "pending",
+      "dependencies": [
+        {
+          "taskId": "10d6dd7f-0390-4b55-88f3-68f4d8f11214"
+        }
+      ],
+      "createdAt": "2026-05-04T12:06:22.783Z",
+      "updatedAt": "2026-05-04T12:06:22.783Z",
+      "relatedFiles": [
+        {
+          "path": "components/community/report-sheet.tsx",
+          "type": "CREATE",
+          "description": "通報 Bottom Sheet"
+        },
+        {
+          "path": "components/community/write-bottom-sheet.tsx",
+          "type": "REFERENCE",
+          "description": "Sheet+RHF+sonner 패턴 출처"
+        },
+        {
+          "path": "types/community.ts",
+          "type": "DEPENDENCY",
+          "description": "ReportFormSchema/ReportFormData/REPORT_REASON_VALUES"
+        },
+        {
+          "path": "lib/stores/report-sheet-store.ts",
+          "type": "DEPENDENCY",
+          "description": "useReportSheet"
+        },
+        {
+          "path": "app/api/reports/route.ts",
+          "type": "DEPENDENCY",
+          "description": "POST 응답 envelope"
+        },
+        {
+          "path": "docs/wireframes/report-sheet.md",
+          "type": "REFERENCE",
+          "description": "W6 시안 (만약 부재면 메모리 시안)"
+        }
+      ],
+      "implementationGuide": "1) 'use client' + imports: Sheet/SheetContent/SheetHeader/SheetTitle/SheetDescription/SheetClose, Button, Textarea, RadioGroup/RadioGroupItem, Label, X/Loader2/AlertCircle, useForm/Controller, zodResolver, ReportFormSchema/ReportFormData (types/community), useReportSheet (lib/stores), useRouter, toast (sonner), useEffect/useRef\n2) const REASONS = [{value:'abuse',label:'暴言・誹謗中傷'},{value:'defamation',label:'名誉毀損'},{value:'spam',label:'スパム'},{value:'illegal',label:'違法・不適切なコンテンツ'}] as const\n3) const { isOpen, target, close } = useReportSheet()\n4) form = useForm<ReportFormData>({ resolver: zodResolver(ReportFormSchema), mode:'onChange', defaultValues: { targetType: 'post', targetId: '', reason: undefined as any, description: '' } })\n5) useEffect on target?.id/type — target 가 있을 때 form.reset({ targetType: target.type, targetId: target.id, reason: undefined, description: '' })\n6) onSubmit:\n   res = fetch('/api/reports', POST + JSON)\n   json.ok → toast.success('通報を受け付けました。運営が確認します。') + close() + form.reset\n   res.status===401 → router.replace('/login')\n   res.status===409 || json.error?.code==='CONFLICT' → toast.warning('既に通報済みです') + close()\n   422 + fieldErrors → form.setError 인라인\n   기타 → toast.error('通報に失敗しました', { description: json.error?.message })\n7) JSX:\n   <Sheet open={isOpen} onOpenChange={(o)=>!o&&close()}>\n     <SheetContent side='bottom' showCloseButton={false} className='h-[50vh] p-0 flex flex-col rounded-t-2xl'>\n       <SheetHeader> [SheetClose ghost X] [SheetTitle 通報 + SheetDescription sr-only] [Button submit form='report-form' destructive disabled=!isValid||isSubmitting] </SheetHeader>\n       <form id='report-form' onSubmit={form.handleSubmit(onSubmit)} className='flex-1 overflow-y-auto p-4 space-y-4'>\n         <Alert/안내 div: この{target?.type==='post'?'投稿':'コメント'}を運営に通報します。 内容は管理者のみが確認できます。\n         (선택) target?.preview 표시\n         <Controller name='reason' RadioGroup REASONS map → Label + RadioGroupItem >\n         <Textarea register('description') maxLength=500 placeholder='補足説明 (任意)\\n具体的な状況をご記入ください...' rows=4 + 카운터>\n         <p className='text-xs text-muted-foreground'>⚠️ 同じ投稿への重複通報はできません</p>\n       </form>\n     </SheetContent>\n   </Sheet>\n8) tsc --noEmit",
+      "verificationCriteria": "50vh Sheet + 사유 4 라디오 + 보충 0/500 + 重複 안내 + 通報 라벨 + 既に通報済み 토스트, target.type 에 따라 投稿/コメント 분기, tsc 0건.",
+      "analysisResult": "Task 016 — F008 신고 기능 (W6 와이어프레임). lib/stores/report-sheet-store.ts(Zustand, target 보유) + components/community/report-sheet.tsx(50vh + RHF + zodResolver(ReportFormSchema) + 사유 라디오 4건 + 보충 0/500 + UNIQUE 409 처리) + 3곳 ⋯ placeholder 통합(post-card / post-detail-actions / comment-list — 댓글은 본인이면 削除, 타인이면 通報) + (app)/layout.tsx 에 마운트. /api/reports POST 라우트 + reports 테이블 + UNIQUE 제약 + RLS 정책 모두 Task 011 에서 완료. 일본어 카피 W6 1:1. write-bottom-sheet 와 동일 패턴 (Sheet/RHF/sonner). 4 서브태스크."
+    },
+    {
+      "id": "ef6b1ac1-c484-4f66-9268-bf7d64c5309f",
+      "name": "Task 016-3: ⋯ 메뉴 통합 (post-card + post-detail-actions + comment-list)",
+      "description": "3곳의 ⋯ placeholder 를 useReportSheet().open() 호출로 교체. 댓글은 본인/타인 분기 (본인 削除 / 타인 通報).",
+      "notes": "본인 글 신고 차단은 MVP 에서 미구현 — post-card/post-detail-actions 는 본인 글이라도 통보 메뉴 노출 (자기 신고 가능). 후속 보강 가능. 댓글은 본인/타인 분기로 명확.",
+      "status": "pending",
+      "dependencies": [
+        {
+          "taskId": "386b54f2-f9fc-4923-b681-45b609bf4bcc"
+        }
+      ],
+      "createdAt": "2026-05-04T12:06:22.783Z",
+      "updatedAt": "2026-05-04T12:06:22.783Z",
+      "relatedFiles": [
+        {
+          "path": "components/community/post-card.tsx",
+          "type": "TO_MODIFY",
+          "description": "⋯ menu 진입점",
+          "lineStart": 135,
+          "lineEnd": 180
+        },
+        {
+          "path": "components/community/post-detail-actions.tsx",
+          "type": "TO_MODIFY",
+          "description": "⋯ menu 진입점",
+          "lineStart": 210,
+          "lineEnd": 345
+        },
+        {
+          "path": "components/community/comment-list.tsx",
+          "type": "TO_MODIFY",
+          "description": "본인/타인 분기",
+          "lineStart": 115,
+          "lineEnd": 160
+        },
+        {
+          "path": "lib/stores/report-sheet-store.ts",
+          "type": "DEPENDENCY",
+          "description": "useReportSheet.open"
+        }
+      ],
+      "implementationGuide": "1) post-card.tsx (line ~138):\n   import { useReportSheet } from '@/lib/stores/report-sheet-store'\n   const openReport = useReportSheet(s=>s.open)\n   handleMenu(e):\n     e.stopPropagation()\n     openReport({ type:'post', id: post.id, preview: post.title })\n   기존 toast('準備中') 라인 제거\n\n2) post-detail-actions.tsx (line ~213):\n   동일 import + openReport\n   handleMenu(e):\n     e.stopPropagation()\n     openReport({ type:'post', id: postId, preview: undefined })\n   (post 의 title 은 props 미보유, undefined 로 두거나 props 추가)\n\n3) comment-list.tsx CommentItem (line ~135 부근):\n   currentUserId === c.user_id 가드 제거 — 항상 ⋯ 노출\n   DropdownMenuContent 안:\n     {isOwner ? (\n       <DropdownMenuItem onClick={handleDelete}>削除</DropdownMenuItem>\n     ) : (\n       <DropdownMenuItem onClick={() => openReport({ type:'comment', id: c.id, preview: c.body.slice(0,30) })}>通報</DropdownMenuItem>\n     )}\n   const isOwner = currentUserId === c.user_id\n   import { useReportSheet } from '@/lib/stores/report-sheet-store'\n\n4) tsc --noEmit",
+      "verificationCriteria": "3 곳 placeholder 모두 openReport() 호출로 교체, comment-list 가 타인 댓글에도 ⋯ 노출 + 通報 항목, tsc 0건.",
+      "analysisResult": "Task 016 — F008 신고 기능 (W6 와이어프레임). lib/stores/report-sheet-store.ts(Zustand, target 보유) + components/community/report-sheet.tsx(50vh + RHF + zodResolver(ReportFormSchema) + 사유 라디오 4건 + 보충 0/500 + UNIQUE 409 처리) + 3곳 ⋯ placeholder 통합(post-card / post-detail-actions / comment-list — 댓글은 본인이면 削除, 타인이면 通報) + (app)/layout.tsx 에 마운트. /api/reports POST 라우트 + reports 테이블 + UNIQUE 제약 + RLS 정책 모두 Task 011 에서 완료. 일본어 카피 W6 1:1. write-bottom-sheet 와 동일 패턴 (Sheet/RHF/sonner). 4 서브태스크."
+    },
+    {
+      "id": "7e8e1ca3-bdef-4041-afb2-fb7dd560cd78",
+      "name": "Task 016-4: (app)/layout.tsx 마운트 + npm run build + ROADMAP ✅",
+      "description": "ReportBottomSheet 를 (app) 라우트 layout 에 마운트하여 모든 페이지에서 호출 가능하게 + 통합 검증 + ROADMAP.",
+      "notes": "본 Task 의 build 가 실패하면 가장 흔한 사고: ReportFormSchema 의 reason undefined 초기값 / RadioGroup Controller 타입 / target null 가드.",
+      "status": "pending",
+      "dependencies": [
+        {
+          "taskId": "ef6b1ac1-c484-4f66-9268-bf7d64c5309f"
+        }
+      ],
+      "createdAt": "2026-05-04T12:06:22.783Z",
+      "updatedAt": "2026-05-04T12:06:22.783Z",
+      "relatedFiles": [
+        {
+          "path": "app/(app)/layout.tsx",
+          "type": "TO_MODIFY",
+          "description": "ReportBottomSheet 마운트"
+        },
+        {
+          "path": "docs/ROADMAP.md",
+          "type": "TO_MODIFY",
+          "description": "Task 016 ✅"
+        }
+      ],
+      "implementationGuide": "1) Edit app/(app)/layout.tsx:\n   import { ReportBottomSheet } from '@/components/community/report-sheet'\n   <WriteBottomSheet />\n   <ReportBottomSheet />  ← 추가\n\n2) Bash npm run build (timeout 5분) — 19 라우트 컴파일 통과 확인 (라우트 수 변동 없음)\n\n3) (선택) mcp__supabase__execute_sql 로 reports 테이블 직전 row 확인\n\n4) Edit docs/ROADMAP.md Task 016 ✅ + nested bullet 5~7줄:\n   - lib/stores/report-sheet-store.ts (Zustand + target 페이로드)\n   - components/community/report-sheet.tsx (50vh Sheet + RHF + ReportFormSchema + 사유 4 라디오 + 보충 0/500)\n   - 3 곳 ⋯ placeholder 통합 (post-card / post-detail-actions / comment-list — 본인 削除 vs 타인 通報 분기)\n   - 응답 envelope 처리: 200 toast.success / 409 既に通報済み / 401 redirect / 422 setError / 기타 toast.error\n   - 일본어 카피 W6 1:1 + 重複 안내\n   - npm run build 회귀 0건. Task 017 진입 — 탐색·인기 페이지",
+      "verificationCriteria": "layout 에 ReportBottomSheet 추가, npm run build 회귀 0건, ROADMAP Task 016 ✅ + nested bullet 5~7줄.",
+      "analysisResult": "Task 016 — F008 신고 기능 (W6 와이어프레임). lib/stores/report-sheet-store.ts(Zustand, target 보유) + components/community/report-sheet.tsx(50vh + RHF + zodResolver(ReportFormSchema) + 사유 라디오 4건 + 보충 0/500 + UNIQUE 409 처리) + 3곳 ⋯ placeholder 통합(post-card / post-detail-actions / comment-list — 댓글은 본인이면 削除, 타인이면 通報) + (app)/layout.tsx 에 마운트. /api/reports POST 라우트 + reports 테이블 + UNIQUE 제약 + RLS 정책 모두 Task 011 에서 완료. 일본어 카피 W6 1:1. write-bottom-sheet 와 동일 패턴 (Sheet/RHF/sonner). 4 서브태스크."
+    },
+    {
+      "id": "05b6289e-11e5-4bad-bcd6-9fe3a42b1884",
+      "name": "Task 017-1: components/community/explore-search-bar.tsx (검색바)",
+      "description": "sticky 검색 입력바 — 'use client'. 자동 포커스(mount), 디바운스 300ms, IME composition 가드, URL ?q replace, X 클리어 버튼. shadcn Input + lucide Search/X.\n\n파일: components/community/explore-search-bar.tsx",
+      "notes": "디바운스 300ms — 빠른 타이핑에 fetch 폭주 방지. URL replace 채택 — 디바운스마다 history 추가 방지. composition 중에는 setTimeout 보류 (한자/일본어 조합 안정성).",
+      "status": "pending",
+      "dependencies": [],
+      "createdAt": "2026-05-04T12:17:05.011Z",
+      "updatedAt": "2026-05-04T12:17:05.011Z",
+      "relatedFiles": [
+        {
+          "path": "components/community/explore-search-bar.tsx",
+          "type": "CREATE",
+          "description": "검색 입력바"
+        },
+        {
+          "path": "components/community/category-icon-row.tsx",
+          "type": "REFERENCE",
+          "description": "useRouter+useSearchParams 패턴 출처"
+        },
+        {
+          "path": "components/ui/input.tsx",
+          "type": "DEPENDENCY",
+          "description": "shadcn Input"
+        }
+      ],
+      "implementationGuide": "1) 'use client' + imports: useEffect/useRef/useState, useRouter/useSearchParams/usePathname, Search/X (lucide), Input (shadcn)\n2) 컴포넌트:\n   - const sp = useSearchParams(); const initialQ = sp.get('q') ?? ''\n   - state local (controlled), inputRef, debounceRef (NodeJS.Timeout), composingRef\n   - mount useEffect → inputRef.focus()\n   - useEffect on sp 변경: urlQ 와 local 다르면 setLocal\n   - pushUrl(value): URLSearchParams 에 q set/delete + router.replace(`${pathname}?${qs}`)\n   - scheduleDebounced(value): clearTimeout(prev); composing 면 return; setTimeout(()=>pushUrl(value),300)\n   - onChange(e): setLocal + scheduleDebounced\n   - onCompositionStart: composingRef=true\n   - onCompositionEnd: composingRef=false; scheduleDebounced(value)\n   - onClear: setLocal('') + clearTimeout + pushUrl('') + focus\n3) JSX:\n   <div sticky top-0 z-30 bg-background/95 backdrop-blur border-b px-4 py-3>\n     <div className='relative'>\n       <Search absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground />\n       <Input ref + value + onChange + onCompositionStart + onCompositionEnd + placeholder='キーワードを検索...' aria-label='検索' role='searchbox' className='pl-10 pr-10 h-11' />\n       {local && <button X onClear absolute right-2 ...>}\n     </div>\n   </div>\n4) tsc --noEmit",
+      "verificationCriteria": "sticky 검색바 + 자동 포커스 + 디바운스 300ms + IME 가드 + X 클리어 + URL ?q replace 모두 동작, tsc 0건.",
+      "analysisResult": "Task 017 — F007 검색 + 인기 페이지 (W4 와이어프레임). 3 산출물: components/community/explore-search-bar.tsx (sticky+자동포커스+디바운스 300ms+IME composition 가드+URL ?q replace+X 클리어) / components/community/post-feed.tsx 빈 상태 분기 1줄 보강 (search 모드면 該当する投稿が見つかりません) / app/(app)/explore/page.tsx 교체 (Server Component, searchParams Promise, q 있으면 sort=latest+search+limit=20 / q 없으면 sort=popular+limit=10, ExploreSearchBar+CategoryIconRow+PostFeed 조합). PostCard/PostFeed/CategoryIconRow 100% 재사용. fetchPosts 의 search 옵션 그대로. 일본어 카피 W4 1:1."
+    },
+    {
+      "id": "f4493de9-57ec-4596-a93b-9cf8ae353848",
+      "name": "Task 017-2: PostFeed 빈 상태 분기 보강 (search 모드)",
+      "description": "components/community/post-feed.tsx 의 빈 상태 메시지를 search prop 유무에 따라 분기. truthy 면 '該当する投稿が見つかりません — キーワードを変えて再検索', falsy 면 기존 'まだ投稿がありません ...'. 1줄 변경.",
+      "notes": "props 시그니처 (search?: string) 가 이미 존재하므로 추가 변경 X. 단순 분기 1줄.",
+      "status": "pending",
+      "dependencies": [
+        {
+          "taskId": "05b6289e-11e5-4bad-bcd6-9fe3a42b1884"
+        }
+      ],
+      "createdAt": "2026-05-04T12:17:05.011Z",
+      "updatedAt": "2026-05-04T12:17:05.011Z",
+      "relatedFiles": [
+        {
+          "path": "components/community/post-feed.tsx",
+          "type": "TO_MODIFY",
+          "description": "빈 상태 분기",
+          "lineStart": 85,
+          "lineEnd": 100
+        }
+      ],
+      "implementationGuide": "Edit components/community/post-feed.tsx 의 `if (items.length === 0)` 블록:\nreturn (\n  <div className='py-12 text-center text-sm text-muted-foreground'>\n    {search\n      ? '該当する投稿が見つかりません — キーワードを変えて再検索'\n      : 'まだ投稿がありません — 右下のボタンから最初の投稿を作成しましょう'}\n  </div>\n)\n\ntsc --noEmit 검증",
+      "verificationCriteria": "검색 모드에서 빈 결과 시 '該当する投稿が見つかりません', 평소 빈 결과 시 기존 메시지. tsc 0건.",
+      "analysisResult": "Task 017 — F007 검색 + 인기 페이지 (W4 와이어프레임). 3 산출물: components/community/explore-search-bar.tsx (sticky+자동포커스+디바운스 300ms+IME composition 가드+URL ?q replace+X 클리어) / components/community/post-feed.tsx 빈 상태 분기 1줄 보강 (search 모드면 該当する投稿が見つかりません) / app/(app)/explore/page.tsx 교체 (Server Component, searchParams Promise, q 있으면 sort=latest+search+limit=20 / q 없으면 sort=popular+limit=10, ExploreSearchBar+CategoryIconRow+PostFeed 조합). PostCard/PostFeed/CategoryIconRow 100% 재사용. fetchPosts 의 search 옵션 그대로. 일본어 카피 W4 1:1."
+    },
+    {
+      "id": "689cdafb-63df-47fa-b8da-78f7e059957b",
+      "name": "Task 017-3: app/(app)/explore/page.tsx 교체 + npm run build + ROADMAP ✅",
+      "description": "placeholder 페이지를 Server Component 본격 구현으로 교체. searchParams Promise + q 분기 (검색/인기) + ExploreSearchBar + CategoryIconRow + PostFeed.",
+      "notes": "page.tsx 가 ○ static → ƒ Dynamic 으로 변경 (searchParams + supabase 호출). 정상 동작.",
+      "status": "pending",
+      "dependencies": [
+        {
+          "taskId": "f4493de9-57ec-4596-a93b-9cf8ae353848"
+        }
+      ],
+      "createdAt": "2026-05-04T12:17:05.011Z",
+      "updatedAt": "2026-05-04T12:17:05.011Z",
+      "relatedFiles": [
+        {
+          "path": "app/(app)/explore/page.tsx",
+          "type": "TO_MODIFY",
+          "description": "placeholder → Server Component 본격 구현"
+        },
+        {
+          "path": "docs/ROADMAP.md",
+          "type": "TO_MODIFY",
+          "description": "Task 017 ✅"
+        },
+        {
+          "path": "components/community/category-icon-row.tsx",
+          "type": "DEPENDENCY",
+          "description": "재사용"
+        },
+        {
+          "path": "components/community/post-feed.tsx",
+          "type": "DEPENDENCY",
+          "description": "재사용"
+        },
+        {
+          "path": "lib/community/posts.ts",
+          "type": "DEPENDENCY",
+          "description": "fetchPosts(search)"
+        }
+      ],
+      "implementationGuide": "1) Edit app/(app)/explore/page.tsx 전체 교체:\n   - import Suspense, createClient, fetchPosts, CATEGORY_SLUG_VALUES, CategorySlug, ExploreSearchBar, CategoryIconRow, PostFeed\n   - searchParams Promise<{ q?: string; category?: string }>\n   - const sp = await searchParams\n   - const q = sp.q?.trim() || undefined\n   - const categorySlug = sp.category 가 CATEGORY_SLUG_VALUES 에 포함되면 CategorySlug 캐스트, 아니면 undefined\n   - const sort: 'latest'|'popular' = q ? 'latest' : 'popular'\n   - const limit = q ? 20 : 10\n   - const list = await fetchPosts(supabase, { sort, search: q, categorySlug, limit })\n   - JSX:\n     <div>\n       <header sticky top-0 z-30 bg-background/95 backdrop-blur border-b px-4 h-14 flex items-center>\n         <h1 className='text-lg font-bold'>探索</h1>\n       </header>\n       <Suspense fallback={빈 div}><ExploreSearchBar /></Suspense>\n       <Suspense fallback={빈 div}><CategoryIconRow /></Suspense>\n       <section className='px-4 pt-3 pb-1'>\n         {q ? <h2>'\"{q}\"の検索結果'</h2> : <h2>🔥 今週の人気投稿</h2>}\n       </section>\n       <section className='px-4 pb-4'>\n         <PostFeed key={`${q ?? ''}-${categorySlug ?? 'all'}-${sort}`} initial={list} sort={sort} categorySlug={categorySlug} search={q} />\n       </section>\n     </div>\n\n2) Bash npm run build (timeout 5분) — 19 라우트 컴파일 (/explore 가 ○ static → ƒ Dynamic 변경 예상). 회귀 0건 확인\n\n3) Edit docs/ROADMAP.md Task 017 ✅ + nested bullet 5~7줄:\n   - components/community/explore-search-bar.tsx — sticky + 자동 포커스 + 디바운스 300ms + IME composition 가드 + URL ?q replace + X 클리어\n   - PostFeed 빈 상태 카피 분기 (search 모드 → '該当する投稿が見つかりません — キーワードを変えて再検索')\n   - app/(app)/explore/page.tsx Server Component — searchParams Promise + q 분기 (검색=latest+limit20 / 인기=popular+limit10) + ExploreSearchBar + CategoryIconRow 재사용 + PostFeed key reset\n   - 카테고리 칩 필터 (CategoryIconRow ?category 동기화) + PostCard 인라인 ❤/🔖 그대로\n   - 일본어 카피 W4 1:1 (探索 / キーワードを検索... / 🔥今週の人気投稿 / \"...\"の検索結果 / 該当する投稿が見つかりません)\n   - npm run build 회귀 0건. 다음 — Task 018 마이페이지",
+      "verificationCriteria": "/explore 진입 시 sticky 검색바 + 카테고리 행 + 인기 TOP10 (q 빈) / 검색 결과 (q 있음) 모두 정상 렌더, npm run build 회귀 0건, ROADMAP Task 017 ✅.",
+      "analysisResult": "Task 017 — F007 검색 + 인기 페이지 (W4 와이어프레임). 3 산출물: components/community/explore-search-bar.tsx (sticky+자동포커스+디바운스 300ms+IME composition 가드+URL ?q replace+X 클리어) / components/community/post-feed.tsx 빈 상태 분기 1줄 보강 (search 모드면 該当する投稿が見つかりません) / app/(app)/explore/page.tsx 교체 (Server Component, searchParams Promise, q 있으면 sort=latest+search+limit=20 / q 없으면 sort=popular+limit=10, ExploreSearchBar+CategoryIconRow+PostFeed 조합). PostCard/PostFeed/CategoryIconRow 100% 재사용. fetchPosts 의 search 옵션 그대로. 일본어 카피 W4 1:1."
+    },
+    {
+      "id": "be737d50-91c6-4b7d-95af-6528d182bd8c",
+      "name": "Task 018-1: lib/community/my.ts (fetchMyPosts/Comments/Bookmarks)",
+      "description": "마이페이지 Server-side 데이터 액세스 3 함수. 모두 supabase 클라이언트 + userId 받음. 50건 hard limit. 익명 마스킹 불필요(본인 페이지). RLS 통과 (profiles_select_own / posts_select_self / comments_select_visible / bookmarks_select_self).\n\n파일: lib/community/my.ts",
+      "notes": "FK 별칭 select 패턴 — Task 011 의 fetchPosts/post-detail 와 일관. supabase ssr 클라이언트가 RLS 자동 적용. user_id 매개변수는 명시 비교용 (RLS 추가 보장).",
+      "status": "pending",
+      "dependencies": [],
+      "createdAt": "2026-05-04T13:16:51.110Z",
+      "updatedAt": "2026-05-04T13:16:51.110Z",
+      "relatedFiles": [
+        {
+          "path": "lib/community/my.ts",
+          "type": "CREATE",
+          "description": "마이 데이터 액세스 3 함수"
+        },
+        {
+          "path": "lib/community/posts.ts",
+          "type": "REFERENCE",
+          "description": "PostListItem 타입 + FK select 패턴"
+        }
+      ],
+      "implementationGuide": "1) Write lib/community/my.ts:\n   - export interface MyComment { id, body, created_at, post_id, post_title }\n   - export interface MyBookmark { id, created_at, post: PostListItem }\n   - export async function fetchMyPosts(supabase, userId): Promise<PostListItem[]>:\n     supabase.from('posts').select('*, category:categories(slug,name,type), author:profiles(nickname)').eq('user_id',userId).eq('is_deleted',false).order('created_at',{ascending:false}).limit(50)\n   - export async function fetchMyComments(supabase, userId): Promise<MyComment[]>:\n     .from('comments').select('id, body, created_at, post_id, post:posts(title)').eq('user_id',userId).eq('is_deleted',false).order('created_at',{ascending:false}).limit(50)\n     → row.post.title 을 post_title 로 평탄화\n   - export async function fetchMyBookmarks(supabase, userId): Promise<MyBookmark[]>:\n     .from('bookmarks').select('id, created_at, post:posts(*, category:categories(slug,name,type), author:profiles(nickname))').eq('user_id',userId).order('created_at',{ascending:false}).limit(50)\n2) tsc --noEmit",
+      "verificationCriteria": "3 함수 모두 export, PostListItem/MyComment/MyBookmark 타입 정합, tsc 0건.",
+      "analysisResult": "Task 018 — F009·F011 마이페이지 (W5). 1 lib 모듈(my.ts: fetchMyPosts/Comments/Bookmarks) + 5 컴포넌트(my-tabs sticky URL ?tab + my-post-card 削除 + my-comment-card 削除+元投稿 링크 + my-bookmark-card 解除 + logout-button) + page.tsx Server Component 교체 (프로필 헤더 + 3탭 + 카드 리스트 + 빈 상태 분기 + 하단 ログアウト). 50건 hard limit, 페이징 P1. /api/posts·/api/comments·/api/bookmarks 라우트 + soft_delete_comment RPC 모두 재사용. 일본어 카피 W5 1:1. 3 서브태스크."
+    },
+    {
+      "id": "4e3e2557-0050-489b-a230-1e4b26a74a9e",
+      "name": "Task 018-2: my-tabs + my-post-card + my-comment-card + my-bookmark-card + logout-button",
+      "description": "마이페이지 컴포넌트 5개. Client Components.\n\n파일:\n- components/community/my-tabs.tsx — sticky 3탭 segment + URL ?tab 동기화\n- components/community/my-post-card.tsx — [削除] 버튼 + DELETE /api/posts/[id]\n- components/community/my-comment-card.tsx — 본문 + 元投稿 링크 + [削除] + DELETE /api/comments/[id]\n- components/community/my-bookmark-card.tsx — [🔖 解除] + POST /api/bookmarks (토글)\n- components/community/logout-button.tsx — supabase.auth.signOut + router.replace('/login')",
+      "notes": "my-bookmark-card 의 toggleBookmark 응답이 { bookmarked: false } 라 별도 분기 불필요. 즉시 router.refresh 로 목록에서 사라짐.",
+      "status": "pending",
+      "dependencies": [
+        {
+          "taskId": "be737d50-91c6-4b7d-95af-6528d182bd8c"
+        }
+      ],
+      "createdAt": "2026-05-04T13:16:51.110Z",
+      "updatedAt": "2026-05-04T13:16:51.110Z",
+      "relatedFiles": [
+        {
+          "path": "components/community/my-tabs.tsx",
+          "type": "CREATE",
+          "description": "3탭 segment"
+        },
+        {
+          "path": "components/community/my-post-card.tsx",
+          "type": "CREATE",
+          "description": "내 투고 카드"
+        },
+        {
+          "path": "components/community/my-comment-card.tsx",
+          "type": "CREATE",
+          "description": "내 댓글 카드"
+        },
+        {
+          "path": "components/community/my-bookmark-card.tsx",
+          "type": "CREATE",
+          "description": "북마크 카드"
+        },
+        {
+          "path": "components/community/logout-button.tsx",
+          "type": "CREATE",
+          "description": "로그아웃 버튼"
+        },
+        {
+          "path": "components/community/sort-toggle.tsx",
+          "type": "REFERENCE",
+          "description": "segment control + URL 동기화 패턴"
+        }
+      ],
+      "implementationGuide": "1) my-tabs.tsx ('use client'):\n   const TABS = [{value:'posts',label:'投稿'},{value:'comments',label:'コメント'},{value:'bookmarks',label:'ブックマーク'}] as const\n   useSearchParams + useRouter + usePathname\n   const tab = sp.get('tab') ?? 'posts' (3개 중 하나로 검증)\n   onSelect(v): URLSearchParams set tab + router.replace\n   sticky top-14 z-20 bg-background/95 backdrop-blur border-b + segment control 3 button (sort-toggle 패턴)\n\n2) my-post-card.tsx ('use client'):\n   props { post: PostListItem }\n   카테고리 배지 + 시간 + 제목 line-clamp-1 + ❤ 추천수 + 💬 댓글수 + 우측 [削除] Button destructive\n   handleDelete: confirm '投稿を削除しますか?' + fetch DELETE `/api/posts/${post.id}` + ok → toast.success('投稿を削除しました') + router.refresh / 401→/login / 기타→toast.error\n   카드 자체는 router.push(`/posts/${id}`) (役割 button + tabIndex)\n\n3) my-comment-card.tsx ('use client'):\n   props { comment: MyComment }\n   본문 line-clamp-2 + 元の投稿: <Link href={`/posts/${comment.post_id}`}>{comment.post_title}</Link> + 시간 + [削除]\n   handleDelete: confirm + fetch DELETE `/api/comments/${id}` + ok → toast + router.refresh\n\n4) my-bookmark-card.tsx ('use client'):\n   props { bookmark: MyBookmark }\n   카테고리 배지 + 제목 line-clamp-1 + ❤ 추천수 + 💬 댓글수 + 우측 [🔖 解除]\n   handleUnbookmark: fetch POST `/api/bookmarks` body { postId } → ok 시 toast.success('ブックマークを解除しました') + router.refresh\n   카드 클릭 시 router.push(`/posts/${bookmark.post.id}`)\n\n5) logout-button.tsx ('use client'):\n   import { createClient } from '@/lib/supabase/client'\n   onClick: const supabase = createClient(); await supabase.auth.signOut(); router.replace('/login')\n   Button variant='destructive' className='w-full'\n\n6) tsc --noEmit",
+      "verificationCriteria": "5 컴포넌트 모두 export 및 Client Component 정확, 削除/解除/ログアウト 모두 fetch + router.refresh/replace 동작, tsc 0건.",
+      "analysisResult": "Task 018 — F009·F011 마이페이지 (W5). 1 lib 모듈(my.ts: fetchMyPosts/Comments/Bookmarks) + 5 컴포넌트(my-tabs sticky URL ?tab + my-post-card 削除 + my-comment-card 削除+元投稿 링크 + my-bookmark-card 解除 + logout-button) + page.tsx Server Component 교체 (프로필 헤더 + 3탭 + 카드 리스트 + 빈 상태 분기 + 하단 ログアウト). 50건 hard limit, 페이징 P1. /api/posts·/api/comments·/api/bookmarks 라우트 + soft_delete_comment RPC 모두 재사용. 일본어 카피 W5 1:1. 3 서브태스크."
+    },
+    {
+      "id": "547f910d-7fcf-43a1-b7c0-0e3aaf32a5d4",
+      "name": "Task 018-3: app/(app)/my/page.tsx 교체 + npm run build + ROADMAP ✅",
+      "description": "placeholder /my 를 Server Component 본격 구현으로 교체. 프로필 헤더 + 3탭 + 카드 리스트 + 빈 상태 분기 + 하단 로그아웃.",
+      "notes": "page.tsx 가 ƒ Dynamic 으로 전환됨. /my/profile 은 그대로 재활용 (한국어 카피 그대로 — 후속 일본어 변환).",
+      "status": "pending",
+      "dependencies": [
+        {
+          "taskId": "4e3e2557-0050-489b-a230-1e4b26a74a9e"
+        }
+      ],
+      "createdAt": "2026-05-04T13:16:51.110Z",
+      "updatedAt": "2026-05-04T13:16:51.110Z",
+      "relatedFiles": [
+        {
+          "path": "app/(app)/my/page.tsx",
+          "type": "TO_MODIFY",
+          "description": "placeholder → Server Component"
+        },
+        {
+          "path": "docs/ROADMAP.md",
+          "type": "TO_MODIFY",
+          "description": "Task 018 ✅"
+        },
+        {
+          "path": "lib/community/my.ts",
+          "type": "DEPENDENCY",
+          "description": "3 fetch 함수"
+        },
+        {
+          "path": "components/community/my-tabs.tsx",
+          "type": "DEPENDENCY",
+          "description": "3탭"
+        }
+      ],
+      "implementationGuide": "1) Edit app/(app)/my/page.tsx 전체 교체:\n   import Suspense, Link, Settings, createClient, fetchMyPosts/Comments/Bookmarks, MyTabs, MyPostCard, MyCommentCard, MyBookmarkCard, LogoutButton\n   searchParams Promise<{ tab?: string }>\n   const sp = await searchParams\n   const tab: 'posts'|'comments'|'bookmarks' = ['posts','comments','bookmarks'].includes(sp.tab??'') ? sp.tab as any : 'posts'\n   supabase = await createClient()\n   const { data: { user } } = await supabase.auth.getUser()\n   if (!user) redirect('/login') (혹은 proxy 가 처리하므로 미사용 분기)\n   const { data: profile } = await supabase.from('profiles').select('nickname,campus,department').eq('id', user.id).maybeSingle()\n   탭별 fetch:\n     const items = tab==='posts' ? await fetchMyPosts(supabase,user.id) :\n                   tab==='comments' ? await fetchMyComments(supabase,user.id) :\n                   await fetchMyBookmarks(supabase,user.id)\n\n   JSX:\n   <div>\n     <header sticky top-0 z-30 + マイページ + ml-auto Link href='/my/profile' aria-label='設定'><Settings /></Link>\n   </header>\n     <section profile header — px-4 py-4 border-b flex items-center gap-3>\n       <div size-12 rounded-full bg-muted flex items-center justify-center>👤</div>\n       <div flex-1>\n         <p font-semibold>{profile?.nickname ?? '匿名'}</p>\n         <p text-xs text-muted-foreground>{profile?.campus ?? '—'} / {profile?.department ?? '—'}</p>\n       </div>\n       <Button asChild variant='outline' size='sm'><Link href='/my/profile'>プロフィール編集</Link></Button>\n     </section>\n     <Suspense fallback={빈 div}><MyTabs /></Suspense>\n     <section px-4 py-4 space-y-3>\n       {items.length === 0 ? (\n         <div className='py-12 text-center text-sm text-muted-foreground'>\n           {tab==='posts' ? 'まだ投稿がありません' : tab==='comments' ? 'まだコメントがありません' : 'まだブックマークがありません'}\n         </div>\n       ) : tab==='posts' ? items.map(p => <MyPostCard key={p.id} post={p} />) :\n           tab==='comments' ? items.map(c => <MyCommentCard key={c.id} comment={c} />) :\n           items.map(b => <MyBookmarkCard key={b.id} bookmark={b} />)}\n     </section>\n     <section px-4 py-4 border-t>\n       <LogoutButton />\n     </section>\n   </div>\n\n2) npm run build (timeout 5분) — 18 라우트 컴파일 통과. /my 가 ○ static → ƒ Dynamic 으로 변경 예상\n\n3) Edit docs/ROADMAP.md Task 018 ✅ + nested bullet 5~7줄:\n   - lib/community/my.ts — fetchMyPosts/Comments/Bookmarks (50건 hard limit)\n   - components/community/{my-tabs(sticky 3탭 ?tab), my-post-card(削除), my-comment-card(削除 + 元投稿 링크), my-bookmark-card(🔖 解除), logout-button(signOut)}\n   - app/(app)/my/page.tsx Server Component — searchParams ?tab 분기 + 프로필 헤더 + 3탭 + 카드 리스트 + 빈 상태 분기 + 하단 ログアウト\n   - 削除/解除/ログアウト → fetch + router.refresh/replace 즉시 반영\n   - 일본어 카피 W5 1:1 (投稿/コメント/ブックマーク, 削除/解除/プロフィール編集/ログアウト, まだ〜がありません)\n   - npm run build 회귀 0건. Phase 4 완료 (Task 012~018). 다음 — Phase 5 어드민 큐",
+      "verificationCriteria": "/my SSR 정상, 3탭 전환 + 削除/解除/ログアウト 동작, npm run build 회귀 0건, ROADMAP ✅.",
+      "analysisResult": "Task 018 — F009·F011 마이페이지 (W5). 1 lib 모듈(my.ts: fetchMyPosts/Comments/Bookmarks) + 5 컴포넌트(my-tabs sticky URL ?tab + my-post-card 削除 + my-comment-card 削除+元投稿 링크 + my-bookmark-card 解除 + logout-button) + page.tsx Server Component 교체 (프로필 헤더 + 3탭 + 카드 리스트 + 빈 상태 분기 + 하단 ログアウト). 50건 hard limit, 페이징 P1. /api/posts·/api/comments·/api/bookmarks 라우트 + soft_delete_comment RPC 모두 재사용. 일본어 카피 W5 1:1. 3 서브태스크."
     }
   ]
 }
