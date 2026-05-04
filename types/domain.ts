@@ -130,10 +130,6 @@ export type Grade = (typeof GRADE_VALUES)[number]
 
 export const GradeSchema = z.enum(GRADE_VALUES)
 
-// ============================================================
-// 게이오 이메일 도메인 검증 (회원가입용)
-// ============================================================
-
-// KeioEmailSchema 와 KEIO_EMAIL_DOMAINS 는 types/auth.ts 가 단일 출처(SoT).
-// 하위 호환을 위해 여기서 re-export 만 합니다.
-export { KeioEmailSchema, KEIO_EMAIL_DOMAINS } from './auth'
+// 게이오 이메일 검증은 types/auth.ts 가 단일 출처(SoT). 직접 거기서 import 사용.
+// 이전엔 하위 호환 위해 re-export 했으나 domain ↔ auth 순환이 production 빌드 시
+// CampusSchema TDZ 를 유발해 제거함.

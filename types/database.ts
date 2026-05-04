@@ -7,8 +7,11 @@
  * 사용 예:
  * ```ts
  * import type { Database } from '@/types/database'
- * type Course = Database['public']['Tables']['courses']['Row']
+ * type Profile = Database['public']['Tables']['profiles']['Row']
  * ```
+ *
+ * 참고: courses/reviews 테이블 타입은 게시판 피벗(Task 007)으로 제거됨.
+ * 게시판 관련 7테이블은 Task 010에서 mcp__supabase__generate_typescript_types 로 재생성 예정.
  */
 
 // ============================================================
@@ -78,143 +81,6 @@ export interface Database {
           },
         ]
       }
-
-      // ──────────────────────────────────────────────────────
-      // courses — 강의 정보
-      //   PRD 14컬럼 + day_period/classroom 추가 (PDF 추출 데이터 호환)
-      // ──────────────────────────────────────────────────────
-      courses: {
-        Row: {
-          id: string
-          name: string
-          name_en: string | null
-          professor: string
-          campus: string
-          faculty: string
-          semester: string
-          language: 'ja' | 'en'
-          requirement_type: string | null
-          has_textbook: boolean
-          enrollment_size: string | null
-          day_period: string | null
-          classroom: string | null
-          avg_rating: number | null
-          review_count: number
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id?: string
-          name: string
-          name_en?: string | null
-          professor: string
-          campus: string
-          faculty: string
-          semester: string
-          language?: 'ja' | 'en'
-          requirement_type?: string | null
-          has_textbook?: boolean
-          enrollment_size?: string | null
-          day_period?: string | null
-          classroom?: string | null
-          avg_rating?: number | null
-          review_count?: number
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          id?: string
-          name?: string
-          name_en?: string | null
-          professor?: string
-          campus?: string
-          faculty?: string
-          semester?: string
-          language?: 'ja' | 'en'
-          requirement_type?: string | null
-          has_textbook?: boolean
-          enrollment_size?: string | null
-          day_period?: string | null
-          classroom?: string | null
-          avg_rating?: number | null
-          review_count?: number
-          created_at?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
-
-      // ──────────────────────────────────────────────────────
-      // reviews — 강의 리뷰 (5축 평점)
-      //   UNIQUE(course_id, user_id) — 한 사용자는 한 강의당 1개 리뷰
-      //   AFTER INSERT/UPDATE/DELETE 트리거가 courses.avg_rating, review_count 갱신
-      // ──────────────────────────────────────────────────────
-      reviews: {
-        Row: {
-          id: string
-          course_id: string
-          user_id: string
-          taken_semester: string
-          rating_overall: number
-          rating_attendance: number
-          rating_exam_difficulty: number
-          rating_grading_ease: number
-          rating_teaching_style: number
-          teaching_style_tags: string[]
-          body: string | null
-          is_anonymous: boolean
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id?: string
-          course_id: string
-          user_id: string
-          taken_semester: string
-          rating_overall: number
-          rating_attendance: number
-          rating_exam_difficulty: number
-          rating_grading_ease: number
-          rating_teaching_style: number
-          teaching_style_tags?: string[]
-          body?: string | null
-          is_anonymous?: boolean
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          id?: string
-          course_id?: string
-          user_id?: string
-          taken_semester?: string
-          rating_overall?: number
-          rating_attendance?: number
-          rating_exam_difficulty?: number
-          rating_grading_ease?: number
-          rating_teaching_style?: number
-          teaching_style_tags?: string[]
-          body?: string | null
-          is_anonymous?: boolean
-          created_at?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: 'reviews_course_id_fkey'
-            columns: ['course_id']
-            isOneToOne: false
-            referencedRelation: 'courses'
-            referencedColumns: ['id']
-          },
-          {
-            foreignKeyName: 'reviews_user_id_fkey'
-            columns: ['user_id']
-            isOneToOne: false
-            referencedRelation: 'users'
-            referencedColumns: ['id']
-          },
-        ]
-      }
     }
     Views: {
       // user_list 뷰는 profiles 마이그레이션에서 정의됨
@@ -250,15 +116,7 @@ export type TablesInsert<T extends keyof Database['public']['Tables']> =
 export type TablesUpdate<T extends keyof Database['public']['Tables']> =
   Database['public']['Tables'][T]['Update']
 
-// 자주 쓰는 모델 단축 export
+// profiles 모델 단축 export
 export type Profile = Tables<'profiles'>
-export type Course = Tables<'courses'>
-export type Review = Tables<'reviews'>
-
 export type ProfileInsert = TablesInsert<'profiles'>
-export type CourseInsert = TablesInsert<'courses'>
-export type ReviewInsert = TablesInsert<'reviews'>
-
 export type ProfileUpdate = TablesUpdate<'profiles'>
-export type CourseUpdate = TablesUpdate<'courses'>
-export type ReviewUpdate = TablesUpdate<'reviews'>

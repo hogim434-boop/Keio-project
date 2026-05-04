@@ -56,8 +56,9 @@ export async function proxy(request: NextRequest) {
     }
 
     // 계정 설정이 완료된 사용자: 로그인·회원가입·setup 페이지에서 내보냄
+    // /courses → / 로 변경 (게시판 피벗 Task 007-E)
     if (isLoginPath || isSignupPath || isSetupPath) {
-      return NextResponse.redirect(new URL('/courses', request.url))
+      return NextResponse.redirect(new URL('/', request.url))
     }
   }
 
