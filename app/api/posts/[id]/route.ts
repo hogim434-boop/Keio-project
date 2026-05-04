@@ -41,13 +41,14 @@ export async function DELETE(
   if (!parsed.success) return err('VALIDATION', 'IDが正しくありません', 422)
 
   return withAuth(async (supabase) => {
-    const { data, error } = await supabase
+    // soft delete 후 is_deleted=true 가 된 row 는 select 정책으로 가려지므로
+    // .select() 대신 count 로 영향 행 수 확인 — RLS 가 비본인을 차단하면 count=0
+    const { error, count } = await supabase
       .from('posts')
-      .update({ is_deleted: true })
+      .update({ is_deleted: true }, { count: 'exact' })
       .eq('id', parsed.data.id)
-      .select('id')
     if (error) throw error
-    if (!data || data.length === 0) {
+    if (!count || count === 0) {
       throw new Error('FORBIDDEN_OR_NOT_FOUND')
     }
     return { id: parsed.data.id }
