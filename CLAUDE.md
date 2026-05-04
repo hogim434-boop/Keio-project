@@ -74,3 +74,8 @@ Next.js 16은 여러 파일 컨벤션이 변경되었음. `middleware.ts` → `p
 - **Tailwind v4 문법은 v3와 다름** — `@apply`, 설정 방식 등이 변경됨
 - shadcn 컴포넌트는 `components.json`의 `aliases` 설정을 따름
 - 환경변수 `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`는 `.env.local`에 설정
+
+- 중요!!!
+해당 웹 에플리케이션은 일본 사람들을 대상으로 만들어질 것입니다. \
+따라서 해당 웹은 일본어를 기반으로 만들어주세요!!
+
