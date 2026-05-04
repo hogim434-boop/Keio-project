@@ -36,9 +36,10 @@ export async function proxy(request: NextRequest) {
   const isSetupPath = pathname === '/signup/setup' || pathname.startsWith('/signup/setup/')
   const isLoginPath = pathname === '/login'
   const isSignupPath = pathname === '/signup' && !isSetupPath
+  const isLandingPath = pathname === '/landing'
 
   // 공개 경로 화이트리스트 — 나열된 경로 외에는 모두 로그인 필요
-  const PUBLIC_PATHS = ['/login', '/signup', '/auth/']
+  const PUBLIC_PATHS = ['/landing', '/login', '/signup', '/auth/']
   const isPublicPath = PUBLIC_PATHS.some((p) => pathname.startsWith(p))
 
   if (user) {
@@ -55,9 +56,8 @@ export async function proxy(request: NextRequest) {
       return supabaseResponse
     }
 
-    // 계정 설정이 완료된 사용자: 로그인·회원가입·setup 페이지에서 내보냄
-    // /courses → / 로 변경 (게시판 피벗 Task 007-E)
-    if (isLoginPath || isSignupPath || isSetupPath) {
+    // 계정 설정이 완료된 사용자: 랜딩·로그인·회원가입·setup 페이지에서 내보냄
+    if (isLandingPath || isLoginPath || isSignupPath || isSetupPath) {
       return NextResponse.redirect(new URL('/', request.url))
     }
   }
@@ -67,9 +67,9 @@ export async function proxy(request: NextRequest) {
     if (isSetupPath) {
       return NextResponse.redirect(new URL('/signup', request.url))
     }
-    // 공개 경로 외 모든 경로 → 로그인으로
+    // 공개 경로 외 모든 경로 → 랜딩으로 (랜딩에서 시작하기/로그인 분기)
     if (!isPublicPath) {
-      return NextResponse.redirect(new URL('/login', request.url))
+      return NextResponse.redirect(new URL('/landing', request.url))
     }
   }
 
