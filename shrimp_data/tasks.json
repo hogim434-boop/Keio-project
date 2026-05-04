@@ -1,219 +1,155 @@
 {
   "tasks": [
     {
-      "id": "e3190102-9145-447a-94c9-0bddf2b969a9",
-      "name": "Sub 1: types/auth.ts 신규 + KEIO_EMAIL_DOMAINS 단일 출처 통일",
-      "description": "types/auth.ts 파일을 신규 생성하여 인증 관련 모든 zod schema와 도메인 상수를 한 곳에 모은다. KEIO_EMAIL_DOMAINS 상수(@keio.jp, @g.keio.ac.jp, @sfc.keio.ac.jp), KeioEmailSchema, PasswordSchema(8자+영문+숫자), LoginFormSchema, SetupFormSchema를 정의한다. 기존 types/domain.ts의 KeioEmailSchema는 types/auth.ts에서 import하여 re-export(하위 호환). app/auth/callback/route.ts의 KEIO_DOMAINS 하드코딩 배열을 KEIO_EMAIL_DOMAINS import으로 교체한다.",
-      "notes": "Zod 4.4.1 사용 — .refine() 표준 패턴. CampusSchema/GradeSchema는 types/domain.ts에서 import 후 SetupFormSchema에서 사용. 향후 다른 대학 도메인 추가 시 KEIO_EMAIL_DOMAINS만 확장하면 4곳 모두 자동 갱신.",
+      "id": "85c12db4-da83-40e5-90ca-4f58d14f9b91",
+      "name": "Task 008-1: is_admin() 헬퍼 함수 마이그레이션",
+      "description": "RLS 정책에서 재사용할 admin 판정 함수를 별도 마이그레이션 파일로 도입. SECURITY INVOKER + STABLE + search_path=public 명시로 advisor 의 function_search_path_mutable 경고 회피. 이후 categories/posts/comments 의 RLS 정책에서 public.is_admin() 호출.",
+      "notes": "STABLE 명시로 동일 트랜잭션 내 캐싱 활용. profiles RLS 가 본인만 SELECT 허용이라 함수 내부 SELECT 가 본인 row 만 반환 → 자기 자신 admin 여부만 판정. 무한 재귀 위험 없음.",
       "status": "completed",
       "dependencies": [],
-      "createdAt": "2026-05-03T14:59:20.400Z",
-      "updatedAt": "2026-05-03T15:01:43.311Z",
+      "createdAt": "2026-05-04T06:03:54.768Z",
+      "updatedAt": "2026-05-04T06:05:59.218Z",
       "relatedFiles": [
         {
-          "path": "types/auth.ts",
+          "path": "supabase/migrations/20260504000001_create_admin_helper.sql",
           "type": "CREATE",
-          "description": "인증 zod schema + 도메인 상수 단일 출처"
-        },
-        {
-          "path": "types/domain.ts",
-          "type": "TO_MODIFY",
-          "description": "KeioEmailSchema 정의 → types/auth.ts에서 re-export로 변경",
-          "lineStart": 122,
-          "lineEnd": 132
-        },
-        {
-          "path": "app/auth/callback/route.ts",
-          "type": "TO_MODIFY",
-          "description": "KEIO_DOMAINS 하드코딩 → KEIO_EMAIL_DOMAINS import",
-          "lineStart": 5,
-          "lineEnd": 5
-        }
-      ],
-      "implementationGuide": "1) types/auth.ts 작성:\\n   - export const KEIO_EMAIL_DOMAINS = ['@keio.jp', '@g.keio.ac.jp', '@sfc.keio.ac.jp'] as const\\n   - export const KeioEmailSchema = z.string().email().refine(e => KEIO_EMAIL_DOMAINS.some(d => e.endsWith(d)), { message: '...' })\\n   - export const PasswordSchema = z.string().min(8).regex(/[A-Za-z]/).regex(/[0-9]/)\\n   - export const LoginFormSchema = z.object({ email: KeioEmailSchema, password: z.string().min(1) })\\n   - export const SetupFormSchema = z.object({ password: PasswordSchema, confirmPassword: z.string(), nickname: z.string().min(2).max(20), campus: CampusSchema, grade: GradeSchema, department: z.string().min(1) }).refine(d => d.password === d.confirmPassword, { message: '비밀번호 불일치', path: ['confirmPassword'] })\\n   - 각 schema에 한국어 에러 메시지\\n2) types/domain.ts에서 기존 KeioEmailSchema 정의 삭제 → types/auth.ts에서 re-export 추가:\\n   export { KeioEmailSchema, KEIO_EMAIL_DOMAINS } from './auth'\\n3) app/auth/callback/route.ts:5의 KEIO_DOMAINS 하드코딩 삭제 → import { KEIO_EMAIL_DOMAINS } from '@/types/auth'\\n4) tsc --noEmit 으로 타입 검증\\n5) 테스트: KeioEmailSchema.safeParse('a@keio.jp').success === true, .safeParse('a@gmail.com').success === false",
-      "verificationCriteria": "(1) types/auth.ts 존재 (2) tsc --noEmit 에러 0건 (3) KeioEmailSchema.safeParse('a@keio.jp').success === true (4) KeioEmailSchema.safeParse('a@gmail.com').success === false (5) PasswordSchema.safeParse('abc12345').success === true (6) PasswordSchema.safeParse('abcdefgh').success === false (7) LoginFormSchema/SetupFormSchema 모두 export 가능 (8) auth/callback/route.ts에서 KEIO_EMAIL_DOMAINS import 동작",
-      "analysisResult": "ROADMAP Task 006 목표: Jukulog 인증 플로우의 격차를 보강하여 (1) Zod 클라이언트 검증을 통한 단일 출처(SoT) 도메인 검증, (2) profiles.email DB CHECK 제약을 통한 서버 사이드 이중 검증, (3) login/setup 페이지의 React Hook Form + Zod 리팩토링으로 한꺼번에 에러 표시·UX 개선, (4) Playwright MCP E2E 4종으로 보호 라우트·세션·로그아웃 시나리오 검증을 완료한다. 핵심 결정: ① 회원가입은 Google OAuth(@hd=keio.jp), 로그인은 email/password 하이브리드 유지 ② KEIO_EMAIL_DOMAINS 단일 상수로 4곳 동기화 ③ CAMPUSES 일본어→한국어 enum 통일(courses 테이블과 정합) ④ profiles upsert는 DB 트리거가 자동 처리(추가 코드 불필요) ⑤ Test 1(OAuth 도메인 차단)은 자동화 한계 인정, 콜백 단위 검증 + 수동 확인. 의존성: Sub 1·2 병렬 → Sub 3·4 병렬 → Sub 5.",
-      "summary": "Sub 1 완료: types/auth.ts 신규 + 단일 출처 통일. (1) types/auth.ts 작성 — KEIO_EMAIL_DOMAINS 상수 + KeioEmailSchema(이메일+도메인) + PasswordSchema(8자+영문+숫자) + NicknameSchema(2-20자) + LoginFormSchema + SetupFormSchema(confirmPassword refine 포함) + LoginFormData/SetupFormData type ✅ (2) types/domain.ts에서 기존 KeioEmailSchema 정의 삭제 → types/auth.ts에서 re-export ✅ (3) app/auth/callback/route.ts에서 KEIO_DOMAINS 하드코딩 제거 → KEIO_EMAIL_DOMAINS import ✅ (4) tsc --noEmit 에러 0건 ✅ (5) 검증 10/10 PASS — keio.jp/g.keio.ac.jp/sfc.keio.ac.jp 모두 통과, gmail.com/형식 위반 거부, 비밀번호 정책(영문+숫자+8자) 강제 ✅",
-      "completedAt": "2026-05-03T15:01:43.310Z"
-    },
-    {
-      "id": "c536a9df-020c-47b4-b0b5-1095d58e834d",
-      "name": "Sub 2: profiles.email DB CHECK 마이그레이션 (서버 사이드 이중 검증)",
-      "description": "supabase/migrations/20260503000003_check_profiles_email_domain.sql 파일을 신규 작성하여 profiles.email 컬럼에 keio.jp 도메인 CHECK 제약을 추가한다. 정규식 패턴 @(keio\\.jp|g\\.keio\\.ac\\.jp|sfc\\.keio\\.ac\\.jp)$로 매칭. 기존 데이터 호환을 위해 DO 블록으로 위반 row 사전 검증 후 안전 적용. Supabase MCP apply_migration으로 적용 후 EXPLAIN으로 동작 확인.",
-      "notes": "기존 데이터(tatuya128@keio.jp) @keio.jp로 종료 — 정규식 통과 확인됨(Sub 6에서 검증 완료). 마이그레이션 idempotent — IF NOT EXISTS pg_constraint 체크. 트리거 handle_new_user가 INSERT 시 작동 → CHECK가 OAuth 콜백 직후 위반 도메인 차단 보장.",
-      "status": "completed",
-      "dependencies": [],
-      "createdAt": "2026-05-03T14:59:20.400Z",
-      "updatedAt": "2026-05-03T15:02:55.399Z",
-      "relatedFiles": [
-        {
-          "path": "supabase/migrations/20260503000003_check_profiles_email_domain.sql",
-          "type": "CREATE",
-          "description": "profiles.email DB CHECK 제약 마이그레이션"
+          "description": "is_admin 함수 마이그레이션"
         },
         {
           "path": "supabase/migrations/20260502000000_create_profiles.sql",
           "type": "REFERENCE",
-          "description": "기존 profiles 정의 — DROP 금지"
+          "description": "set_updated_at 함수 패턴 참조"
         },
         {
-          "path": "types/auth.ts",
+          "path": "supabase/migrations/20260503000000_extend_profiles.sql",
           "type": "REFERENCE",
-          "description": "KEIO_EMAIL_DOMAINS와 정규식 동기화 확인"
+          "description": "profiles.role 컬럼 추가"
         }
       ],
-      "implementationGuide": "1) Supabase MCP execute_sql로 기존 데이터 검증:\\n   SELECT email FROM profiles WHERE email !~ '@(keio\\\\.jp|g\\\\.keio\\\\.ac\\\\.jp|sfc\\\\.keio\\\\.ac\\\\.jp)$';\\n   → 0행이어야 안전 (현재 tatuya128@keio.jp는 통과)\\n2) supabase/migrations/20260503000003_check_profiles_email_domain.sql 작성:\\n   DO $$\\n   BEGIN\\n     IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'profiles_email_keio_check') THEN\\n       ALTER TABLE public.profiles\\n         ADD CONSTRAINT profiles_email_keio_check\\n         CHECK (email ~ '@(keio\\\\.jp|g\\\\.keio\\\\.ac\\\\.jp|sfc\\\\.keio\\\\.ac\\\\.jp)$');\\n     END IF;\\n   END $$;\\n   COMMENT ON CONSTRAINT profiles_email_keio_check ON public.profiles IS '게이오 도메인 이메일만 허용 — types/auth.ts KEIO_EMAIL_DOMAINS와 동기화';\\n3) Supabase MCP apply_migration 호출\\n4) 검증 SQL: INSERT INTO profiles(id, email) VALUES (gen_random_uuid(), 'test@gmail.com') → 23514 check_violation 에러 확인\\n5) 정상 INSERT 검증: INSERT INTO profiles(id, email) VALUES (gen_random_uuid(), 'test@keio.jp') → 성공 후 즉시 DELETE",
-      "verificationCriteria": "(1) 마이그레이션 파일 존재 + idempotent (2) Supabase MCP apply_migration 성공 (3) profiles_email_keio_check 제약 존재 (pg_constraint 조회) (4) 위반 INSERT 시도 시 23514 check_violation 에러 (5) 정상 도메인 INSERT 성공 (6) 기존 데이터 영향 없음 (tatuya128@keio.jp 정상 SELECT 가능)",
-      "analysisResult": "ROADMAP Task 006 목표: Jukulog 인증 플로우의 격차를 보강하여 (1) Zod 클라이언트 검증을 통한 단일 출처(SoT) 도메인 검증, (2) profiles.email DB CHECK 제약을 통한 서버 사이드 이중 검증, (3) login/setup 페이지의 React Hook Form + Zod 리팩토링으로 한꺼번에 에러 표시·UX 개선, (4) Playwright MCP E2E 4종으로 보호 라우트·세션·로그아웃 시나리오 검증을 완료한다. 핵심 결정: ① 회원가입은 Google OAuth(@hd=keio.jp), 로그인은 email/password 하이브리드 유지 ② KEIO_EMAIL_DOMAINS 단일 상수로 4곳 동기화 ③ CAMPUSES 일본어→한국어 enum 통일(courses 테이블과 정합) ④ profiles upsert는 DB 트리거가 자동 처리(추가 코드 불필요) ⑤ Test 1(OAuth 도메인 차단)은 자동화 한계 인정, 콜백 단위 검증 + 수동 확인. 의존성: Sub 1·2 병렬 → Sub 3·4 병렬 → Sub 5.",
-      "summary": "Sub 2 완료: profiles.email DB CHECK 마이그레이션 적용. (1) 사전 검증 — 위반 row 0건 SELECT 확인 ✅ (2) 마이그레이션 파일 작성 (idempotent, DO 블록 + IF NOT EXISTS) ✅ (3) Supabase MCP apply_migration 성공 (check_profiles_email_domain) ✅ (4) 위반 INSERT(test@gmail.com) → 23514 check_violation 정상 차단 ✅ (5) 제약 정의 확인: CHECK ((email ~ '@(keio\\\\.jp|g\\\\.keio\\\\.ac\\\\.jp|sfc\\\\.keio\\\\.ac\\\\.jp)$'::text)) — types/auth.ts KEIO_EMAIL_DOMAINS와 정확히 동기화 ✅ (6) 기존 데이터(tatuya128@keio.jp) 영향 없음 ✅. 정상 도메인 INSERT 단독 검증은 auth.users FK 때문에 불가능했으나, 제약은 FK 평가 전에 평가되며 위반 차단이 검증되었으므로 정상 도메인은 자동 통과 보장.",
-      "completedAt": "2026-05-03T15:02:55.398Z"
+      "implementationGuide": "1) 파일 생성: supabase/migrations/20260504000001_create_admin_helper.sql\\n2) SQL:\\n   CREATE OR REPLACE FUNCTION public.is_admin()\\n   RETURNS boolean\\n   LANGUAGE sql\\n   STABLE\\n   SECURITY INVOKER\\n   SET search_path = public\\n   AS $$\\n     SELECT EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin')\\n   $$;\\n   COMMENT ON FUNCTION public.is_admin() IS '현재 세션 사용자가 profiles.role = admin 인지 판정. RLS 정책에서 재사용';\\n3) mcp__supabase__apply_migration name='create_admin_helper' query=<위 SQL>\\n4) mcp__supabase__execute_sql \\\"SELECT public.is_admin()\\\" 호출해 boolean 반환 확인 (현재 세션 anon 이므로 false 예상)",
+      "verificationCriteria": "apply_migration success. SELECT public.is_admin() 호출이 boolean 반환. SELECT routine_name FROM information_schema.routines WHERE routine_schema='public' AND routine_name='is_admin' 결과 1 row.",
+      "analysisResult": "ROADMAP Task 008: 게시판 첫 3 테이블(categories/posts/comments) + admin 헬퍼 함수 마이그레이션 SQL 작성·적용. profiles 마이그레이션 패턴(IF NOT EXISTS, set_updated_at 함수 재사용, ALTER TABLE ... ENABLE ROW LEVEL SECURITY) 따름. is_admin() 헬퍼는 SECURITY INVOKER + STABLE + search_path=public 으로 advisor 회피. soft delete RLS 패턴: is_deleted=false OR public.is_admin(). 부분 인덱스 + GIN(pg_trgm) 으로 검색·정렬 성능 확보. CREATE POLICY IF NOT EXISTS 미지원 → DROP POLICY IF EXISTS + CREATE POLICY 패턴. 5개 서브태스크 직선 의존: helper(008-1) → categories(008-2) → posts(008-3) → comments(008-4) → 검증·ROADMAP(008-5).",
+      "summary": "supabase/migrations/20260504000001_create_admin_helper.sql 신규 작성. CREATE OR REPLACE FUNCTION public.is_admin() RETURNS boolean LANGUAGE sql STABLE SECURITY INVOKER SET search_path=public. apply_migration success. information_schema.routines 결과 routine_name=is_admin, security_type=INVOKER, data_type=boolean 확인. anon 호출 SELECT public.is_admin() = false 정상. 이후 categories/posts/comments RLS 정책에서 재사용 가능.",
+      "completedAt": "2026-05-04T06:05:59.217Z"
     },
     {
-      "id": "055b9640-35b4-43f5-87f9-2edb564d07c8",
-      "name": "Sub 3: login 페이지 React Hook Form + Zod 리팩토링",
-      "description": "app/(public)/login/page.tsx를 React Hook Form + zodResolver(LoginFormSchema)로 리팩토링한다. 기존 useState 4개(email, password, errorMsg, loading)를 useForm으로 통합. 이메일 도메인 검증을 클라이언트 단에서 즉시 적용(키오스 미타 도메인 차단). UI 골격(motion 애니메이션, 라벨, 버튼, 회원가입 링크)은 그대로 유지. 필드별 에러 메시지 인라인 표시(form.formState.errors.email/password). Supabase signInWithPassword 결과 에러는 form.setError로 통합 표시.",
-      "notes": "router.replace('/courses') 유지. form.formState.isSubmitting로 loading 대체. form.setError('root') 패턴으로 일반 오류 표시. Input의 className(rounded-full bg-muted)은 변경 X — UI 일관성.",
+      "id": "6d5bd901-0000-401e-9465-7e57b0f27cc4",
+      "name": "Task 008-2: categories 테이블 마이그레이션 + RLS + 인덱스",
+      "description": "갤러리/카테고리 분류 테이블. 9개 카테고리 시드는 Task 010 에서 처리하고 본 Task 는 스키마만. SELECT 는 anon 포함 모두 허용, 변경은 admin 만.",
+      "notes": "type CHECK 는 ('topic','campus') 만 허용. 시드 9건(자유/연애·썸/학업·수업/취업·인턴/일상·잡담/질문·도움 + 미타/히요시/SFC) INSERT 는 Task 010 에서 처리.",
       "status": "completed",
       "dependencies": [
         {
-          "taskId": "e3190102-9145-447a-94c9-0bddf2b969a9"
+          "taskId": "85c12db4-da83-40e5-90ca-4f58d14f9b91"
         }
       ],
-      "createdAt": "2026-05-03T14:59:20.400Z",
-      "updatedAt": "2026-05-03T15:03:40.446Z",
+      "createdAt": "2026-05-04T06:03:54.768Z",
+      "updatedAt": "2026-05-04T06:07:17.313Z",
       "relatedFiles": [
         {
-          "path": "app/(public)/login/page.tsx",
-          "type": "TO_MODIFY",
-          "description": "RHF + zodResolver(LoginFormSchema) 리팩토링",
-          "lineStart": 1,
-          "lineEnd": 162
+          "path": "supabase/migrations/20260504000002_create_categories.sql",
+          "type": "CREATE",
+          "description": "categories 테이블·RLS·인덱스"
         },
         {
-          "path": "types/auth.ts",
-          "type": "DEPENDENCY",
-          "description": "LoginFormSchema import"
-        },
-        {
-          "path": "components/ui/input.tsx",
+          "path": "supabase/migrations/20260502000000_create_profiles.sql",
           "type": "REFERENCE",
-          "description": "Input 컴포넌트 register 호환성"
+          "description": "RLS·트리거 패턴 참조"
         }
       ],
-      "implementationGuide": "1) app/(public)/login/page.tsx 수정:\\n   - import: useForm, zodResolver, LoginFormSchema 추가\\n   - useState 4개 제거\\n   - const form = useForm<z.infer<typeof LoginFormSchema>>({ resolver: zodResolver(LoginFormSchema), defaultValues: { email: '', password: '' } })\\n   - <form onSubmit={form.handleSubmit(async (values) => { ... })}>로 변경\\n   - 각 Input에 {...form.register('email')}, {...form.register('password')}\\n   - 에러 표시: {form.formState.errors.email?.message && <p className='text-destructive text-xs'>{...}</p>}\\n   - submit 핸들러:\\n     try {\\n       const { error } = await supabase.auth.signInWithPassword(values)\\n       if (error) form.setError('root', { message: '이메일 또는 비밀번호가 올바르지 않습니다' })\\n       else router.replace('/courses')\\n     }\\n   - loading: form.formState.isSubmitting 사용\\n2) UI 골격 유지: motion.div, fadeUp, formContainer 그대로\\n3) 빌드 검증: npm run lint",
-      "verificationCriteria": "(1) LoginFormSchema, useForm, zodResolver import 확인 (2) useState 제거됨 (3) 잘못된 도메인(@gmail.com) 입력 시 클라이언트 즉시 에러 표시 (4) 빈 필드 제출 시 필드별 에러 표시 (5) Supabase 인증 실패 시 root 에러 표시 (6) 정상 로그인 시 /courses 리다이렉션 (7) UI 골격(motion 애니메이션, 라벨, 버튼) 시각적 변화 없음 (8) lint/타입 에러 0건",
-      "analysisResult": "ROADMAP Task 006 목표: Jukulog 인증 플로우의 격차를 보강하여 (1) Zod 클라이언트 검증을 통한 단일 출처(SoT) 도메인 검증, (2) profiles.email DB CHECK 제약을 통한 서버 사이드 이중 검증, (3) login/setup 페이지의 React Hook Form + Zod 리팩토링으로 한꺼번에 에러 표시·UX 개선, (4) Playwright MCP E2E 4종으로 보호 라우트·세션·로그아웃 시나리오 검증을 완료한다. 핵심 결정: ① 회원가입은 Google OAuth(@hd=keio.jp), 로그인은 email/password 하이브리드 유지 ② KEIO_EMAIL_DOMAINS 단일 상수로 4곳 동기화 ③ CAMPUSES 일본어→한국어 enum 통일(courses 테이블과 정합) ④ profiles upsert는 DB 트리거가 자동 처리(추가 코드 불필요) ⑤ Test 1(OAuth 도메인 차단)은 자동화 한계 인정, 콜백 단위 검증 + 수동 확인. 의존성: Sub 1·2 병렬 → Sub 3·4 병렬 → Sub 5.",
-      "summary": "Sub 3 완료: app/(public)/login/page.tsx React Hook Form + Zod 리팩토링. (1) useForm + zodResolver(LoginFormSchema) 적용, useState 4개 모두 제거 ✅ (2) register/handleSubmit/setError/formState 패턴 적용 ✅ (3) 잘못된 도메인은 Zod refine으로 클라이언트 즉시 차단(메시지: 'keio.jp 도메인 이메일만 사용 가능합니다') ✅ (4) 빈 필드 → 필드별 인라인 에러 표시 (Email \"이메일을 입력해주세요\", Password \"비밀번호를 입력해주세요\") ✅ (5) Supabase signInWithPassword 실패 → setError('root') 패턴으로 폼 전체 에러 표시 ✅ (6) router.replace('/courses') 유지 ✅ (7) UI 골격 유지 (motion 애니메이션, Label, Button, 회원가입 링크 모두 동일) ✅ (8) tsc --noEmit 0건, eslint 0건 ✅. aria-invalid + role='alert' 추가로 접근성 강화 (보너스).",
-      "completedAt": "2026-05-03T15:03:40.446Z"
+      "implementationGuide": "1) 파일: supabase/migrations/20260504000002_create_categories.sql\\n2) 주요 SQL:\\n   CREATE TABLE IF NOT EXISTS public.categories (\\n     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),\\n     slug TEXT NOT NULL UNIQUE,\\n     name TEXT NOT NULL,\\n     type TEXT NOT NULL CHECK (type IN ('topic','campus')),\\n     sort_order INTEGER NOT NULL DEFAULT 0,\\n     is_active BOOLEAN NOT NULL DEFAULT true,\\n     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),\\n     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()\\n   );\\n   CREATE INDEX IF NOT EXISTS idx_categories_type_sort ON public.categories (type, sort_order);\\n   ALTER TABLE public.categories ENABLE ROW LEVEL SECURITY;\\n3) RLS 4정책 (DROP IF EXISTS + CREATE 패턴으로 idempotent):\\n   DROP POLICY IF EXISTS categories_select_all ON public.categories;\\n   CREATE POLICY categories_select_all ON public.categories FOR SELECT USING (true);\\n   DROP POLICY IF EXISTS categories_insert_admin ON public.categories;\\n   CREATE POLICY categories_insert_admin ON public.categories FOR INSERT WITH CHECK (public.is_admin());\\n   DROP POLICY IF EXISTS categories_update_admin ON public.categories;\\n   CREATE POLICY categories_update_admin ON public.categories FOR UPDATE USING (public.is_admin()) WITH CHECK (public.is_admin());\\n   DROP POLICY IF EXISTS categories_delete_admin ON public.categories;\\n   CREATE POLICY categories_delete_admin ON public.categories FOR DELETE USING (public.is_admin());\\n4) 트리거: DROP TRIGGER IF EXISTS categories_set_updated_at ON public.categories; CREATE TRIGGER categories_set_updated_at BEFORE UPDATE ON public.categories FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();\\n5) mcp__supabase__apply_migration name='create_categories' query=<위 SQL>",
+      "verificationCriteria": "list_tables 결과에 public.categories 등장. CHECK type IN ('topic','campus') 위반 INSERT 시 23514 에러. INSERT slug='dup' 두 번 시도 시 두 번째 23505 에러. anon SELECT 통과 (USING true).",
+      "analysisResult": "ROADMAP Task 008: 게시판 첫 3 테이블(categories/posts/comments) + admin 헬퍼 함수 마이그레이션 SQL 작성·적용. profiles 마이그레이션 패턴(IF NOT EXISTS, set_updated_at 함수 재사용, ALTER TABLE ... ENABLE ROW LEVEL SECURITY) 따름. is_admin() 헬퍼는 SECURITY INVOKER + STABLE + search_path=public 으로 advisor 회피. soft delete RLS 패턴: is_deleted=false OR public.is_admin(). 부분 인덱스 + GIN(pg_trgm) 으로 검색·정렬 성능 확보. CREATE POLICY IF NOT EXISTS 미지원 → DROP POLICY IF EXISTS + CREATE POLICY 패턴. 5개 서브태스크 직선 의존: helper(008-1) → categories(008-2) → posts(008-3) → comments(008-4) → 검증·ROADMAP(008-5).",
+      "summary": "supabase/migrations/20260504000002_create_categories.sql 신규 작성. CREATE TABLE IF NOT EXISTS public.categories (id UUID PK / slug UNIQUE / name / type CHECK in topic|campus / sort_order / is_active / created_at·updated_at). idx_categories_type_sort 인덱스. ENABLE ROW LEVEL SECURITY + 4 RLS 정책 (select_all USING true / insert_admin / update_admin / delete_admin — public.is_admin() 호출). categories_set_updated_at 트리거. apply_migration success. list_tables 결과 public.categories 등장 (rls_enabled true). type='invalid_type' INSERT 시 23514 categories_type_check 위반 정상. UNIQUE 위반은 시드 INSERT 후 검증 단계(008-5)에서 별도 확인 예정.",
+      "completedAt": "2026-05-04T06:07:17.310Z"
     },
     {
-      "id": "8a28d41f-5a9e-43a1-bf82-da10acc73ce6",
-      "name": "Sub 4: setup 페이지 RHF + Zod 리팩토링 + 캠퍼스/학년 enum 통일",
-      "description": "app/(public)/signup/setup/page.tsx를 React Hook Form + zodResolver(SetupFormSchema)로 리팩토링. 기존 7개 if문 검증 → SetupFormSchema 한꺼번에 검증. 비밀번호 정책 강화(영문+숫자 PasswordSchema 적용). 캠퍼스 상수를 일본어(三田/日吉/SFC)에서 한국어 CampusSchema 6개(미타/히요시/SFC/야가미/시나노마치/시바공립)로 변경 — courses 테이블 CHECK와 정합. 학년 상수도 GradeSchema 사용 + 라벨 매핑. Select 컴포넌트와 RHF Controller 통합.",
-      "notes": "Controller 패턴 — Select, RadioGroup 등 register로 직접 못 다루는 컴포넌트에 사용. CAMPUSES 한국어 통일은 향후 courses 테이블과 매칭하기 위해 필수. 기존 사용자 1명(tatuya128@keio.jp)은 setup 미완료 가능성 → 데이터 호환 문제 없음. 만약 일본어 campus가 이미 저장된 사용자가 있다면 별도 마이그레이션 필요(현재 없음 가정).",
+      "id": "9585ab00-a74a-4e00-aedd-491d2b912672",
+      "name": "Task 008-3: posts 테이블 마이그레이션 + 부분 인덱스 + GIN + RLS",
+      "description": "게시글 본 테이블. category_id FK ON DELETE RESTRICT, user_id FK ON DELETE CASCADE. soft delete 정책(is_deleted=false OR is_admin), 부분 인덱스로 인덱스 크기 최소화, pg_trgm GIN 으로 F007 검색 지원.",
+      "notes": "category_id ON DELETE RESTRICT — 카테고리 삭제 전 모든 게시글 이전 또는 archive 처리 필요. profiles 삭제(auth.users 삭제 시 CASCADE) 시 게시글도 자동 삭제됨. 부분 인덱스로 일반 SELECT 인덱스 비용 최소화.",
       "status": "completed",
       "dependencies": [
         {
-          "taskId": "e3190102-9145-447a-94c9-0bddf2b969a9"
+          "taskId": "6d5bd901-0000-401e-9465-7e57b0f27cc4"
         }
       ],
-      "createdAt": "2026-05-03T14:59:20.400Z",
-      "updatedAt": "2026-05-03T15:04:49.602Z",
+      "createdAt": "2026-05-04T06:03:54.768Z",
+      "updatedAt": "2026-05-04T06:09:00.116Z",
       "relatedFiles": [
         {
-          "path": "app/(public)/signup/setup/page.tsx",
-          "type": "TO_MODIFY",
-          "description": "RHF + SetupFormSchema 리팩토링 + CAMPUSES/GRADES enum 통일",
-          "lineStart": 1,
-          "lineEnd": 315
+          "path": "supabase/migrations/20260504000003_create_posts.sql",
+          "type": "CREATE",
+          "description": "posts 테이블·인덱스·RLS"
         },
         {
-          "path": "types/auth.ts",
+          "path": "supabase/migrations/20260504000002_create_categories.sql",
           "type": "DEPENDENCY",
-          "description": "SetupFormSchema, PasswordSchema import"
-        },
-        {
-          "path": "types/domain.ts",
-          "type": "DEPENDENCY",
-          "description": "CAMPUS_VALUES, GRADE_VALUES, CampusSchema, GradeSchema import",
-          "lineStart": 18,
-          "lineEnd": 100
-        },
-        {
-          "path": "components/ui/select.tsx",
-          "type": "REFERENCE",
-          "description": "Select + Controller 호환성"
-        },
-        {
-          "path": "app/(app)/my/profile/page.tsx",
-          "type": "REFERENCE",
-          "description": "프로필 설정 페이지 동일 패턴 — 향후 일관 적용"
+          "description": "category_id FK 참조"
         }
       ],
-      "implementationGuide": "1) app/(public)/signup/setup/page.tsx 수정:\\n   - import: useForm, Controller, zodResolver, SetupFormSchema, CAMPUS_VALUES, GRADE_VALUES from types\\n   - useState 9개(password, confirmPassword, campus, grade, department, nickname, errorMsg, submitting, initializing) 제거 → useForm + initializing만 useState 유지\\n   - const form = useForm<z.infer<typeof SetupFormSchema>>({ resolver: zodResolver(SetupFormSchema), defaultValues: {...} })\\n   - CAMPUSES = CAMPUS_VALUES (한국어 6개)\\n   - GRADES = [{ value: '1', label: '1학년' }, ...] (GRADE_VALUES 매핑)\\n   - Select은 <Controller name='campus' control={form.control} render={({ field }) => <Select value={field.value} onValueChange={field.onChange}>...</Select>} />\\n   - 일반 Input은 {...form.register('nickname')} 등\\n   - 에러: form.formState.errors.{field}?.message 인라인 표시\\n   - submit: form.handleSubmit(async (values) => { await supabase.auth.updateUser({ password: values.password, data: { password_set: true, ...values } }); await supabase.auth.signOut(); router.replace('/login') })\\n2) 기존 verifiedEmail/initializing/CheckCircle2 UI 유지\\n3) 페이지 진입 시 세션 확인 useEffect는 그대로\\n4) UI 골격(motion, Label, ProgressBar) 변경 X",
-      "verificationCriteria": "(1) RHF + zodResolver 적용 (2) CAMPUSES 한국어 6개로 변경됨 (3) GRADES 라벨 매핑 적용 (4) 비밀번호 영문+숫자 미포함 시 에러 표시 (5) 비밀번호 불일치 시 confirmPassword 필드에 에러 (6) 모든 필드 비어있을 때 동시 에러 표시 (한꺼번에) (7) 정상 제출 시 updateUser → signOut → /login (8) 기존 motion 애니메이션 유지 (9) verifiedEmail 표시 유지 (10) lint/타입 에러 0건",
-      "analysisResult": "ROADMAP Task 006 목표: Jukulog 인증 플로우의 격차를 보강하여 (1) Zod 클라이언트 검증을 통한 단일 출처(SoT) 도메인 검증, (2) profiles.email DB CHECK 제약을 통한 서버 사이드 이중 검증, (3) login/setup 페이지의 React Hook Form + Zod 리팩토링으로 한꺼번에 에러 표시·UX 개선, (4) Playwright MCP E2E 4종으로 보호 라우트·세션·로그아웃 시나리오 검증을 완료한다. 핵심 결정: ① 회원가입은 Google OAuth(@hd=keio.jp), 로그인은 email/password 하이브리드 유지 ② KEIO_EMAIL_DOMAINS 단일 상수로 4곳 동기화 ③ CAMPUSES 일본어→한국어 enum 통일(courses 테이블과 정합) ④ profiles upsert는 DB 트리거가 자동 처리(추가 코드 불필요) ⑤ Test 1(OAuth 도메인 차단)은 자동화 한계 인정, 콜백 단위 검증 + 수동 확인. 의존성: Sub 1·2 병렬 → Sub 3·4 병렬 → Sub 5.",
-      "summary": "Sub 4 완료: app/(public)/signup/setup/page.tsx RHF + Zod 리팩토링 + enum 통일. (1) useForm + zodResolver(SetupFormSchema) 적용, useState 9개 → 2개(verifiedEmail, initializing)로 축소 ✅ (2) CAMPUSES = CAMPUS_VALUES (한국어 6개: 미타/히요시/SFC/야가미/시나노마치/시바공립) — courses CHECK 와 정합 ✅ (3) GRADES = GRADE_VALUES 매핑 (1~6학년 + 대학원, value는 '1'~'6'/'대학원', label은 '1학년' 등) ✅ (4) PasswordSchema (8자+영문+숫자) 적용으로 비밀번호 정책 강화 ✅ (5) confirmPassword refine으로 불일치 시 confirmPassword 필드에 에러 표시 ✅ (6) 모든 필드 동시 검증 (한꺼번에 표시) — 첫 에러만 보여주던 if문 7개 제거 ✅ (7) Controller 패턴으로 Select 통합 (campus, grade) ✅ (8) updateUser({ password, data }) → signOut → /login 흐름 유지 ✅ (9) verifiedEmail/CheckCircle2/ProgressBar/motion 애니메이션 모두 유지 ✅ (10) tsc 0건, eslint 0건 ✅. aria-invalid 추가로 접근성 강화.",
-      "completedAt": "2026-05-03T15:04:49.601Z"
+      "implementationGuide": "1) 파일: supabase/migrations/20260504000003_create_posts.sql\\n2) CREATE EXTENSION IF NOT EXISTS pg_trgm; (방어적, 이미 설치)\\n3) 테이블 SQL: id UUID PK / user_id REFERENCES profiles(id) ON DELETE CASCADE / category_id REFERENCES categories(id) ON DELETE RESTRICT / title TEXT CHECK length 1-100 / body TEXT CHECK length 10-5000 / is_anonymous BOOLEAN DEFAULT true / reaction_up INT DEFAULT 0 / reaction_down INT DEFAULT 0 / comment_count INT DEFAULT 0 / is_deleted BOOLEAN DEFAULT false / created_at·updated_at TIMESTAMPTZ DEFAULT now()\\n4) 인덱스 (모두 IF NOT EXISTS):\\n   - idx_posts_category_created (category_id, created_at DESC) WHERE is_deleted=false\\n   - idx_posts_created (created_at DESC) WHERE is_deleted=false\\n   - idx_posts_popular (reaction_up DESC, created_at DESC) WHERE is_deleted=false\\n   - idx_posts_user (user_id, created_at DESC)\\n   - idx_posts_title_trgm USING GIN (title gin_trgm_ops)\\n   - idx_posts_body_trgm USING GIN (body gin_trgm_ops)\\n5) ALTER TABLE ENABLE ROW LEVEL SECURITY;\\n6) RLS 4정책 (DROP+CREATE):\\n   - posts_select_visible FOR SELECT USING (is_deleted = false OR public.is_admin())\\n   - posts_insert_self FOR INSERT WITH CHECK (auth.uid() = user_id)\\n   - posts_update_self FOR UPDATE USING (auth.uid() = user_id OR public.is_admin()) WITH CHECK (auth.uid() = user_id OR public.is_admin())\\n   - posts_delete_self FOR DELETE USING (auth.uid() = user_id OR public.is_admin())\\n7) 트리거: posts_set_updated_at\\n8) apply_migration name='create_posts' 적용",
+      "verificationCriteria": "list_tables verbose 로 컬럼·FK·인덱스 6개 확인. title 길이 0 INSERT → 23514. body 길이 9 INSERT → 23514. category_id missing UUID → 23503 FK 위반. is_deleted=true row 일반 사용자 SELECT → 0 row, admin SELECT → 1 row.",
+      "analysisResult": "ROADMAP Task 008: 게시판 첫 3 테이블(categories/posts/comments) + admin 헬퍼 함수 마이그레이션 SQL 작성·적용. profiles 마이그레이션 패턴(IF NOT EXISTS, set_updated_at 함수 재사용, ALTER TABLE ... ENABLE ROW LEVEL SECURITY) 따름. is_admin() 헬퍼는 SECURITY INVOKER + STABLE + search_path=public 으로 advisor 회피. soft delete RLS 패턴: is_deleted=false OR public.is_admin(). 부분 인덱스 + GIN(pg_trgm) 으로 검색·정렬 성능 확보. CREATE POLICY IF NOT EXISTS 미지원 → DROP POLICY IF EXISTS + CREATE POLICY 패턴. 5개 서브태스크 직선 의존: helper(008-1) → categories(008-2) → posts(008-3) → comments(008-4) → 검증·ROADMAP(008-5).",
+      "summary": "supabase/migrations/20260504000003_create_posts.sql 신규 작성. 12 컬럼(id/user_id/category_id/title/body/is_anonymous/reaction_up/reaction_down/comment_count/is_deleted/created_at/updated_at). FK 2개: user_id→profiles ON DELETE CASCADE, category_id→categories ON DELETE RESTRICT. CHECK title 1-100, body 10-5000. 부분 인덱스 4종(category_created/created/popular/user) WHERE is_deleted=false + GIN(title|body gin_trgm_ops). RLS 4정책: select_visible(soft delete), insert_self(auth.uid=user_id), update_self·delete_self(본인 OR is_admin). posts_set_updated_at 트리거. apply_migration success. list_tables verbose 결과 컬럼·FK·RLS 모두 정합. CHECK 위반 시나리오는 008-5 에서 일괄 검증.",
+      "completedAt": "2026-05-04T06:09:00.115Z"
     },
     {
-      "id": "e5a4659d-c7ce-468f-b008-5c0c7df50527",
-      "name": "Sub 5: Playwright MCP E2E 4종 + ROADMAP/lecture 업데이트",
-      "description": "Playwright MCP로 인증 플로우 4가지 핵심 시나리오를 자동화 검증. (1) Test 1 — 보호 라우트 미인증 차단(비로그인 상태 /courses 접근 → /login 리다이렉션) (2) Test 2 — 정상 로그인(tatuya128@keio.jp + 비밀번호 → /courses 진입 + 마이페이지 닉네임 표시) (3) Test 3 — 로그아웃(마이페이지 로그아웃 → /login) (4) Test 4 — 잘못된 도메인 콜백 차단(callback URL에 임의 code 전달 → /signup?error=auth 또는 ?error=domain). 단, OAuth 자체는 외부 의존이므로 Test 4는 콜백 단위 + 수동 검증. 모든 결과를 docs/lecture.md에 기록하고 ROADMAP.md Task 006을 ✅로 표시.",
-      "notes": "비밀번호는 사용자에게 확인 요청 필수 — 자동 입력하면 보안 위반. dev 서버는 background로 실행하고 종료 후 정리. browser_take_screenshot으로 PASS 시점 캡처 권장. Test 4는 진짜 OAuth 도메인 차단 검증이 아닌 콜백 라우트 자체 동작 검증으로 한계 명시.",
+      "id": "c7204804-630b-4377-8700-960e789d05b3",
+      "name": "Task 008-4: comments 테이블 마이그레이션 + self-parent CHECK + RLS",
+      "description": "댓글 + 1단계 대댓글 테이블. parent_id self-FK 로 1단계 대댓글 지원, 자기 자신 참조 방지 CHECK. RLS 동일 패턴.",
+      "notes": "ON DELETE CASCADE 가 부모 댓글 삭제 시 자식 댓글도 삭제. soft delete 의 경우 application 단에서 '삭제된 댓글입니다' placeholder 처리. comment_count 갱신은 Task 009 에서 트리거로 처리.",
       "status": "completed",
       "dependencies": [
         {
-          "taskId": "c536a9df-020c-47b4-b0b5-1095d58e834d"
-        },
-        {
-          "taskId": "055b9640-35b4-43f5-87f9-2edb564d07c8"
-        },
-        {
-          "taskId": "8a28d41f-5a9e-43a1-bf82-da10acc73ce6"
+          "taskId": "9585ab00-a74a-4e00-aedd-491d2b912672"
         }
       ],
-      "createdAt": "2026-05-03T14:59:20.400Z",
-      "updatedAt": "2026-05-03T15:08:53.240Z",
+      "createdAt": "2026-05-04T06:03:54.768Z",
+      "updatedAt": "2026-05-04T06:10:28.832Z",
       "relatedFiles": [
         {
-          "path": "docs/lecture.md",
-          "type": "TO_MODIFY",
-          "description": "Task 006 E2E 검증 결과 섹션 추가"
+          "path": "supabase/migrations/20260504000004_create_comments.sql",
+          "type": "CREATE",
+          "description": "comments 테이블·CHECK·RLS"
         },
+        {
+          "path": "supabase/migrations/20260504000003_create_posts.sql",
+          "type": "DEPENDENCY",
+          "description": "post_id FK 참조"
+        }
+      ],
+      "implementationGuide": "1) 파일: supabase/migrations/20260504000004_create_comments.sql\\n2) 테이블 SQL: id UUID PK / post_id REFERENCES posts(id) ON DELETE CASCADE / user_id REFERENCES profiles(id) ON DELETE CASCADE / parent_id UUID NULL REFERENCES comments(id) ON DELETE CASCADE / body TEXT CHECK length 1-1000 / is_anonymous BOOLEAN DEFAULT true / is_deleted BOOLEAN DEFAULT false / created_at·updated_at\\n3) CHECK constraint: CONSTRAINT comments_no_self_parent CHECK (parent_id IS NULL OR parent_id <> id)\\n4) 인덱스:\\n   - idx_comments_post_created (post_id, created_at) WHERE is_deleted=false\\n   - idx_comments_parent (parent_id) WHERE parent_id IS NOT NULL\\n   - idx_comments_user (user_id, created_at DESC)\\n5) ALTER TABLE ENABLE ROW LEVEL SECURITY;\\n6) RLS 4정책: select_visible / insert_self / update_self / delete_self (posts 와 동일 패턴, post_id 컬럼 활용 안 함)\\n7) 트리거: comments_set_updated_at\\n8) apply_migration name='create_comments' 적용\\n9) 1단계 대댓글 강제는 application 레이어에서 (API 라우트) — DB CHECK 로는 깊이 1 강제 불가",
+      "verificationCriteria": "INSERT parent_id=id (자기참조) → 23514 CHECK 위반. body 길이 0 또는 1001 → 23514. post_id missing → 23503 FK. 일반 사용자 INSERT user_id=타인 → RLS WITH CHECK 차단(0 row). is_deleted=true 댓글 일반 사용자 SELECT 결과 0 row.",
+      "analysisResult": "ROADMAP Task 008: 게시판 첫 3 테이블(categories/posts/comments) + admin 헬퍼 함수 마이그레이션 SQL 작성·적용. profiles 마이그레이션 패턴(IF NOT EXISTS, set_updated_at 함수 재사용, ALTER TABLE ... ENABLE ROW LEVEL SECURITY) 따름. is_admin() 헬퍼는 SECURITY INVOKER + STABLE + search_path=public 으로 advisor 회피. soft delete RLS 패턴: is_deleted=false OR public.is_admin(). 부분 인덱스 + GIN(pg_trgm) 으로 검색·정렬 성능 확보. CREATE POLICY IF NOT EXISTS 미지원 → DROP POLICY IF EXISTS + CREATE POLICY 패턴. 5개 서브태스크 직선 의존: helper(008-1) → categories(008-2) → posts(008-3) → comments(008-4) → 검증·ROADMAP(008-5).",
+      "summary": "supabase/migrations/20260504000004_create_comments.sql 신규 작성. 9 컬럼(id/post_id/user_id/parent_id/body/is_anonymous/is_deleted/created_at/updated_at). FK 3개: post_id→posts ON DELETE CASCADE, user_id→profiles ON DELETE CASCADE, parent_id→comments(self) ON DELETE CASCADE. CHECK body 1-1000 + comments_no_self_parent (parent_id IS NULL OR parent_id<>id). 인덱스 3종(post_created/parent/user). RLS 4정책: select_visible(soft delete), insert_self, update_self·delete_self(본인 OR is_admin). comments_set_updated_at 트리거. apply_migration success. list_tables 결과 4개 테이블 모두 RLS true. 1단계 대댓글 깊이 강제는 application 레이어 책임 명시. CHECK·RLS 시나리오는 008-5 일괄 검증.",
+      "completedAt": "2026-05-04T06:10:28.832Z"
+    },
+    {
+      "id": "5b07eb73-938e-422d-b7b0-2d1416038ed2",
+      "name": "Task 008-5: RLS·CHECK 시나리오 검증 + advisor 점검 + ROADMAP ✅",
+      "description": "execute_sql 로 RLS·CHECK 위반 시나리오 6~8 건 검증, get_advisors security 로 RLS 누락·search_path 경고 0건 확인. 통과 시 ROADMAP.md Task 008 에 ✅ + 검증 결과 요약 nested bullet 추가.",
+      "notes": "검증 시드는 일회성이므로 정식 시드와 충돌하지 않게 slug='test_' 같은 prefix 권장. ROADMAP 갱신 후 git commit 은 사용자 명령 시.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "c7204804-630b-4377-8700-960e789d05b3"
+        }
+      ],
+      "createdAt": "2026-05-04T06:03:54.768Z",
+      "updatedAt": "2026-05-04T06:12:37.584Z",
+      "relatedFiles": [
         {
           "path": "docs/ROADMAP.md",
           "type": "TO_MODIFY",
-          "description": "Task 006 ✅ 표시 + 완료 항목 갱신",
-          "lineStart": 92,
-          "lineEnd": 97
-        },
-        {
-          "path": "app/(public)/login/page.tsx",
-          "type": "DEPENDENCY",
-          "description": "Sub 3 산출물 검증 대상"
-        },
-        {
-          "path": "app/(public)/signup/setup/page.tsx",
-          "type": "DEPENDENCY",
-          "description": "Sub 4 산출물 검증 대상"
-        },
-        {
-          "path": "app/(app)/my/_components/logout-button.tsx",
-          "type": "REFERENCE",
-          "description": "로그아웃 동작 검증 대상"
-        },
-        {
-          "path": "proxy.ts",
-          "type": "REFERENCE",
-          "description": "보호 라우트 가드 검증 대상"
+          "description": "Task 008 ✅ 표시"
         }
       ],
-      "implementationGuide": "1) 사용자에게 비밀번호 확인 요청 (tatuya128@keio.jp 계정 비밀번호 필요) — 또는 테스트 계정 신규 생성 안내\\n2) npm run dev 백그라운드 실행 → localhost:3000 대기\\n3) Playwright MCP browser_navigate('http://localhost:3000/courses') → URL이 /login으로 변경됐는지 검증 (Test 1)\\n4) browser_navigate('/login'), browser_fill_form([{name:email,...}, {name:password,...}]), browser_click(submit) → URL /courses 검증 → browser_navigate('/my') → 닉네임 텍스트 확인 (Test 2)\\n5) browser_click(로그아웃 버튼) → URL /login 검증 (Test 3)\\n6) browser_navigate('/auth/callback') 또는 browser_navigate('/auth/callback?code=invalid') → URL이 /signup?error=auth로 리다이렉트 검증 (Test 4 단위)\\n7) 결과 정리 — docs/lecture.md에 'Task 006 E2E 검증 결과' 섹션 추가:\\n   - 테스트 일자, 시나리오별 PASS/FAIL, 캡처된 URL/메시지\\n8) docs/ROADMAP.md Task 006 ✅ 표시 + 완료 사항 7개 추가\\n9) (선택) 콘솔 로그 확인: browser_console_messages로 React 경고/에러 검출",
-      "verificationCriteria": "(1) Test 1 (보호 라우트 차단) PASS — 비로그인 /courses 접근 시 /login 리다이렉트 (2) Test 2 (정상 로그인) PASS — 로그인 후 /courses + 마이페이지 닉네임 표시 (3) Test 3 (로그아웃) PASS — 로그아웃 후 /login (4) Test 4 (콜백 단위 검증) PASS — invalid code 시 /signup?error=auth (5) docs/lecture.md에 결과 기록 (6) docs/ROADMAP.md Task 006 ✅ 표시 (7) 콘솔 에러 0건 (또는 알려진 무해 경고)",
-      "analysisResult": "ROADMAP Task 006 목표: Jukulog 인증 플로우의 격차를 보강하여 (1) Zod 클라이언트 검증을 통한 단일 출처(SoT) 도메인 검증, (2) profiles.email DB CHECK 제약을 통한 서버 사이드 이중 검증, (3) login/setup 페이지의 React Hook Form + Zod 리팩토링으로 한꺼번에 에러 표시·UX 개선, (4) Playwright MCP E2E 4종으로 보호 라우트·세션·로그아웃 시나리오 검증을 완료한다. 핵심 결정: ① 회원가입은 Google OAuth(@hd=keio.jp), 로그인은 email/password 하이브리드 유지 ② KEIO_EMAIL_DOMAINS 단일 상수로 4곳 동기화 ③ CAMPUSES 일본어→한국어 enum 통일(courses 테이블과 정합) ④ profiles upsert는 DB 트리거가 자동 처리(추가 코드 불필요) ⑤ Test 1(OAuth 도메인 차단)은 자동화 한계 인정, 콜백 단위 검증 + 수동 확인. 의존성: Sub 1·2 병렬 → Sub 3·4 병렬 → Sub 5.",
-      "summary": "Sub 5 완료: Playwright MCP E2E 검증 + 문서화. (1) Test 1 (보호 라우트 차단) PASS — /courses 비로그인 접근 시 /login 리다이렉트 ✅ (2) Test 4 (콜백 단위 검증) PASS — /auth/callback (no code) → /signup?error=auth ✅ (3) 보너스 검증 3종 PASS — Zod 도메인 차단(test@gmail.com → \"keio.jp 도메인 이메일만 사용 가능합니다\" 인라인 에러, Supabase 호출 차단), setup 가드(/signup/setup 비로그인 → /signup), 콘솔 에러 0건 ✅ (4) docs/ROADMAP.md Task 006 ✅ 표시 + 9개 완료 항목 갱신 ✅ (5) docs/lecture.md Task 006 진행상황 + E2E 결과 표 추가 ✅. Test 2(정상 로그인)/Test 3(로그아웃)는 사용자 비밀번호 필요로 보류 — 나중에 비밀번호 받으면 5분 내 자동화 가능. 점수 88: 자동화 가능한 모든 항목 통과, 비밀번호 의존 2건만 사용자 입력 대기.",
-      "completedAt": "2026-05-03T15:08:53.239Z"
+      "implementationGuide": "1) execute_sql 시나리오 (각 1쿼리):\\n   A. INSERT INTO categories (slug, name, type) VALUES ('test', 'Test', 'invalid') → 23514\\n   B. INSERT INTO categories (slug, name, type) VALUES ('a','A','topic'), ('a','A2','topic') → 23505 두 번째 row\\n   C. 임시 시드: INSERT INTO categories (id, slug, name, type) VALUES ('aaaa...', 'free','자유','topic')\\n   D. 익명 INSERT INTO posts (user_id, category_id, title, body) VALUES ('<random uuid>', '<categories.id>', 'T', 'short') → CHECK length 위반 23514\\n   E. INSERT comments parent_id=id 자기참조 → 23514\\n   F. SELECT * FROM posts WHERE is_deleted=true (anon role) → 0 row 예상 (RLS)\\n   G. SELECT public.is_admin() (anon role) → false\\n2) get_advisors type='security' 호출. 새 경고(특히 RLS 누락 / search_path mutable) 0건 확인\\n3) docs/ROADMAP.md 의 'Task 008: 게시판 7테이블 마이그레이션 (categories / posts / comments)' 항목에 ✅ 표시 + nested bullet 추가:\\n   - ✅ is_admin() 헬퍼 함수 (search_path=public, STABLE, SECURITY INVOKER)\\n   - ✅ categories: type CHECK (topic|campus) + slug UNIQUE + RLS 4정책\\n   - ✅ posts: title 100자/body 5000자 CHECK + 부분 인덱스 4종 + GIN(title|body) + RLS 4정책 (soft delete)\\n   - ✅ comments: 1단계 대댓글 self-FK + parent_id<>id CHECK + RLS 4정책\\n   - ✅ get_advisors RLS 누락 0 / search_path 경고 0\\n4) 임시 시드 카테고리는 검증 후 ROLLBACK 또는 그대로 두고 Task 010 에서 정식 9건 INSERT 시 정합 확인",
+      "verificationCriteria": "시나리오 A~G 모두 예상 결과 일치. get_advisors security 새 경고 0건. ROADMAP.md 의 Task 008 에 ✅ + 5개 nested bullet.",
+      "analysisResult": "ROADMAP Task 008: 게시판 첫 3 테이블(categories/posts/comments) + admin 헬퍼 함수 마이그레이션 SQL 작성·적용. profiles 마이그레이션 패턴(IF NOT EXISTS, set_updated_at 함수 재사용, ALTER TABLE ... ENABLE ROW LEVEL SECURITY) 따름. is_admin() 헬퍼는 SECURITY INVOKER + STABLE + search_path=public 으로 advisor 회피. soft delete RLS 패턴: is_deleted=false OR public.is_admin(). 부분 인덱스 + GIN(pg_trgm) 으로 검색·정렬 성능 확보. CREATE POLICY IF NOT EXISTS 미지원 → DROP POLICY IF EXISTS + CREATE POLICY 패턴. 5개 서브태스크 직선 의존: helper(008-1) → categories(008-2) → posts(008-3) → comments(008-4) → 검증·ROADMAP(008-5).",
+      "summary": "7개 검증 시나리오 모두 PASS — A: categories type CHECK 23514, B: slug UNIQUE 23505, C: 임시 시드 정상, D: posts body 9자 23514, E: comments parent_id=id 자기참조 23514, F: is_deleted=true row anon SELECT 0건(RLS 정상 작동), G: is_admin() = false. get_advisors security 결과 본 Task 신규 경고 0건 (기존 7개 advisor 항목은 모두 사전부터 존재하던 이슈로 본 Task 무관). 임시 검증 데이터(test_free, test_dup, TestPost 등) 모두 DELETE 처리, categories/posts/comments 모두 0 row 로 Task 010 정식 시드 대기. docs/ROADMAP.md Task 008 항목에 ✅ + 9개 nested bullet 추가 완료.",
+      "completedAt": "2026-05-04T06:12:37.583Z"
     }
   ]
 }
