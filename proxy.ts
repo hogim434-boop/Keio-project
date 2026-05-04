@@ -35,11 +35,11 @@ export async function proxy(request: NextRequest) {
 
   const isSetupPath = pathname === '/signup/setup' || pathname.startsWith('/signup/setup/')
   const isLoginPath = pathname === '/login'
-  const isSignupPath = pathname === '/signup' && !isSetupPath
+  const isSignupPath = pathname === '/signup'
   const isLandingPath = pathname === '/landing'
 
-  // 공개 경로 화이트리스트 — 나열된 경로 외에는 모두 로그인 필요
-  const PUBLIC_PATHS = ['/landing', '/login', '/signup', '/auth/']
+  // 공개 경로 화이트리스트 — /auth/* 는 위에서 이미 early return 처리됨
+  const PUBLIC_PATHS = ['/landing', '/login', '/signup']
   const isPublicPath = PUBLIC_PATHS.some((p) => pathname.startsWith(p))
 
   if (user) {
