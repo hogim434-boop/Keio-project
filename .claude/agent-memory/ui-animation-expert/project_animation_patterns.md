@@ -104,6 +104,27 @@ type: project
 - `motion.div`로 Button을 외부 래핑 → whileHover/whileTap 적용
 - Button 자체를 motion.* 로 변환하지 않음 (asChild radix 충돌 방지)
 
+## 랜딩 페이지 Phase 3 마이크로인터랙션 (2026-05-04)
+
+### `app/(public)/landing/page.tsx` — 추가된 로컬 컴포넌트
+
+#### `<Spotlight />`
+- 마우스를 아주 느리게 따라오는 ambient 글로우 원 (파일 내 로컬 컴포넌트)
+- useSpring: `{ stiffness: 50, damping: 20 }` — Apple 풍 거의 따라오지 않는 속도
+- 크기: 700x700px, `radial-gradient` + `blur-[40px]`
+- 라이트: `oklch(0.7 0.18 270 / 0.08)`, 다크: `oklch(0.6 0.22 270 / 0.15)`
+- `mix-blend-multiply`(라이트) / `mix-blend-screen`(다크)
+- 배치: `position: absolute` (main 기준) — body 768px 제약 안에 가둠 (fixed 미사용)
+- 가드: `reduced=true` 시 DOM 렌더 안 함, `(pointer: coarse)` 시 mousemove 미등록
+
+#### `<MagneticButton />`
+- 마우스 끌림 효과 + hover glow 를 한 컴포넌트로 통합 (파일 내 로컬 컴포넌트)
+- useSpring: `{ stiffness: 200, damping: 18, mass: 0.6 }` — 탄탄하되 민첩
+- 끌림 강도: `(dx, dy) * 0.25`, clamp ±8px
+- `isPrimary=true` 시 whileHover 에 `boxShadow: '0 0 30px oklch(0.6 0.22 270 / 0.4)'` 추가
+- 기존 scale 1.02 / 0.96 springTap 과 공존 (x/y transform 은 독립 축)
+- 가드: `reduced=true` 시 whileHover/whileTap undefined, mousemove ref 로 coarse 감지
+
 ## 컴포넌트별 적용 패턴
 
 ### `app/(public)/layout.tsx`
