@@ -87,10 +87,13 @@ export function PostFeed({ initial, sort, categorySlug, search }: PostFeedProps)
   // unmount 시 진행 중 fetch abort
   useEffect(() => () => abortRef.current?.abort(), [])
 
+  // 빈 상태 — 검색 모드와 일반 모드 카피 분기
   if (items.length === 0) {
     return (
       <div className="py-12 text-center text-sm text-muted-foreground">
-        まだ投稿がありません — 右下のボタンから最初の投稿を作成しましょう
+        {search
+          ? '該当する投稿が見つかりません — キーワードを変えて再検索'
+          : 'まだ投稿がありません — 右下のボタンから最初の投稿を作成しましょう'}
       </div>
     )
   }
