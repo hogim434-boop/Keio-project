@@ -17,43 +17,17 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { AuthHeader } from '../../_components/auth-header'
+import {
+  AUTH_INPUT_CLASS,
+  authFadeUp,
+  authField,
+  authFormContainer,
+  authPageContainer,
+} from '../../_components/auth-styles'
 import { createClient } from '@/lib/supabase/client'
 import { SetupFormSchema, type SetupFormData } from '@/types/auth'
 import { CAMPUS_VALUES, GRADE_VALUES } from '@/types/domain'
-
-// 학년: GRADE_VALUES + 라벨 매핑
-const GRADES = GRADE_VALUES.map((value) => ({
-  value,
-  label: value === '대학원' ? '대학원' : `${value}학년`,
-}))
-
-const pageContainer = {
-  hidden: {},
-  visible: { transition: { staggerChildren: 0.07, delayChildren: 0.1 } },
-}
-
-const fadeUp = {
-  hidden: { opacity: 0, y: 16 },
-  visible: {
-    opacity: 1,
-    y: 0,
-    transition: { duration: 0.5, ease: [0.22, 1, 0.36, 1] as const },
-  },
-}
-
-const formContainer = {
-  hidden: {},
-  visible: { transition: { staggerChildren: 0.06 } },
-}
-
-const field = {
-  hidden: { opacity: 0, y: 10 },
-  visible: {
-    opacity: 1,
-    y: 0,
-    transition: { duration: 0.4, ease: [0.22, 1, 0.36, 1] as const },
-  },
-}
+import { getCampusLabel, getGradeLabel } from '@/lib/locale/labels'
 
 function ProgressBar({ active }: { active: boolean }) {
   return (
@@ -72,7 +46,6 @@ export default function SetupPage() {
   const [verifiedEmail, setVerifiedEmail] = useState('')
   const [initializing, setInitializing] = useState(true)
 
-  // RHF + SetupFormSchema (비밀번호 강화 + 필드별 검증 + confirmPassword 일치)
   const form = useForm<SetupFormData>({
     resolver: zodResolver(SetupFormSchema),
     defaultValues: {
@@ -94,7 +67,6 @@ export default function SetupPage() {
     formState: { errors, isSubmitting },
   } = form
 
-  // 페이지 진입 시 세션 확인
   useEffect(() => {
     async function checkSession() {
       const supabase = createClient()
@@ -106,7 +78,6 @@ export default function SetupPage() {
         router.replace('/signup')
         return
       }
-      // 이미 설정 완료된 사용자
       if (user.user_metadata?.password_set === true) {
         router.replace('/')
         return
@@ -135,7 +106,7 @@ export default function SetupPage() {
     if (error) {
       setError('root', {
         type: 'manual',
-        message: '오류가 발생했습니다. 다시 시도해 주세요',
+        message: 'エラーが発生しました。もう一度お試しください',
       })
       return
     }
@@ -144,7 +115,6 @@ export default function SetupPage() {
     router.replace('/login')
   }
 
-  // 세션 확인 중 로딩 스피너
   if (initializing) {
     return (
       <div className="flex min-h-dvh items-center justify-center">
@@ -158,51 +128,50 @@ export default function SetupPage() {
       <AuthHeader />
 
       <motion.div
-        variants={shouldReduce ? {} : pageContainer}
+        variants={shouldReduce ? {} : authPageContainer}
         initial="hidden"
         animate="visible"
         className="flex-1 flex flex-col justify-center mx-auto max-w-sm w-full px-6 py-8"
       >
-        {/* 진행 표시 (2/2) */}
-        <motion.div variants={shouldReduce ? {} : fadeUp} className="flex gap-1.5 mb-8">
+        {/* 進捗 (2/2) */}
+        <motion.div variants={shouldReduce ? {} : authFadeUp} className="flex gap-1.5 mb-8">
           <ProgressBar active={true} />
           <ProgressBar active={true} />
         </motion.div>
 
-        {/* 제목 */}
         <motion.h1
-          variants={shouldReduce ? {} : fadeUp}
+          variants={shouldReduce ? {} : authFadeUp}
           className="text-3xl font-bold mb-8"
         >
-          계정 설정
+          アカウント設定
         </motion.h1>
 
         <motion.form
-          variants={shouldReduce ? {} : formContainer}
+          variants={shouldReduce ? {} : authFormContainer}
           initial="hidden"
           animate="visible"
           onSubmit={handleSubmit(onSubmit)}
           className="space-y-4"
           noValidate
         >
-          {/* 인증된 keio.jp 이메일 표시 */}
-          <motion.div variants={shouldReduce ? {} : field} className="space-y-2">
-            <Label>인증된 keio.jp 이메일</Label>
+          {/* 認証済み keio.jp メール */}
+          <motion.div variants={shouldReduce ? {} : authField} className="space-y-2">
+            <Label>認証済みの keio.jp メールアドレス</Label>
             <div className="flex h-12 items-center gap-3 rounded-full bg-muted px-5">
               <CheckCircle2 size={16} className="shrink-0 text-green-500" />
               <span className="truncate text-sm font-medium">{verifiedEmail}</span>
             </div>
           </motion.div>
 
-          {/* 닉네임 */}
-          <motion.div variants={shouldReduce ? {} : field} className="space-y-2">
-            <Label htmlFor="nickname">닉네임</Label>
+          {/* ニックネーム */}
+          <motion.div variants={shouldReduce ? {} : authField} className="space-y-2">
+            <Label htmlFor="nickname">ニックネーム</Label>
             <Input
               id="nickname"
-              placeholder="앱에서 표시될 이름"
+              placeholder="アプリ上で表示される名前"
               autoComplete="nickname"
               aria-invalid={!!errors.nickname}
-              className="rounded-full bg-muted border-0 h-12 px-5 focus-visible:ring-1 focus-visible:ring-ring"
+              className={AUTH_INPUT_CLASS}
               {...register('nickname')}
             />
             {errors.nickname?.message && (
@@ -212,16 +181,16 @@ export default function SetupPage() {
             )}
           </motion.div>
 
-          {/* 비밀번호 설정 */}
-          <motion.div variants={shouldReduce ? {} : field} className="space-y-2">
-            <Label htmlFor="password">비밀번호 설정</Label>
+          {/* パスワード */}
+          <motion.div variants={shouldReduce ? {} : authField} className="space-y-2">
+            <Label htmlFor="password">パスワード</Label>
             <Input
               id="password"
               type="password"
-              placeholder="8자 이상, 영문+숫자 포함"
+              placeholder="8文字以上、英数字を含む"
               autoComplete="new-password"
               aria-invalid={!!errors.password}
-              className="rounded-full bg-muted border-0 h-12 px-5 focus-visible:ring-1 focus-visible:ring-ring"
+              className={AUTH_INPUT_CLASS}
               {...register('password')}
             />
             {errors.password?.message && (
@@ -231,16 +200,16 @@ export default function SetupPage() {
             )}
           </motion.div>
 
-          {/* 비밀번호 확인 */}
-          <motion.div variants={shouldReduce ? {} : field} className="space-y-2">
-            <Label htmlFor="confirmPassword">비밀번호 확인</Label>
+          {/* パスワード確認 */}
+          <motion.div variants={shouldReduce ? {} : authField} className="space-y-2">
+            <Label htmlFor="confirmPassword">パスワード確認</Label>
             <Input
               id="confirmPassword"
               type="password"
-              placeholder="비밀번호 재입력"
+              placeholder="もう一度入力"
               autoComplete="new-password"
               aria-invalid={!!errors.confirmPassword}
-              className="rounded-full bg-muted border-0 h-12 px-5 focus-visible:ring-1 focus-visible:ring-ring"
+              className={AUTH_INPUT_CLASS}
               {...register('confirmPassword')}
             />
             {errors.confirmPassword?.message && (
@@ -250,9 +219,9 @@ export default function SetupPage() {
             )}
           </motion.div>
 
-          {/* 캠퍼스 */}
-          <motion.div variants={shouldReduce ? {} : field} className="space-y-2">
-            <Label>캠퍼스</Label>
+          {/* キャンパス */}
+          <motion.div variants={shouldReduce ? {} : authField} className="space-y-2">
+            <Label>キャンパス</Label>
             <Controller
               name="campus"
               control={control}
@@ -262,12 +231,12 @@ export default function SetupPage() {
                     aria-invalid={!!errors.campus}
                     className="rounded-full bg-muted border-0 h-12 px-5"
                   >
-                    <SelectValue placeholder="캠퍼스 선택" />
+                    <SelectValue placeholder="キャンパスを選択" />
                   </SelectTrigger>
                   <SelectContent>
                     {CAMPUS_VALUES.map((c) => (
                       <SelectItem key={c} value={c}>
-                        {c}
+                        {getCampusLabel(c)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -281,9 +250,9 @@ export default function SetupPage() {
             )}
           </motion.div>
 
-          {/* 학년 */}
-          <motion.div variants={shouldReduce ? {} : field} className="space-y-2">
-            <Label>학년</Label>
+          {/* 学年 */}
+          <motion.div variants={shouldReduce ? {} : authField} className="space-y-2">
+            <Label>学年</Label>
             <Controller
               name="grade"
               control={control}
@@ -293,12 +262,12 @@ export default function SetupPage() {
                     aria-invalid={!!errors.grade}
                     className="rounded-full bg-muted border-0 h-12 px-5"
                   >
-                    <SelectValue placeholder="학년 선택" />
+                    <SelectValue placeholder="学年を選択" />
                   </SelectTrigger>
                   <SelectContent>
-                    {GRADES.map((g) => (
-                      <SelectItem key={g.value} value={g.value}>
-                        {g.label}
+                    {GRADE_VALUES.map((g) => (
+                      <SelectItem key={g} value={g}>
+                        {getGradeLabel(g)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -312,14 +281,14 @@ export default function SetupPage() {
             )}
           </motion.div>
 
-          {/* 학부 */}
-          <motion.div variants={shouldReduce ? {} : field} className="space-y-2">
-            <Label htmlFor="department">학부</Label>
+          {/* 学部 */}
+          <motion.div variants={shouldReduce ? {} : authField} className="space-y-2">
+            <Label htmlFor="department">学部</Label>
             <Input
               id="department"
-              placeholder="예: 経済学部"
+              placeholder="例: 経済学部"
               aria-invalid={!!errors.department}
-              className="rounded-full bg-muted border-0 h-12 px-5 focus-visible:ring-1 focus-visible:ring-ring"
+              className={AUTH_INPUT_CLASS}
               {...register('department')}
             />
             {errors.department?.message && (
@@ -329,7 +298,6 @@ export default function SetupPage() {
             )}
           </motion.div>
 
-          {/* 폼 전체 에러 (서버 오류 등) */}
           {errors.root?.message && (
             <motion.p
               role="alert"
@@ -341,8 +309,8 @@ export default function SetupPage() {
             </motion.p>
           )}
 
-          {/* 가입하기 버튼 */}
-          <motion.div variants={shouldReduce ? {} : field}>
+          {/* 登録ボタン */}
+          <motion.div variants={shouldReduce ? {} : authField}>
             <motion.div
               whileHover={shouldReduce ? {} : { scale: 1.02 }}
               whileTap={shouldReduce ? {} : { scale: 0.98 }}
@@ -353,7 +321,7 @@ export default function SetupPage() {
                 disabled={isSubmitting}
                 className="w-full rounded-full h-12 mt-1"
               >
-                {isSubmitting ? '처리 중…' : '가입하기'}
+                {isSubmitting ? '処理中…' : '登録する'}
               </Button>
             </motion.div>
           </motion.div>
