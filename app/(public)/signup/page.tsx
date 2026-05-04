@@ -5,21 +5,8 @@ import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { AuthHeader } from '../_components/auth-header'
+import { authFadeUp, authPageContainer } from '../_components/auth-styles'
 import { createClient } from '@/lib/supabase/client'
-
-const pageContainer = {
-  hidden: {},
-  visible: { transition: { staggerChildren: 0.08, delayChildren: 0.1 } },
-}
-
-const fadeUp = {
-  hidden: { opacity: 0, y: 16 },
-  visible: {
-    opacity: 1,
-    y: 0,
-    transition: { duration: 0.5, ease: [0.22, 1, 0.36, 1] as const },
-  },
-}
 
 function ProgressBar({ active }: { active: boolean }) {
   return (
@@ -31,7 +18,7 @@ function ProgressBar({ active }: { active: boolean }) {
   )
 }
 
-// Google 공식 컬러 로고
+// Google 公式カラーロゴ
 function GoogleIcon() {
   return (
     <svg viewBox="0 0 24 24" className="h-5 w-5 shrink-0" aria-hidden="true">
@@ -48,14 +35,16 @@ export default function SignupPage() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const shouldReduce = useReducedMotion()
 
-  // URL 쿼리 파라미터로 전달된 에러 확인
+  // URL 쿼리 파라미터로 전달된 에러 확인 (마운트 1회, window 사용을 위한 effect)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const err = params.get('error')
     if (err === 'domain') {
-      setErrorMsg('게이오 이메일(@keio.jp)만 가입 가능합니다')
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setErrorMsg('keio.jp ドメインのメールアドレスのみご登録いただけます')
     } else if (err === 'auth') {
-      setErrorMsg('인증 중 오류가 발생했습니다. 다시 시도해 주세요')
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setErrorMsg('認証中にエラーが発生しました。もう一度お試しください')
     }
   }, [])
 
@@ -71,9 +60,8 @@ export default function SignupPage() {
         queryParams: { hd: 'keio.jp' },
       },
     })
-    // 실패 시에만 도달 (성공하면 리다이렉트로 페이지를 떠남)
     if (error) {
-      setErrorMsg('Google 로그인 중 오류가 발생했습니다. 다시 시도해 주세요')
+      setErrorMsg('Google ログインでエラーが発生しました。もう一度お試しください')
       setLoading(false)
     }
   }
@@ -83,35 +71,32 @@ export default function SignupPage() {
       <AuthHeader />
 
       <motion.div
-        variants={shouldReduce ? {} : pageContainer}
+        variants={shouldReduce ? {} : authPageContainer}
         initial="hidden"
         animate="visible"
         className="flex-1 flex flex-col justify-center mx-auto max-w-sm w-full px-6 py-8"
       >
-        {/* 진행 표시 (1/2) */}
-        <motion.div variants={shouldReduce ? {} : fadeUp} className="flex gap-1.5 mb-8">
+        {/* 進捗 (1/2) */}
+        <motion.div variants={shouldReduce ? {} : authFadeUp} className="flex gap-1.5 mb-8">
           <ProgressBar active={true} />
           <ProgressBar active={false} />
         </motion.div>
 
-        {/* 제목 */}
         <motion.h1
-          variants={shouldReduce ? {} : fadeUp}
+          variants={shouldReduce ? {} : authFadeUp}
           className="text-3xl font-bold mb-2"
         >
-          회원가입
+          新規登録
         </motion.h1>
 
-        {/* 설명 */}
         <motion.p
-          variants={shouldReduce ? {} : fadeUp}
+          variants={shouldReduce ? {} : authFadeUp}
           className="text-sm text-muted-foreground mb-8 leading-relaxed"
         >
-          게이오 학생임을 확인하기 위해<br />
-          keio.jp 이메일로 로그인해 주세요
+          慶應義塾の在学生であることを確認するため、<br />
+          keio.jp のメールアドレスでログインしてください
         </motion.p>
 
-        {/* 에러 메시지 */}
         {errorMsg && (
           <motion.div
             initial={shouldReduce ? false : { opacity: 0, y: 8 }}
@@ -122,8 +107,7 @@ export default function SignupPage() {
           </motion.div>
         )}
 
-        {/* Google 인증 버튼 */}
-        <motion.div variants={shouldReduce ? {} : fadeUp}>
+        <motion.div variants={shouldReduce ? {} : authFadeUp}>
           <motion.div
             whileHover={shouldReduce ? {} : { scale: 1.02 }}
             whileTap={shouldReduce ? {} : { scale: 0.98 }}
@@ -137,40 +121,37 @@ export default function SignupPage() {
               className="w-full rounded-full h-12 gap-2 font-medium"
             >
               <GoogleIcon />
-              {loading ? '연결 중…' : 'Google로 keio.jp 인증하기'}
+              {loading ? '接続中…' : 'Google で keio.jp 認証'}
             </Button>
           </motion.div>
         </motion.div>
 
-        {/* 안내 박스 */}
-        <motion.div variants={shouldReduce ? {} : fadeUp} className="mt-4">
+        <motion.div variants={shouldReduce ? {} : authFadeUp} className="mt-4">
           <p className="rounded-xl bg-muted px-5 py-3 text-xs text-muted-foreground leading-relaxed">
-            Google 로그인 후 게이오 대학교 인증 화면이 나타납니다.
-            keio.jp 계정으로 로그인하면 자동으로 돌아옵니다.
+            Google ログイン後、慶應義塾の認証画面に遷移します。
+            keio.jp アカウントでログインすると自動で戻ります。
           </p>
         </motion.div>
 
-        {/* 구분선 */}
         <motion.div
-          variants={shouldReduce ? {} : fadeUp}
+          variants={shouldReduce ? {} : authFadeUp}
           className="my-6 flex items-center gap-3"
         >
           <div className="h-px flex-1 bg-border" />
-          <span className="text-xs text-muted-foreground">또는</span>
+          <span className="text-xs text-muted-foreground">または</span>
           <div className="h-px flex-1 bg-border" />
         </motion.div>
 
-        {/* 로그인 링크 */}
         <motion.p
-          variants={shouldReduce ? {} : fadeUp}
+          variants={shouldReduce ? {} : authFadeUp}
           className="text-center text-sm text-muted-foreground"
         >
-          이미 계정이 있으신가요?{' '}
+          すでにアカウントをお持ちの方は{' '}
           <Link
             href="/login"
             className="font-medium text-foreground underline underline-offset-4 hover:text-foreground/80 transition-colors"
           >
-            로그인
+            ログイン
           </Link>
         </motion.p>
       </motion.div>
