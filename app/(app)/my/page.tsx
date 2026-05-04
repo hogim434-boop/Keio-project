@@ -1,11 +1,147 @@
-// 마이페이지 — Phase 4 Task 018에서 게시판 마이로 재작성 예정
-// 현재는 강의 도메인 피벗 작업(Task 007) 진행 중 임시 placeholder
+/**
+ * 마이페이지 (Server Component)
+ *
+ * ?tab 파라미터로 투고 / 댓글 / 북마크 탭 분기.
+ * 프로필 헤더 + MyTabs + 탭별 카드 리스트 + 하단 ログアウト.
+ * 미인증 시 /login 리다이렉트.
+ */
 
-export default function MyPage() {
+import { Suspense } from 'react'
+import Link from 'next/link'
+import { redirect } from 'next/navigation'
+import { Settings } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { createClient } from '@/lib/supabase/server'
+import { fetchMyPosts, fetchMyComments, fetchMyBookmarks } from '@/lib/community/my'
+import { MyTabs } from '@/components/community/my-tabs'
+import { MyPostCard } from '@/components/community/my-post-card'
+import { MyCommentCard } from '@/components/community/my-comment-card'
+import { MyBookmarkCard } from '@/components/community/my-bookmark-card'
+import { LogoutButton } from '@/components/community/logout-button'
+
+/** 유효한 탭 값 목록 */
+const TAB_VALUES = ['posts', 'comments', 'bookmarks'] as const
+type TabValue = (typeof TAB_VALUES)[number]
+
+/** 마이페이지 — ?tab 분기 Server Component */
+export default async function MyPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ tab?: string }>
+}) {
+  // Next.js 16: searchParams 를 await 으로 받음
+  const sp = await searchParams
+  const tab: TabValue = (TAB_VALUES as readonly string[]).includes(sp.tab ?? '')
+    ? (sp.tab as TabValue)
+    : 'posts'
+
+  // 인증 확인 — 미인증 시 /login 리다이렉트
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
+
+  // 프로필 조회 (nickname / campus / department)
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('nickname, campus, department')
+    .eq('id', user.id)
+    .maybeSingle()
+
+  // 탭별 데이터 페칭 — 해당 탭만 쿼리 (불필요한 쿼리 방지)
+  const [posts, comments, bookmarks] =
+    tab === 'posts'
+      ? [await fetchMyPosts(supabase, user.id), [], []]
+      : tab === 'comments'
+        ? [[], await fetchMyComments(supabase, user.id), []]
+        : [[], [], await fetchMyBookmarks(supabase, user.id)]
+
   return (
-    <div className="mx-auto max-w-[768px] px-4 py-12 text-center text-muted-foreground">
-      <h1 className="text-xl font-bold mb-2">마이페이지</h1>
-      <p>게시판 피벗 작업 중입니다. 곧 게시판 마이로 돌아옵니다 (Phase 4 Task 018).</p>
+    <div>
+      {/* 상단 헤더 — glass-panel 다크 보라 글래스 효과 */}
+      <header className="sticky top-0 z-30 glass-panel px-4 h-14 flex items-center">
+        {/* 보라 그라데이션 타이틀 */}
+        <h1 className="text-gradient-violet text-lg font-bold">マイページ</h1>
+        <Link
+          href="/my/profile"
+          aria-label="設定"
+          className="ml-auto p-2 rounded-md hover:bg-muted"
+        >
+          <Settings className="size-5" />
+        </Link>
+      </header>
+
+      {/* 프로필 섹션 — 보라 라디알 그라데이션 글로우 배경 */}
+      <section className="relative overflow-hidden px-4 py-4 border-b flex items-center gap-3 bg-gradient-violet-radial">
+        {/* Avatar — 보라 그라데이션 + 글로우 링 */}
+        <div
+          className="size-14 rounded-full bg-gradient-violet shadow-glow-violet ring-2 ring-primary/30 flex items-center justify-center text-2xl text-white"
+          aria-hidden
+        >
+          👤
+        </div>
+        <div className="flex-1 min-w-0">
+          {/* 닉네임 — 큰 타이포 SNS 친화 */}
+          <p className="text-lg font-bold tracking-tight truncate">{profile?.nickname ?? '匿名'}</p>
+          <p className="text-xs text-muted-foreground truncate">
+            {profile?.campus ?? '—'} / {profile?.department ?? '—'}
+          </p>
+        </div>
+        {/* プロフィール編集 링크 — /my/profile 재활용 */}
+        <Button asChild variant="outline" size="sm">
+          <Link href="/my/profile">プロフィール編集</Link>
+        </Button>
+      </section>
+
+      {/* 탭 세그먼트 컨트롤 — Suspense 로 감싸기 (useSearchParams 사용) */}
+      <Suspense fallback={<div className="h-[60px]" aria-hidden />}>
+        <MyTabs />
+      </Suspense>
+
+      {/* 탭 콘텐츠 — 선택된 탭에 따라 카드 리스트 렌더 */}
+      <section className="px-4 py-4 space-y-3">
+        {/* 투고 탭 */}
+        {tab === 'posts' &&
+          (posts.length === 0 ? (
+            /* 빈 상태 — 보라 글로우 이모지 + 안내 텍스트 */
+            <div className="py-16 text-center space-y-3">
+              <p className="text-4xl" aria-hidden>🌸</p>
+              <p className="text-sm text-muted-foreground">まだ投稿がありません</p>
+            </div>
+          ) : (
+            posts.map((p) => <MyPostCard key={p.id} post={p} />)
+          ))}
+
+        {/* 댓글 탭 */}
+        {tab === 'comments' &&
+          (comments.length === 0 ? (
+            /* 빈 상태 — 댓글 없음 안내 */
+            <div className="py-16 text-center space-y-3">
+              <p className="text-4xl" aria-hidden>💬</p>
+              <p className="text-sm text-muted-foreground">まだコメントがありません</p>
+            </div>
+          ) : (
+            comments.map((c) => <MyCommentCard key={c.id} comment={c} />)
+          ))}
+
+        {/* 북마크 탭 */}
+        {tab === 'bookmarks' &&
+          (bookmarks.length === 0 ? (
+            /* 빈 상태 — 북마크 없음 안내 */
+            <div className="py-16 text-center space-y-3">
+              <p className="text-4xl" aria-hidden>🔖</p>
+              <p className="text-sm text-muted-foreground">まだブックマークがありません</p>
+            </div>
+          ) : (
+            bookmarks.map((b) => <MyBookmarkCard key={b.id} bookmark={b} />)
+          ))}
+      </section>
+
+      {/* 하단 로그아웃 버튼 — 보더 통일 */}
+      <section className="px-4 py-4 border-t border-border/50">
+        <LogoutButton />
+      </section>
     </div>
   )
 }
