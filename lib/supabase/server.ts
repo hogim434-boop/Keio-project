@@ -17,7 +17,10 @@ export async function createClient() {
             cookiesToSet.forEach(({ name, value, options }) =>
               cookieStore.set(name, value, options)
             )
-          } catch {}
+          } catch {
+            // Server Component 컨텍스트에서는 cookies().set() 이 ReadonlyRequestCookiesError 를
+            // 던지므로 의도적으로 무시. proxy.ts 가 다음 응답에서 세션을 갱신함.
+          }
         },
       },
     }
