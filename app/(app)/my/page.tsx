@@ -1,29 +1,11 @@
-import { createClient } from '@/lib/supabase/server'
-import { DUMMY_REVIEWS, DUMMY_COURSES } from '@/lib/dummy-data'
-import { MyClient } from './_components/my-client'
+// 마이페이지 — Phase 4 Task 018에서 게시판 마이로 재작성 예정
+// 현재는 강의 도메인 피벗 작업(Task 007) 진행 중 임시 placeholder
 
-const MY_REVIEWS = DUMMY_REVIEWS.filter((r) => r.courseId === 'course-1')
-
-export default async function MyPage() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-
-  const userInfo = {
-    name: user?.user_metadata?.nickname || user?.email?.split('@')[0] || '사용자',
-    campus: user?.user_metadata?.campus ?? '',
-    department: user?.user_metadata?.department ?? '',
-  }
-
-  const reviews = MY_REVIEWS.map((review) => {
-    const course = DUMMY_COURSES.find((c) => c.id === review.courseId)
-    return {
-      id: review.id,
-      courseName: course?.name ?? '-',
-      overallRating: review.ratings.overall,
-      createdAt: review.createdAt,
-      comment: review.comment,
-    }
-  })
-
-  return <MyClient user={userInfo} reviews={reviews} />
+export default function MyPage() {
+  return (
+    <div className="mx-auto max-w-[768px] px-4 py-12 text-center text-muted-foreground">
+      <h1 className="text-xl font-bold mb-2">마이페이지</h1>
+      <p>게시판 피벗 작업 중입니다. 곧 게시판 마이로 돌아옵니다 (Phase 4 Task 018).</p>
+    </div>
+  )
 }

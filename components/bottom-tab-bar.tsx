@@ -1,17 +1,19 @@
 'use client'
 
+// BottomTabBar — 임시 정리 버전 (Task 007-E)
+// Phase 4 Task 012에서 3탭(게시판/탐색/마이) + 중앙 FAB 구조로 재작성 예정.
+// 강의·검색·커뮤니티 라우트는 게시판 피벗으로 폐기됨 → 임시로 마이 탭만 유지.
+
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Home, Search, User, MessageSquare } from 'lucide-react'
+import { Home, User } from 'lucide-react'
 import { motion, useReducedMotion } from 'framer-motion'
 import { cn } from '@/lib/utils'
 
-// 하단 탭 목록 (4탭: 강의 · 검색 · 커뮤니티 · 마이)
+// 임시 탭 목록 — Phase 4 Task 012에서 3탭+FAB로 재작성 예정
 const TABS = [
-  { href: '/courses',   icon: Home,          label: '강의'    },
-  { href: '/search',    icon: Search,        label: '검색'    },
-  { href: '/community', icon: MessageSquare, label: '커뮤니티' },
-  { href: '/my',        icon: User,          label: '마이'    },
+  { href: '/',    icon: Home, label: '게시판' },
+  { href: '/my',  icon: User, label: '마이'   },
 ]
 
 export function BottomTabBar() {
@@ -27,7 +29,8 @@ export function BottomTabBar() {
     >
       <div className="flex h-14 items-stretch">
         {TABS.map(({ href, icon: Icon, label }) => {
-          const isActive = pathname.startsWith(href)
+          // 홈('/')은 정확히 일치할 때만 활성, 나머지는 startsWith로 판단
+          const isActive = href === '/' ? pathname === '/' : pathname.startsWith(href)
           return (
             <Link
               key={href}
@@ -68,7 +71,7 @@ export function BottomTabBar() {
                 />
               </motion.div>
 
-              {/* 탭 레이블 — text-xs로 가독성 향상 */}
+              {/* 탭 레이블 */}
               <span
                 className={cn(
                   'text-xs transition-colors',
