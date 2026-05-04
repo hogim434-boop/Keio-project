@@ -31,25 +31,25 @@ export const KEIO_EMAIL_DOMAINS = [
 /** keio.jp / g.keio.ac.jp / sfc.keio.ac.jp 도메인만 허용 */
 export const KeioEmailSchema = z
   .string()
-  .min(1, '이메일을 입력해주세요')
-  .email('이메일 형식이 올바르지 않습니다')
+  .min(1, 'メールアドレスを入力してください')
+  .email('メールアドレスの形式が正しくありません')
   .refine(
     (email) => KEIO_EMAIL_DOMAINS.some((domain) => email.endsWith(domain)),
-    { message: 'keio.jp 도메인 이메일만 사용 가능합니다' }
+    { message: 'keio.jp ドメインのメールアドレスのみご利用いただけます' }
   )
 
 /** 비밀번호: 8자 이상 + 영문 1자 + 숫자 1자 */
 export const PasswordSchema = z
   .string()
-  .min(8, '비밀번호는 8자 이상이어야 합니다')
-  .regex(/[A-Za-z]/, '영문을 1자 이상 포함해야 합니다')
-  .regex(/[0-9]/, '숫자를 1자 이상 포함해야 합니다')
+  .min(8, 'パスワードは8文字以上で入力してください')
+  .regex(/[A-Za-z]/, '英字を1文字以上含めてください')
+  .regex(/[0-9]/, '数字を1文字以上含めてください')
 
 /** 닉네임: 2~20자 */
 export const NicknameSchema = z
   .string()
-  .min(2, '닉네임은 2자 이상이어야 합니다')
-  .max(20, '닉네임은 20자 이하여야 합니다')
+  .min(2, 'ニックネームは2文字以上で入力してください')
+  .max(20, 'ニックネームは20文字以下で入力してください')
   .trim()
 
 // ============================================================
@@ -59,7 +59,7 @@ export const NicknameSchema = z
 /** 로그인 폼 — login 페이지에서 사용 */
 export const LoginFormSchema = z.object({
   email: KeioEmailSchema,
-  password: z.string().min(1, '비밀번호를 입력해주세요'),
+  password: z.string().min(1, 'パスワードを入力してください'),
 })
 
 export type LoginFormData = z.infer<typeof LoginFormSchema>
@@ -68,14 +68,14 @@ export type LoginFormData = z.infer<typeof LoginFormSchema>
 export const SetupFormSchema = z
   .object({
     password: PasswordSchema,
-    confirmPassword: z.string().min(1, '비밀번호 확인을 입력해주세요'),
+    confirmPassword: z.string().min(1, 'パスワード確認を入力してください'),
     nickname: NicknameSchema,
     campus: CampusSchema,
     grade: GradeSchema,
-    department: z.string().min(1, '학부를 입력해주세요').trim(),
+    department: z.string().min(1, '学部を入力してください').trim(),
   })
   .refine((data) => data.password === data.confirmPassword, {
-    message: '비밀번호가 일치하지 않습니다',
+    message: 'パスワードが一致しません',
     path: ['confirmPassword'],
   })
 
