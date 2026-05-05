@@ -44,6 +44,9 @@ export default async function HomePage({
   // Supabase 서버 클라이언트 생성
   const supabase = await createClient()
 
+  // 현재 로그인 유저 — PostCard isOwner 판단에 사용
+  const { data: { user } } = await supabase.auth.getUser()
+
   // 핫 피드 + 게시글 목록 병렬 fetch
   const [hot, list] = await Promise.all([
     fetchHotPosts(supabase),
@@ -106,6 +109,7 @@ export default async function HomePage({
           initial={list}
           sort={sort}
           categorySlug={categorySlug}
+          currentUserId={user?.id ?? null}
         />
       </section>
     </div>

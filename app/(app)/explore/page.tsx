@@ -37,6 +37,9 @@ export default async function ExplorePage({
 
   const supabase = await createClient()
 
+  // 현재 로그인 유저 — PostCard isOwner 판단에 사용
+  const { data: { user } } = await supabase.auth.getUser()
+
   // 검색 모드: latest + 20건 / 인기 모드: popular + 10건
   const sort: 'latest' | 'popular' = q ? 'latest' : 'popular'
   const limit = q ? 20 : 10
@@ -91,6 +94,7 @@ export default async function ExplorePage({
           sort={sort}
           categorySlug={categorySlug}
           search={q}
+          currentUserId={user?.id ?? null}
         />
       </section>
     </div>
