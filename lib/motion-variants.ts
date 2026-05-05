@@ -116,3 +116,54 @@ export const letterReveal: Variants = {
     },
   },
 }
+
+// ============================================================
+// 랜딩 hero 전용 — 영화 인트로 톤
+// ============================================================
+
+/**
+ * Hero 배경 Ken Burns 진입 — scale 1.3 → 1.05 (1.6s, expo-out).
+ * 진입 후엔 useAnimationControls 로 호흡 단계로 전환 (랜딩 페이지 참고).
+ */
+export const heroKenBurns: Variants = {
+  hidden: { scale: 1.3 },
+  visible: {
+    scale: 1.05,
+    transition: {
+      duration: 1.6,
+      ease: [0.22, 1, 0.36, 1] as [number, number, number, number],
+    },
+  },
+}
+
+/**
+ * 가로선 underline reveal — scaleX 0 → 1 (transform-origin: left).
+ * 워드마크 stagger 가 끝난 직후 등장하도록 부모 컨테이너의 delayChildren 으로 타이밍 조정.
+ */
+export const underlineReveal: Variants = {
+  hidden: { scaleX: 0 },
+  visible: {
+    scaleX: 1,
+    transition: {
+      duration: 0.7,
+      ease: [0.22, 1, 0.36, 1] as [number, number, number, number],
+    },
+  },
+}
+
+/**
+ * 서브 카피 reveal — opacity + y:14 + blur(6px) → 0 (0.6s expo-out).
+ * 워드마크/언더라인 등장 후 부드럽게 페이드 업.
+ */
+export const subCopyReveal: Variants = {
+  hidden: { opacity: 0, y: 14, filter: 'blur(6px)' },
+  visible: {
+    opacity: 1,
+    y: 0,
+    filter: 'blur(0px)',
+    transition: {
+      duration: 0.6,
+      ease: [0.22, 1, 0.36, 1] as [number, number, number, number],
+    },
+  },
+}
