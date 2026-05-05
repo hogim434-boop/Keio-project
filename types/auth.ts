@@ -11,7 +11,7 @@
  */
 
 import { z } from 'zod'
-import { CampusSchema, GradeSchema } from './domain'
+import { CampusSchema, GradeSchema, DepartmentSchema } from './domain'
 
 // ============================================================
 // 게이오 이메일 도메인 화이트리스트 (단일 출처)
@@ -72,7 +72,7 @@ export const SetupFormSchema = z
     nickname: NicknameSchema,
     campus: CampusSchema,
     grade: GradeSchema,
-    department: z.string().min(1, '学部を入力してください').trim(),
+    department: DepartmentSchema,
   })
   .refine((data) => data.password === data.confirmPassword, {
     message: 'パスワードが一致しません',
