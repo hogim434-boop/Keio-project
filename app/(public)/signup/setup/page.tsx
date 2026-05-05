@@ -26,8 +26,8 @@ import {
 } from '../../_components/auth-styles'
 import { createClient } from '@/lib/supabase/client'
 import { SetupFormSchema, type SetupFormData } from '@/types/auth'
-import { CAMPUS_VALUES, GRADE_VALUES } from '@/types/domain'
-import { getCampusLabel, getGradeLabel } from '@/lib/locale/labels'
+import { CAMPUS_VALUES, GRADE_VALUES, DEPARTMENT_VALUES } from '@/types/domain'
+import { getCampusLabel, getGradeLabel, getDepartmentLabel } from '@/lib/locale/labels'
 
 function ProgressBar({ active }: { active: boolean }) {
   return (
@@ -54,7 +54,7 @@ export default function SetupPage() {
       nickname: '',
       campus: undefined,
       grade: undefined,
-      department: '',
+      department: undefined,
     },
     mode: 'onSubmit',
   })
@@ -281,15 +281,29 @@ export default function SetupPage() {
             )}
           </motion.div>
 
-          {/* 学部 */}
+          {/* 学部 — 자유 입력 대신 고정 선택지 (캠퍼스/학년과 동일 패턴) */}
           <motion.div variants={shouldReduce ? {} : authField} className="space-y-2">
-            <Label htmlFor="department">学部</Label>
-            <Input
-              id="department"
-              placeholder="例: 経済学部"
-              aria-invalid={!!errors.department}
-              className={AUTH_INPUT_CLASS}
-              {...register('department')}
+            <Label>学部</Label>
+            <Controller
+              name="department"
+              control={control}
+              render={({ field }) => (
+                <Select value={field.value ?? ''} onValueChange={field.onChange}>
+                  <SelectTrigger
+                    aria-invalid={!!errors.department}
+                    className="rounded-full bg-muted border-0 h-12 px-5"
+                  >
+                    <SelectValue placeholder="学部を選択" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {DEPARTMENT_VALUES.map((d) => (
+                      <SelectItem key={d} value={d}>
+                        {getDepartmentLabel(d)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             />
             {errors.department?.message && (
               <p role="alert" className="px-2 text-xs text-destructive">
