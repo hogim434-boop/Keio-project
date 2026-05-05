@@ -15,15 +15,22 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { createClient } from '@/lib/supabase/client'
-import { CAMPUS_VALUES, GRADE_VALUES, type Campus, type Grade } from '@/types/domain'
+import {
+  CAMPUS_VALUES,
+  GRADE_VALUES,
+  DEPARTMENT_VALUES,
+  type Campus,
+  type Grade,
+  type Department,
+} from '@/types/domain'
 import { NicknameSchema, PasswordSchema } from '@/types/auth'
-import { getCampusLabel, getGradeLabel } from '@/lib/locale/labels'
+import { getCampusLabel, getGradeLabel, getDepartmentLabel } from '@/lib/locale/labels'
 
 const ProfileFormSchema = z.object({
   nickname: NicknameSchema,
   campus: z.enum(CAMPUS_VALUES),
   grade: z.enum(GRADE_VALUES),
-  department: z.string().min(1, '学部を入力してください').trim(),
+  department: z.enum(DEPARTMENT_VALUES),
 })
 type ProfileFormData = z.infer<typeof ProfileFormSchema>
 
@@ -50,7 +57,7 @@ export default function ProfilePage() {
       nickname: '',
       campus: undefined,
       grade: undefined,
-      department: '',
+      department: undefined,
     },
     mode: 'onSubmit',
   })
@@ -74,7 +81,7 @@ export default function ProfilePage() {
           nickname: (user.user_metadata?.nickname as string) ?? '',
           campus: (user.user_metadata?.campus as Campus | undefined),
           grade: (user.user_metadata?.grade as Grade | undefined),
-          department: (user.user_metadata?.department as string) ?? '',
+          department: user.user_metadata?.department as Department | undefined,
         })
       }
 
@@ -220,13 +227,28 @@ export default function ProfilePage() {
           )}
         </div>
 
+        {/* 学部 — 자유 입력 대신 고정 선택지 (캠퍼스/학년과 동일 패턴) */}
         <div className="space-y-2">
-          <Label htmlFor="department">学部</Label>
-          <Input
-            id="department"
-            placeholder="例: 経済学部"
-            aria-invalid={!!profileForm.formState.errors.department}
-            {...profileForm.register('department')}
+          <Label>学部</Label>
+          <Controller
+            name="department"
+            control={profileForm.control}
+            render={({ field }) => (
+              <Select value={field.value ?? ''} onValueChange={field.onChange}>
+                <SelectTrigger
+                  aria-invalid={!!profileForm.formState.errors.department}
+                >
+                  <SelectValue placeholder="学部を選択" />
+                </SelectTrigger>
+                <SelectContent>
+                  {DEPARTMENT_VALUES.map((d) => (
+                    <SelectItem key={d} value={d}>
+                      {getDepartmentLabel(d)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
           />
           {profileForm.formState.errors.department?.message && (
             <p role="alert" className="px-2 text-xs text-destructive">
