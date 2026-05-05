@@ -23,9 +23,11 @@ export interface PostFeedProps {
   sort: 'latest' | 'popular'
   categorySlug?: string
   search?: string
+  /** 현재 로그인 유저 ID — PostCard 의 isOwner 판단에 전달 (null = 미인증) */
+  currentUserId?: string | null
 }
 
-export function PostFeed({ initial, sort, categorySlug, search }: PostFeedProps) {
+export function PostFeed({ initial, sort, categorySlug, search, currentUserId }: PostFeedProps) {
   const router = useRouter()
   const [items, setItems] = useState<PostListItem[]>(initial.items)
   const [cursor, setCursor] = useState<string | null>(initial.nextCursor)
@@ -101,7 +103,7 @@ export function PostFeed({ initial, sort, categorySlug, search }: PostFeedProps)
   return (
     <div className="space-y-3">
       {items.map((p) => (
-        <PostCard key={p.id} post={p} />
+        <PostCard key={p.id} post={p} currentUserId={currentUserId} />
       ))}
       {hasMore && (
         <div ref={sentinelRef} className="py-6 flex justify-center">
