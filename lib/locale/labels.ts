@@ -1,7 +1,7 @@
-import type { Campus, Grade } from '@/types/domain'
+import type { Campus, Grade, Department } from '@/types/domain'
 
 /**
- * 도메인 enum 의 저장값(`CAMPUS_VALUES`, `GRADE_VALUES`) 을 UI 표시용 일본어 라벨로 변환.
+ * 도메인 enum 의 저장값(`CAMPUS_VALUES`, `GRADE_VALUES`, `DEPARTMENT_VALUES`) 을 UI 표시용 라벨로 변환.
  *
  * 저장값은 호환성을 위해 그대로 두고(현 DB CHECK 제약과 일치), UI 노출 시점에만 일본어로 매핑.
  * 향후 저장값 자체를 일본어로 통일하는 마이그레이션 시에는 이 매핑을 identity 로 단순화 가능.
@@ -22,4 +22,19 @@ export function getCampusLabel(value: Campus): string {
 
 export function getGradeLabel(value: Grade): string {
   return value === '대학원' ? '大学院' : `${value}年生`
+}
+
+const DEPARTMENT_LABELS: Record<Department, string> = {
+  文: '文学部',
+  商: '商学部',
+  理工: '理工学部',
+  経済: '経済学部',
+  法: '法学部',
+  医: '医学部',
+  薬: '薬学部',
+  sfc: 'SFC',
+}
+
+export function getDepartmentLabel(value: Department): string {
+  return DEPARTMENT_LABELS[value]
 }
