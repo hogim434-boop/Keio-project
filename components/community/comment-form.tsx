@@ -15,8 +15,9 @@
  * 위치: bottom 계산에 safe-area-inset-bottom 포함 (iOS 홈 인디케이터 대응)
  */
 
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
+import { motion, useReducedMotion } from 'framer-motion'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { CommentFormSchema } from '@/types/community'
@@ -41,6 +42,11 @@ export function CommentForm({
   onCancelReply,
 }: CommentFormProps) {
   const router = useRouter()
+  // 시스템 "모션 줄이기" 설정 감지 — 접근성 대응
+  const shouldReduce = useReducedMotion()
+
+  // 폼 높이를 CSS 변수(--comment-form-h)로 발행 → WriteFab 이 동적으로 추종
+  const formRef = useRef<HTMLFormElement>(null)
 
   const form = useForm<CommentFormData>({
     resolver: zodResolver(CommentFormSchema),
@@ -57,6 +63,31 @@ export function CommentForm({
   useEffect(() => {
     form.setValue('parentId', replyTo?.id ?? null, { shouldDirty: true })
   }, [replyTo, form])
+
+  // 폼 실제 높이를 ResizeObserver 로 측정해 CSS 변수에 발행
+  // FAB 등 다른 fixed 요소가 var(--comment-form-h) 로 폼 위쪽 좌표를 동기화 가능
+  useEffect(() => {
+    const el = formRef.current
+    if (!el) return
+
+    const update = () => {
+      document.documentElement.style.setProperty(
+        '--comment-form-h',
+        `${el.offsetHeight}px`,
+      )
+    }
+
+    update()
+
+    const observer = new ResizeObserver(update)
+    observer.observe(el)
+
+    return () => {
+      observer.disconnect()
+      // unmount 시 reset → 다른 라우트의 FAB 이 본래 위치로 복귀
+      document.documentElement.style.setProperty('--comment-form-h', '0px')
+    }
+  }, [])
 
   /**
    * 폼 제출 핸들러
@@ -107,10 +138,23 @@ export function CommentForm({
   }
 
   return (
-    <form
+    <motion.form
+      ref={formRef}
       onSubmit={form.handleSubmit(onSubmit)}
       className="fixed left-1/2 -translate-x-1/2 w-full max-w-[768px] z-30 bg-background border-t px-4 py-2 space-y-2"
       style={{ bottom: 'calc(56px + env(safe-area-inset-bottom))' }}
+      /* 슬라이드업 진입 애니메이션
+       * initial: 폼 전체 높이만큼 화면 아래에 숨겨진 상태에서 시작
+       * animate: 본래 위치(y=0)로 올라오며 등장
+       * transition: 0.5s expo-out (빠르게 치고 올라와 부드럽게 안착 — 뉴욕 스타일 표준 커브)
+       * shouldReduce: 접근성 설정 시 duration 0 으로 즉시 표시 */
+      initial={shouldReduce ? false : { y: '100%' }}
+      animate={{ y: 0 }}
+      transition={
+        shouldReduce
+          ? { duration: 0 }
+          : { duration: 0.8, ease: [0.22, 1, 0.36, 1] }
+      }
     >
       {/* 返信 모드 표시 + 취소 버튼 */}
       {replyTo && (
@@ -182,6 +226,6 @@ export function CommentForm({
           {form.formState.errors.body.message}
         </p>
       )}
-    </form>
+    </motion.form>
   )
 }
