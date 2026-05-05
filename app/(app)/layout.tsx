@@ -12,6 +12,7 @@ import { BottomTabBar } from '@/components/community/bottom-tab-bar'
 import { WriteFab } from '@/components/community/write-fab'
 import { WriteBottomSheet } from '@/components/community/write-bottom-sheet'
 import { ReportBottomSheet } from '@/components/community/report-sheet'
+import { PostActionsSheet } from '@/components/community/post-actions-sheet'
 
 export default function AppLayout({
   children,
@@ -27,6 +28,8 @@ export default function AppLayout({
       <WriteBottomSheet />
       {/* 신고 시트 — 모든 (app) 라우트에서 ⋯ 메뉴 → openReport() 로 호출 가능 */}
       <ReportBottomSheet />
+      {/* 게시글 액션 시트 — ⋯ 메뉴 → openActions() 로 호출 가능 */}
+      <PostActionsSheet />
     </>
   )
 }
