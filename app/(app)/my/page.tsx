@@ -18,6 +18,8 @@ import { MyPostCard } from '@/components/community/my-post-card'
 import { MyCommentCard } from '@/components/community/my-comment-card'
 import { MyBookmarkCard } from '@/components/community/my-bookmark-card'
 import { LogoutButton } from '@/components/community/logout-button'
+import { getCampusLabel, getDepartmentLabel } from '@/lib/locale/labels'
+import { CAMPUS_VALUES, DEPARTMENT_VALUES, type Campus, type Department } from '@/types/domain'
 
 /** 유효한 탭 값 목록 */
 const TAB_VALUES = ['posts', 'comments', 'bookmarks'] as const
@@ -85,7 +87,18 @@ export default async function MyPage({
           {/* 닉네임 — 큰 타이포 SNS 친화 */}
           <p className="text-lg font-bold tracking-tight truncate">{profile?.nickname ?? '匿名'}</p>
           <p className="text-xs text-muted-foreground truncate">
-            {profile?.campus ?? '—'} / {profile?.department ?? '—'}
+            {/* DB 저장값 → 일본어 라벨 매핑. 매핑 실패(레거시 값) 시 원본 그대로 표시 */}
+            {profile?.campus
+              ? (CAMPUS_VALUES.includes(profile.campus as Campus)
+                  ? getCampusLabel(profile.campus as Campus)
+                  : profile.campus)
+              : '—'}{' '}
+            /{' '}
+            {profile?.department
+              ? (DEPARTMENT_VALUES.includes(profile.department as Department)
+                  ? getDepartmentLabel(profile.department as Department)
+                  : profile.department)
+              : '—'}
           </p>
         </div>
         {/* プロフィール編集 링크 — /my/profile 재활용 */}
