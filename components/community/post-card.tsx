@@ -21,7 +21,7 @@ import { toast } from 'sonner'
 import type { PostListItem } from '@/lib/community/posts'
 import type { ReactionKind, CategorySlug } from '@/types/community'
 import { getCategoryEmoji } from '@/lib/community/categories'
-import { useReportSheet } from '@/lib/stores/report-sheet-store'
+import { usePostActionsSheet } from '@/lib/stores/post-actions-sheet-store'
 import { cn } from '@/lib/utils'
 
 /** PostCard 컴포넌트 props */
@@ -31,17 +31,20 @@ export interface PostCardProps {
   initialMyReaction?: ReactionKind | null
   /** 현재 로그인 유저의 초기 북마크 상태 (SSR 에서 전달) */
   initialMyBookmark?: boolean
+  /** 현재 로그인 유저 ID — isOwner 판단에 사용 (null = 미인증) */
+  currentUserId?: string | null
 }
 
 export function PostCard({
   post,
   initialMyReaction = null,
   initialMyBookmark = false,
+  currentUserId = null,
 }: PostCardProps) {
   const router = useRouter()
   /** 접근성: prefers-reduced-motion 감지 */
   const reduce = useReducedMotion()
-  const openReport = useReportSheet((s) => s.open)
+  const openActions = usePostActionsSheet((s) => s.open)
 
   // 인라인 반응 상태 (낙관적 업데이트)
   const [myReaction, setMyReaction] = useState<ReactionKind | null>(initialMyReaction)
@@ -134,10 +137,14 @@ export function PostCard({
     }
   }
 
-  /** ⋯ 메뉴 핸들러 — 신고 Sheet 열기 */
+  /** ⋯ 메뉴 핸들러 — PostActionsSheet 열기 */
   function handleMenu(e: React.MouseEvent) {
     e.stopPropagation()
-    openReport({ type: 'post', id: post.id, preview: post.title })
+    openActions({
+      id: post.id,
+      isOwner: !!currentUserId && currentUserId === post.user_id,
+      preview: post.title,
+    })
   }
 
   /** 게시글 상세 페이지로 이동 */
