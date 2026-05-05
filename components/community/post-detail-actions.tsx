@@ -1,12 +1,13 @@
 'use client'
 
 /**
- * 게시글 상세 액션 바 — ❤ 좋아요 / 👎 싫어요 / 💬 댓글 수 / 🔖 북마크 / 🗑 삭제 / ⋯ 더보기
+ * 게시글 상세 액션 바 — ❤ 좋아요 / 👎 싫어요 / 💬 댓글 수 / 🔖 북마크 / ⋯ 더보기
  *
  * 낙관적(Optimistic) UI 업데이트:
  *  - 좋아요/싫어요 토글 시 즉시 카운터 반영 후 API 호출
  *  - 실패 시 롤백 + 일본어 토스트 에러
  * Framer Motion: 탭 시 0.92 scale 애니메이션 (접근성: prefers-reduced-motion 존중)
+ * ⋯ 클릭 → PostActionsSheet 열림 (削除/通報 통합)
  */
 
 import { useState } from 'react'
@@ -16,7 +17,6 @@ import {
   Heart,
   ThumbsDown,
   Bookmark,
-  Trash2,
   MoreHorizontal,
   Loader2,
   MessageCircle,
@@ -24,6 +24,7 @@ import {
 import { toast } from 'sonner'
 import type { ReactionKind } from '@/types/community'
 import { cn } from '@/lib/utils'
+import { usePostActionsSheet } from '@/lib/stores/post-actions-sheet-store'
 
 export interface PostDetailActionsProps {
   postId: string
@@ -63,7 +64,9 @@ export function PostDetailActions({
   // 로딩 상태
   const [isReacting, setIsReacting] = useState(false)
   const [isBookmarking, setIsBookmarking] = useState(false)
-  const [isDeleting, setIsDeleting] = useState(false)
+
+  // 게시글 액션 시트 열기 핸들러
+  const openActions = usePostActionsSheet((s) => s.open)
 
   /**
    * 반응(좋아요/싫어요) 토글 핸들러
@@ -175,42 +178,11 @@ export function PostDetailActions({
   }
 
   /**
-   * 게시글 삭제 핸들러 (본인만)
-   * confirm 대화상자 → DELETE API → 성공 시 홈으로 이동
-   */
-  const handleDelete = async () => {
-    if (!window.confirm('この投稿を削除しますか?')) return
-    if (isDeleting) return
-
-    setIsDeleting(true)
-
-    try {
-      const res = await fetch(`/api/posts/${postId}`, { method: 'DELETE' })
-
-      if (res.status === 401) {
-        router.replace('/login')
-        return
-      }
-
-      const json = await res.json()
-      if (json.ok) {
-        toast.success('投稿を削除しました')
-        router.replace('/')
-      } else {
-        toast.error('削除に失敗しました')
-      }
-    } catch {
-      toast.error('削除に失敗しました')
-    } finally {
-      setIsDeleting(false)
-    }
-  }
-
-  /**
-   * ⋯ 더보기 메뉴 — Task 016 구현 예정
+   * ⋯ 더보기 메뉴 — PostActionsSheet 열기
+   * 本人 여부를 isOwner 로 전달해 삭제 버튼 노출 제어
    */
   const handleMenu = () => {
-    toast('準備中', { description: 'メニューは Task 016 で実装予定' })
+    openActions({ id: postId, isOwner })
   }
 
   // Framer Motion tap 애니메이션 (접근성 설정 존중)
@@ -284,7 +256,7 @@ export function PostDetailActions({
         </a>
       </div>
 
-      {/* 우측 그룹: 북마크 + 삭제(본인) + 더보기 */}
+      {/* 우측 그룹: 북마크 + ⋯ 더보기 */}
       <div className="ml-auto flex items-center gap-1">
         {/* 북마크 버튼 */}
         <motion.button
@@ -310,27 +282,7 @@ export function PostDetailActions({
           )}
         </motion.button>
 
-        {/* 본인 게시글 삭제 버튼 */}
-        {isOwner && (
-          <motion.button
-            whileTap={tapScale}
-            onClick={handleDelete}
-            disabled={isDeleting}
-            aria-label="投稿を削除"
-            className={cn(
-              'min-h-[44px] px-3 py-2 rounded-full text-xs flex items-center gap-1.5 text-muted-foreground hover:bg-muted hover:text-red-500 transition-colors',
-              isDeleting && 'opacity-50',
-            )}
-          >
-            {isDeleting ? (
-              <Loader2 className="size-4 animate-spin" />
-            ) : (
-              <Trash2 className="size-4" />
-            )}
-          </motion.button>
-        )}
-
-        {/* ⋯ 더보기 메뉴 버튼 */}
+        {/* ⋯ 더보기 메뉴 버튼 — PostActionsSheet 열기 */}
         <motion.button
           whileTap={tapScale}
           onClick={handleMenu}
