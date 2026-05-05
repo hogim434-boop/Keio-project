@@ -258,11 +258,16 @@ export function WriteBottomSheet() {
         h-[80vh]: 화면 80% 높이
         p-0 flex flex-col: 헤더 sticky + 본문 스크롤 레이아웃
         showCloseButton={false}: 커스텀 닫기 버튼 사용
+
+        슬라이드 모션: globals.css 의 sheet-slide-up/down keyframes 직접 적용.
+         - tw-animate-css 의존성 제거 후 shadcn 기본 slide-in-from-* 이 무효이므로 자체 keyframes 사용.
+         - duration 0.8s · easing expo-out [0.22, 1, 0.36, 1] (CommentForm 과 동일).
+         - data-[state=open|closed]: 는 Radix Dialog 가 부여하는 속성으로 mount/unmount 타이밍을 처리.
       */}
       <SheetContent
         side="bottom"
         showCloseButton={false}
-        className="h-[80vh] p-0 flex flex-col rounded-t-2xl"
+        className="h-[80vh] p-0 flex flex-col rounded-t-2xl will-change-transform data-[state=open]:animate-[sheet-slide-up_0.8s_cubic-bezier(0.22,1,0.36,1)] data-[state=closed]:animate-[sheet-slide-down_0.8s_cubic-bezier(0.22,1,0.36,1)]"
       >
         {/* ── 상단 헤더 (sticky) ── */}
         <SheetHeader className="sticky top-0 z-10 flex flex-row items-center justify-between border-b bg-popover px-4 py-3 gap-0">
