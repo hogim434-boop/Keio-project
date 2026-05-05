@@ -130,6 +130,26 @@ export type Grade = (typeof GRADE_VALUES)[number]
 
 export const GradeSchema = z.enum(GRADE_VALUES)
 
+// ============================================================
+// 학부 (Department)
+// ============================================================
+
+/** 게이오 대학 학부 — 자유 입력 대신 고정 선택지 */
+export const DEPARTMENT_VALUES = [
+  '文',
+  '商',
+  '理工',
+  '経済',
+  '法',
+  '医',
+  '薬',
+  'sfc',
+] as const
+
+export type Department = (typeof DEPARTMENT_VALUES)[number]
+
+export const DepartmentSchema = z.enum(DEPARTMENT_VALUES)
+
 // 게이오 이메일 검증은 types/auth.ts 가 단일 출처(SoT). 직접 거기서 import 사용.
 // 이전엔 하위 호환 위해 re-export 했으나 domain ↔ auth 순환이 production 빌드 시
 // CampusSchema TDZ 를 유발해 제거함.
