@@ -129,6 +129,28 @@
   to   { transform: translate(-20px, 20px) scale(0.97); }
 }
 
+/* ============================================================
+   bottom Sheet 슬라이드 업/다운 + 오버레이 페이드
+   tw-animate-css 의존성을 제거했으므로 자체 정의.
+   CommentForm slide-up (0.8s expo-out) 과 동일한 곡선/시간으로 동기화.
+   ============================================================ */
+@keyframes sheet-slide-up {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+@keyframes sheet-slide-down {
+  from { transform: translateY(0); }
+  to   { transform: translateY(100%); }
+}
+@keyframes sheet-overlay-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes sheet-overlay-out {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
