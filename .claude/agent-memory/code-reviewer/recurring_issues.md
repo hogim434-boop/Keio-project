@@ -14,6 +14,20 @@ type: project
 6. **Select에 htmlFor 없음**: 캠퍼스/학년 Select 컴포넌트에 Label의 htmlFor 연결 미구현.
 7. **서버 컴포넌트 활용 부족**: react-hook-form, zod가 의존성에 있지만 미사용.
 
+## 2026-05-06 3차 리뷰 (알림 시스템 + 카테고리 재편)
+
+발견된 문제 패턴:
+1. **pgErrorToResponse의 DB 상세 정보 프로덕션 노출**: `extra = { dbCode, details, hint }` 를 env 분기 없이 응답에 포함 — 프로덕션에서 DB 내부 정보가 클라이언트에 노출됨
+2. **as unknown as 타입 캐스팅**: `lib/notifications/server.ts`에서 Supabase 응답을 `as unknown as RawNotificationRow[]`로 강제 변환 — 런타임 타입 안전성 없음
+3. **useCallback 의존성 비효율**: `markRead`/`markAllRead`가 `[items, unreadCount]`를 의존성으로 갖아 매 렌더 재생성
+4. **TODO 미완성**: `notification-panel.tsx` 에러 상태에 "再試行" 텍스트만 있고 실제 onRetry prop 미구현
+5. **allowedDevOrigins IP 하드코딩**: `next.config.ts`에 `'192.168.128.131'` 하드코딩 — 팀/환경 이동 시 무효
+6. **Dead code**: `scroll-area.tsx`가 프로젝트 어디에서도 실제 사용되지 않음 (알림 패널 리팩터링 흔적)
+7. **주석-코드 불일치**: `notification-panel.tsx` JSDoc 주석이 이전 구현(ScrollArea, stagger) 내용을 여전히 기술 중
+8. **profiles 전체 공개 RLS**: `profiles_select_authenticated` 정책이 `USING (true)` — email·campus·department 등 민감 필드도 인증 사용자 전체에게 노출
+9. **z import 미사용**: `app/api/notifications/route.ts`에서 `z`를 import하지만 직접 사용은 LimitSchema 정의 1곳 뿐 — 이것은 정상 사용임 (오해 아님)
+10. **notification-item의 formatDistanceToNowStrict 렌더 호출**: useMemo 없이 매 렌더마다 날짜 파싱
+
 ## 2026-05-02 2차 리뷰 (2단계 회원가입 + OAuth 콜백 + proxy + SQL)
 
 개선된 사항:

@@ -217,6 +217,27 @@ type: project
 - `CommentItem`: `motion.div variants={fadeInUp}` + 본인 댓글 `ring-1 ring-primary/30`
 - 返信 버튼 hover: `hover:text-primary` (보라 색상)
 
+## Phase 5 알림 시스템 마이크로 인터랙션 (2026-05-06)
+
+### notification-bell.tsx
+- `useAnimationControls()` + `useEffect(shake)` → `controls.start({ rotate: [0,-10,10,-8,8,-4,4,0] })`
+- `motion.span` 으로 `<Bell />` 래핑, `style={{ transformOrigin: 'top center' }}`
+- shake duration: 0.6s, ease: 'easeInOut'
+
+### notification-bell-container.tsx
+- `useRef(unreadCount)` + `useState(shake)` 패턴으로 증가 감지
+- unreadCount 증가 시 `setShake(true)` → setTimeout 700ms 후 `setShake(false)`
+
+### notification-item.tsx
+- 미읽음 점: `motion.span animate={{ scale:[1,1.25,1], opacity:[1,0.7,1] }}` duration:1.8s, repeat:Infinity
+- 클릭 피드백: `motion.div whileTap={{ scale:0.98 }}` transition duration:0.12s
+
+### notification-panel.tsx
+- stagger: `motion.div` wrapper per item, `initial:{opacity:0,y:-4}` → `animate:{opacity:1,y:0}`
+- delay: `index < 8 ? index * 0.04 : 0` (8개 이후는 즉시)
+- 빈 상태 🌸: `motion.span animate={{ y:[0,-3,0] }}` duration:3s, repeat:Infinity
+- SkeletonRow: `animationDelay: ${index * 100}ms` CSS prop 추가
+
 ## body 제약사항
 
 ```css

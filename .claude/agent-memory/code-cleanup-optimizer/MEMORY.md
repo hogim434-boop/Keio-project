@@ -1,0 +1,2 @@
+- [사용자 프로필](user_profile.md) — 코딩 초보자, 케이오대 Q&A 앱, 즉시 실행 방식 선호
+- [즉시 실행 스타일](feedback_execution_style.md) — plan 없이 바로 수정+빌드, 파괴적 변경만 사전 확인
