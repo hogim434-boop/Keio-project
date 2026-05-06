@@ -1,1740 +1,232 @@
 {
   "tasks": [
     {
-      "id": "85c12db4-da83-40e5-90ca-4f58d14f9b91",
-      "name": "Task 008-1: is_admin() 헬퍼 함수 마이그레이션",
-      "description": "RLS 정책에서 재사용할 admin 판정 함수를 별도 마이그레이션 파일로 도입. SECURITY INVOKER + STABLE + search_path=public 명시로 advisor 의 function_search_path_mutable 경고 회피. 이후 categories/posts/comments 의 RLS 정책에서 public.is_admin() 호출.",
-      "notes": "STABLE 명시로 동일 트랜잭션 내 캐싱 활용. profiles RLS 가 본인만 SELECT 허용이라 함수 내부 SELECT 가 본인 row 만 반환 → 자기 자신 admin 여부만 판정. 무한 재귀 위험 없음.",
-      "status": "completed",
+      "id": "2106f71f-ba34-4ccb-ab19-9b2e07c32a94",
+      "name": "[db] profiles agreed_*_at 컬럼 추가 + 트리거 확장 + types 재생성",
+      "description": "F013 동의 정보 저장용 profiles 테이블에 agreed_terms_at / agreed_guidelines_at TIMESTAMPTZ 컬럼 추가 + handle_user_metadata_update 트리거에 동의 timestamp 동기화 IF 블록 2개 추가. 기존 password_set/nickname 동기화 IF 블록 그대로 유지하여 회귀 위험 0. types/database.ts 자동 재생성으로 컬럼 타입 반영.",
+      "notes": "기존 마이그레이션 20260503000000_extend_profiles.sql 의 handle_user_metadata_update 패턴 정확히 따름. nickname 동기화 IF 추가 선례 = agreed_*_at 동일 패턴. 기존 가입자 영향 0 (신규 컬럼 NULL 허용).",
+      "status": "pending",
       "dependencies": [],
-      "createdAt": "2026-05-04T06:03:54.768Z",
-      "updatedAt": "2026-05-04T06:05:59.218Z",
+      "createdAt": "2026-05-06T09:27:48.206Z",
+      "updatedAt": "2026-05-06T09:27:48.206Z",
       "relatedFiles": [
         {
-          "path": "supabase/migrations/20260504000001_create_admin_helper.sql",
+          "path": "supabase/migrations/20260509000000_profiles_agreed_at.sql",
           "type": "CREATE",
-          "description": "is_admin 함수 마이그레이션"
-        },
-        {
-          "path": "supabase/migrations/20260502000000_create_profiles.sql",
-          "type": "REFERENCE",
-          "description": "set_updated_at 함수 패턴 참조"
+          "description": "컬럼 추가 + 트리거 함수 확장"
         },
         {
           "path": "supabase/migrations/20260503000000_extend_profiles.sql",
           "type": "REFERENCE",
-          "description": "profiles.role 컬럼 추가"
-        }
-      ],
-      "implementationGuide": "1) 파일 생성: supabase/migrations/20260504000001_create_admin_helper.sql\\n2) SQL:\\n   CREATE OR REPLACE FUNCTION public.is_admin()\\n   RETURNS boolean\\n   LANGUAGE sql\\n   STABLE\\n   SECURITY INVOKER\\n   SET search_path = public\\n   AS $$\\n     SELECT EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin')\\n   $$;\\n   COMMENT ON FUNCTION public.is_admin() IS '현재 세션 사용자가 profiles.role = admin 인지 판정. RLS 정책에서 재사용';\\n3) mcp__supabase__apply_migration name='create_admin_helper' query=<위 SQL>\\n4) mcp__supabase__execute_sql \\\"SELECT public.is_admin()\\\" 호출해 boolean 반환 확인 (현재 세션 anon 이므로 false 예상)",
-      "verificationCriteria": "apply_migration success. SELECT public.is_admin() 호출이 boolean 반환. SELECT routine_name FROM information_schema.routines WHERE routine_schema='public' AND routine_name='is_admin' 결과 1 row.",
-      "analysisResult": "ROADMAP Task 008: 게시판 첫 3 테이블(categories/posts/comments) + admin 헬퍼 함수 마이그레이션 SQL 작성·적용. profiles 마이그레이션 패턴(IF NOT EXISTS, set_updated_at 함수 재사용, ALTER TABLE ... ENABLE ROW LEVEL SECURITY) 따름. is_admin() 헬퍼는 SECURITY INVOKER + STABLE + search_path=public 으로 advisor 회피. soft delete RLS 패턴: is_deleted=false OR public.is_admin(). 부분 인덱스 + GIN(pg_trgm) 으로 검색·정렬 성능 확보. CREATE POLICY IF NOT EXISTS 미지원 → DROP POLICY IF EXISTS + CREATE POLICY 패턴. 5개 서브태스크 직선 의존: helper(008-1) → categories(008-2) → posts(008-3) → comments(008-4) → 검증·ROADMAP(008-5).",
-      "summary": "supabase/migrations/20260504000001_create_admin_helper.sql 신규 작성. CREATE OR REPLACE FUNCTION public.is_admin() RETURNS boolean LANGUAGE sql STABLE SECURITY INVOKER SET search_path=public. apply_migration success. information_schema.routines 결과 routine_name=is_admin, security_type=INVOKER, data_type=boolean 확인. anon 호출 SELECT public.is_admin() = false 정상. 이후 categories/posts/comments RLS 정책에서 재사용 가능.",
-      "completedAt": "2026-05-04T06:05:59.217Z"
-    },
-    {
-      "id": "6d5bd901-0000-401e-9465-7e57b0f27cc4",
-      "name": "Task 008-2: categories 테이블 마이그레이션 + RLS + 인덱스",
-      "description": "갤러리/카테고리 분류 테이블. 9개 카테고리 시드는 Task 010 에서 처리하고 본 Task 는 스키마만. SELECT 는 anon 포함 모두 허용, 변경은 admin 만.",
-      "notes": "type CHECK 는 ('topic','campus') 만 허용. 시드 9건(자유/연애·썸/학업·수업/취업·인턴/일상·잡담/질문·도움 + 미타/히요시/SFC) INSERT 는 Task 010 에서 처리.",
-      "status": "completed",
-      "dependencies": [
-        {
-          "taskId": "85c12db4-da83-40e5-90ca-4f58d14f9b91"
-        }
-      ],
-      "createdAt": "2026-05-04T06:03:54.768Z",
-      "updatedAt": "2026-05-04T06:07:17.313Z",
-      "relatedFiles": [
-        {
-          "path": "supabase/migrations/20260504000002_create_categories.sql",
-          "type": "CREATE",
-          "description": "categories 테이블·RLS·인덱스"
+          "description": "기존 트리거 IF 블록 추가 패턴 참조"
         },
-        {
-          "path": "supabase/migrations/20260502000000_create_profiles.sql",
-          "type": "REFERENCE",
-          "description": "RLS·트리거 패턴 참조"
-        }
-      ],
-      "implementationGuide": "1) 파일: supabase/migrations/20260504000002_create_categories.sql\\n2) 주요 SQL:\\n   CREATE TABLE IF NOT EXISTS public.categories (\\n     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),\\n     slug TEXT NOT NULL UNIQUE,\\n     name TEXT NOT NULL,\\n     type TEXT NOT NULL CHECK (type IN ('topic','campus')),\\n     sort_order INTEGER NOT NULL DEFAULT 0,\\n     is_active BOOLEAN NOT NULL DEFAULT true,\\n     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),\\n     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()\\n   );\\n   CREATE INDEX IF NOT EXISTS idx_categories_type_sort ON public.categories (type, sort_order);\\n   ALTER TABLE public.categories ENABLE ROW LEVEL SECURITY;\\n3) RLS 4정책 (DROP IF EXISTS + CREATE 패턴으로 idempotent):\\n   DROP POLICY IF EXISTS categories_select_all ON public.categories;\\n   CREATE POLICY categories_select_all ON public.categories FOR SELECT USING (true);\\n   DROP POLICY IF EXISTS categories_insert_admin ON public.categories;\\n   CREATE POLICY categories_insert_admin ON public.categories FOR INSERT WITH CHECK (public.is_admin());\\n   DROP POLICY IF EXISTS categories_update_admin ON public.categories;\\n   CREATE POLICY categories_update_admin ON public.categories FOR UPDATE USING (public.is_admin()) WITH CHECK (public.is_admin());\\n   DROP POLICY IF EXISTS categories_delete_admin ON public.categories;\\n   CREATE POLICY categories_delete_admin ON public.categories FOR DELETE USING (public.is_admin());\\n4) 트리거: DROP TRIGGER IF EXISTS categories_set_updated_at ON public.categories; CREATE TRIGGER categories_set_updated_at BEFORE UPDATE ON public.categories FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();\\n5) mcp__supabase__apply_migration name='create_categories' query=<위 SQL>",
-      "verificationCriteria": "list_tables 결과에 public.categories 등장. CHECK type IN ('topic','campus') 위반 INSERT 시 23514 에러. INSERT slug='dup' 두 번 시도 시 두 번째 23505 에러. anon SELECT 통과 (USING true).",
-      "analysisResult": "ROADMAP Task 008: 게시판 첫 3 테이블(categories/posts/comments) + admin 헬퍼 함수 마이그레이션 SQL 작성·적용. profiles 마이그레이션 패턴(IF NOT EXISTS, set_updated_at 함수 재사용, ALTER TABLE ... ENABLE ROW LEVEL SECURITY) 따름. is_admin() 헬퍼는 SECURITY INVOKER + STABLE + search_path=public 으로 advisor 회피. soft delete RLS 패턴: is_deleted=false OR public.is_admin(). 부분 인덱스 + GIN(pg_trgm) 으로 검색·정렬 성능 확보. CREATE POLICY IF NOT EXISTS 미지원 → DROP POLICY IF EXISTS + CREATE POLICY 패턴. 5개 서브태스크 직선 의존: helper(008-1) → categories(008-2) → posts(008-3) → comments(008-4) → 검증·ROADMAP(008-5).",
-      "summary": "supabase/migrations/20260504000002_create_categories.sql 신규 작성. CREATE TABLE IF NOT EXISTS public.categories (id UUID PK / slug UNIQUE / name / type CHECK in topic|campus / sort_order / is_active / created_at·updated_at). idx_categories_type_sort 인덱스. ENABLE ROW LEVEL SECURITY + 4 RLS 정책 (select_all USING true / insert_admin / update_admin / delete_admin — public.is_admin() 호출). categories_set_updated_at 트리거. apply_migration success. list_tables 결과 public.categories 등장 (rls_enabled true). type='invalid_type' INSERT 시 23514 categories_type_check 위반 정상. UNIQUE 위반은 시드 INSERT 후 검증 단계(008-5)에서 별도 확인 예정.",
-      "completedAt": "2026-05-04T06:07:17.310Z"
-    },
-    {
-      "id": "9585ab00-a74a-4e00-aedd-491d2b912672",
-      "name": "Task 008-3: posts 테이블 마이그레이션 + 부분 인덱스 + GIN + RLS",
-      "description": "게시글 본 테이블. category_id FK ON DELETE RESTRICT, user_id FK ON DELETE CASCADE. soft delete 정책(is_deleted=false OR is_admin), 부분 인덱스로 인덱스 크기 최소화, pg_trgm GIN 으로 F007 검색 지원.",
-      "notes": "category_id ON DELETE RESTRICT — 카테고리 삭제 전 모든 게시글 이전 또는 archive 처리 필요. profiles 삭제(auth.users 삭제 시 CASCADE) 시 게시글도 자동 삭제됨. 부분 인덱스로 일반 SELECT 인덱스 비용 최소화.",
-      "status": "completed",
-      "dependencies": [
-        {
-          "taskId": "6d5bd901-0000-401e-9465-7e57b0f27cc4"
-        }
-      ],
-      "createdAt": "2026-05-04T06:03:54.768Z",
-      "updatedAt": "2026-05-04T06:09:00.116Z",
-      "relatedFiles": [
-        {
-          "path": "supabase/migrations/20260504000003_create_posts.sql",
-          "type": "CREATE",
-          "description": "posts 테이블·인덱스·RLS"
-        },
-        {
-          "path": "supabase/migrations/20260504000002_create_categories.sql",
-          "type": "DEPENDENCY",
-          "description": "category_id FK 참조"
-        }
-      ],
-      "implementationGuide": "1) 파일: supabase/migrations/20260504000003_create_posts.sql\\n2) CREATE EXTENSION IF NOT EXISTS pg_trgm; (방어적, 이미 설치)\\n3) 테이블 SQL: id UUID PK / user_id REFERENCES profiles(id) ON DELETE CASCADE / category_id REFERENCES categories(id) ON DELETE RESTRICT / title TEXT CHECK length 1-100 / body TEXT CHECK length 10-5000 / is_anonymous BOOLEAN DEFAULT true / reaction_up INT DEFAULT 0 / reaction_down INT DEFAULT 0 / comment_count INT DEFAULT 0 / is_deleted BOOLEAN DEFAULT false / created_at·updated_at TIMESTAMPTZ DEFAULT now()\\n4) 인덱스 (모두 IF NOT EXISTS):\\n   - idx_posts_category_created (category_id, created_at DESC) WHERE is_deleted=false\\n   - idx_posts_created (created_at DESC) WHERE is_deleted=false\\n   - idx_posts_popular (reaction_up DESC, created_at DESC) WHERE is_deleted=false\\n   - idx_posts_user (user_id, created_at DESC)\\n   - idx_posts_title_trgm USING GIN (title gin_trgm_ops)\\n   - idx_posts_body_trgm USING GIN (body gin_trgm_ops)\\n5) ALTER TABLE ENABLE ROW LEVEL SECURITY;\\n6) RLS 4정책 (DROP+CREATE):\\n   - posts_select_visible FOR SELECT USING (is_deleted = false OR public.is_admin())\\n   - posts_insert_self FOR INSERT WITH CHECK (auth.uid() = user_id)\\n   - posts_update_self FOR UPDATE USING (auth.uid() = user_id OR public.is_admin()) WITH CHECK (auth.uid() = user_id OR public.is_admin())\\n   - posts_delete_self FOR DELETE USING (auth.uid() = user_id OR public.is_admin())\\n7) 트리거: posts_set_updated_at\\n8) apply_migration name='create_posts' 적용",
-      "verificationCriteria": "list_tables verbose 로 컬럼·FK·인덱스 6개 확인. title 길이 0 INSERT → 23514. body 길이 9 INSERT → 23514. category_id missing UUID → 23503 FK 위반. is_deleted=true row 일반 사용자 SELECT → 0 row, admin SELECT → 1 row.",
-      "analysisResult": "ROADMAP Task 008: 게시판 첫 3 테이블(categories/posts/comments) + admin 헬퍼 함수 마이그레이션 SQL 작성·적용. profiles 마이그레이션 패턴(IF NOT EXISTS, set_updated_at 함수 재사용, ALTER TABLE ... ENABLE ROW LEVEL SECURITY) 따름. is_admin() 헬퍼는 SECURITY INVOKER + STABLE + search_path=public 으로 advisor 회피. soft delete RLS 패턴: is_deleted=false OR public.is_admin(). 부분 인덱스 + GIN(pg_trgm) 으로 검색·정렬 성능 확보. CREATE POLICY IF NOT EXISTS 미지원 → DROP POLICY IF EXISTS + CREATE POLICY 패턴. 5개 서브태스크 직선 의존: helper(008-1) → categories(008-2) → posts(008-3) → comments(008-4) → 검증·ROADMAP(008-5).",
-      "summary": "supabase/migrations/20260504000003_create_posts.sql 신규 작성. 12 컬럼(id/user_id/category_id/title/body/is_anonymous/reaction_up/reaction_down/comment_count/is_deleted/created_at/updated_at). FK 2개: user_id→profiles ON DELETE CASCADE, category_id→categories ON DELETE RESTRICT. CHECK title 1-100, body 10-5000. 부분 인덱스 4종(category_created/created/popular/user) WHERE is_deleted=false + GIN(title|body gin_trgm_ops). RLS 4정책: select_visible(soft delete), insert_self(auth.uid=user_id), update_self·delete_self(본인 OR is_admin). posts_set_updated_at 트리거. apply_migration success. list_tables verbose 결과 컬럼·FK·RLS 모두 정합. CHECK 위반 시나리오는 008-5 에서 일괄 검증.",
-      "completedAt": "2026-05-04T06:09:00.115Z"
-    },
-    {
-      "id": "c7204804-630b-4377-8700-960e789d05b3",
-      "name": "Task 008-4: comments 테이블 마이그레이션 + self-parent CHECK + RLS",
-      "description": "댓글 + 1단계 대댓글 테이블. parent_id self-FK 로 1단계 대댓글 지원, 자기 자신 참조 방지 CHECK. RLS 동일 패턴.",
-      "notes": "ON DELETE CASCADE 가 부모 댓글 삭제 시 자식 댓글도 삭제. soft delete 의 경우 application 단에서 '삭제된 댓글입니다' placeholder 처리. comment_count 갱신은 Task 009 에서 트리거로 처리.",
-      "status": "completed",
-      "dependencies": [
-        {
-          "taskId": "9585ab00-a74a-4e00-aedd-491d2b912672"
-        }
-      ],
-      "createdAt": "2026-05-04T06:03:54.768Z",
-      "updatedAt": "2026-05-04T06:10:28.832Z",
-      "relatedFiles": [
-        {
-          "path": "supabase/migrations/20260504000004_create_comments.sql",
-          "type": "CREATE",
-          "description": "comments 테이블·CHECK·RLS"
-        },
-        {
-          "path": "supabase/migrations/20260504000003_create_posts.sql",
-          "type": "DEPENDENCY",
-          "description": "post_id FK 참조"
-        }
-      ],
-      "implementationGuide": "1) 파일: supabase/migrations/20260504000004_create_comments.sql\\n2) 테이블 SQL: id UUID PK / post_id REFERENCES posts(id) ON DELETE CASCADE / user_id REFERENCES profiles(id) ON DELETE CASCADE / parent_id UUID NULL REFERENCES comments(id) ON DELETE CASCADE / body TEXT CHECK length 1-1000 / is_anonymous BOOLEAN DEFAULT true / is_deleted BOOLEAN DEFAULT false / created_at·updated_at\\n3) CHECK constraint: CONSTRAINT comments_no_self_parent CHECK (parent_id IS NULL OR parent_id <> id)\\n4) 인덱스:\\n   - idx_comments_post_created (post_id, created_at) WHERE is_deleted=false\\n   - idx_comments_parent (parent_id) WHERE parent_id IS NOT NULL\\n   - idx_comments_user (user_id, created_at DESC)\\n5) ALTER TABLE ENABLE ROW LEVEL SECURITY;\\n6) RLS 4정책: select_visible / insert_self / update_self / delete_self (posts 와 동일 패턴, post_id 컬럼 활용 안 함)\\n7) 트리거: comments_set_updated_at\\n8) apply_migration name='create_comments' 적용\\n9) 1단계 대댓글 강제는 application 레이어에서 (API 라우트) — DB CHECK 로는 깊이 1 강제 불가",
-      "verificationCriteria": "INSERT parent_id=id (자기참조) → 23514 CHECK 위반. body 길이 0 또는 1001 → 23514. post_id missing → 23503 FK. 일반 사용자 INSERT user_id=타인 → RLS WITH CHECK 차단(0 row). is_deleted=true 댓글 일반 사용자 SELECT 결과 0 row.",
-      "analysisResult": "ROADMAP Task 008: 게시판 첫 3 테이블(categories/posts/comments) + admin 헬퍼 함수 마이그레이션 SQL 작성·적용. profiles 마이그레이션 패턴(IF NOT EXISTS, set_updated_at 함수 재사용, ALTER TABLE ... ENABLE ROW LEVEL SECURITY) 따름. is_admin() 헬퍼는 SECURITY INVOKER + STABLE + search_path=public 으로 advisor 회피. soft delete RLS 패턴: is_deleted=false OR public.is_admin(). 부분 인덱스 + GIN(pg_trgm) 으로 검색·정렬 성능 확보. CREATE POLICY IF NOT EXISTS 미지원 → DROP POLICY IF EXISTS + CREATE POLICY 패턴. 5개 서브태스크 직선 의존: helper(008-1) → categories(008-2) → posts(008-3) → comments(008-4) → 검증·ROADMAP(008-5).",
-      "summary": "supabase/migrations/20260504000004_create_comments.sql 신규 작성. 9 컬럼(id/post_id/user_id/parent_id/body/is_anonymous/is_deleted/created_at/updated_at). FK 3개: post_id→posts ON DELETE CASCADE, user_id→profiles ON DELETE CASCADE, parent_id→comments(self) ON DELETE CASCADE. CHECK body 1-1000 + comments_no_self_parent (parent_id IS NULL OR parent_id<>id). 인덱스 3종(post_created/parent/user). RLS 4정책: select_visible(soft delete), insert_self, update_self·delete_self(본인 OR is_admin). comments_set_updated_at 트리거. apply_migration success. list_tables 결과 4개 테이블 모두 RLS true. 1단계 대댓글 깊이 강제는 application 레이어 책임 명시. CHECK·RLS 시나리오는 008-5 일괄 검증.",
-      "completedAt": "2026-05-04T06:10:28.832Z"
-    },
-    {
-      "id": "5b07eb73-938e-422d-b7b0-2d1416038ed2",
-      "name": "Task 008-5: RLS·CHECK 시나리오 검증 + advisor 점검 + ROADMAP ✅",
-      "description": "execute_sql 로 RLS·CHECK 위반 시나리오 6~8 건 검증, get_advisors security 로 RLS 누락·search_path 경고 0건 확인. 통과 시 ROADMAP.md Task 008 에 ✅ + 검증 결과 요약 nested bullet 추가.",
-      "notes": "검증 시드는 일회성이므로 정식 시드와 충돌하지 않게 slug='test_' 같은 prefix 권장. ROADMAP 갱신 후 git commit 은 사용자 명령 시.",
-      "status": "completed",
-      "dependencies": [
-        {
-          "taskId": "c7204804-630b-4377-8700-960e789d05b3"
-        }
-      ],
-      "createdAt": "2026-05-04T06:03:54.768Z",
-      "updatedAt": "2026-05-04T06:12:37.584Z",
-      "relatedFiles": [
-        {
-          "path": "docs/ROADMAP.md",
-          "type": "TO_MODIFY",
-          "description": "Task 008 ✅ 표시"
-        }
-      ],
-      "implementationGuide": "1) execute_sql 시나리오 (각 1쿼리):\\n   A. INSERT INTO categories (slug, name, type) VALUES ('test', 'Test', 'invalid') → 23514\\n   B. INSERT INTO categories (slug, name, type) VALUES ('a','A','topic'), ('a','A2','topic') → 23505 두 번째 row\\n   C. 임시 시드: INSERT INTO categories (id, slug, name, type) VALUES ('aaaa...', 'free','자유','topic')\\n   D. 익명 INSERT INTO posts (user_id, category_id, title, body) VALUES ('<random uuid>', '<categories.id>', 'T', 'short') → CHECK length 위반 23514\\n   E. INSERT comments parent_id=id 자기참조 → 23514\\n   F. SELECT * FROM posts WHERE is_deleted=true (anon role) → 0 row 예상 (RLS)\\n   G. SELECT public.is_admin() (anon role) → false\\n2) get_advisors type='security' 호출. 새 경고(특히 RLS 누락 / search_path mutable) 0건 확인\\n3) docs/ROADMAP.md 의 'Task 008: 게시판 7테이블 마이그레이션 (categories / posts / comments)' 항목에 ✅ 표시 + nested bullet 추가:\\n   - ✅ is_admin() 헬퍼 함수 (search_path=public, STABLE, SECURITY INVOKER)\\n   - ✅ categories: type CHECK (topic|campus) + slug UNIQUE + RLS 4정책\\n   - ✅ posts: title 100자/body 5000자 CHECK + 부분 인덱스 4종 + GIN(title|body) + RLS 4정책 (soft delete)\\n   - ✅ comments: 1단계 대댓글 self-FK + parent_id<>id CHECK + RLS 4정책\\n   - ✅ get_advisors RLS 누락 0 / search_path 경고 0\\n4) 임시 시드 카테고리는 검증 후 ROLLBACK 또는 그대로 두고 Task 010 에서 정식 9건 INSERT 시 정합 확인",
-      "verificationCriteria": "시나리오 A~G 모두 예상 결과 일치. get_advisors security 새 경고 0건. ROADMAP.md 의 Task 008 에 ✅ + 5개 nested bullet.",
-      "analysisResult": "ROADMAP Task 008: 게시판 첫 3 테이블(categories/posts/comments) + admin 헬퍼 함수 마이그레이션 SQL 작성·적용. profiles 마이그레이션 패턴(IF NOT EXISTS, set_updated_at 함수 재사용, ALTER TABLE ... ENABLE ROW LEVEL SECURITY) 따름. is_admin() 헬퍼는 SECURITY INVOKER + STABLE + search_path=public 으로 advisor 회피. soft delete RLS 패턴: is_deleted=false OR public.is_admin(). 부분 인덱스 + GIN(pg_trgm) 으로 검색·정렬 성능 확보. CREATE POLICY IF NOT EXISTS 미지원 → DROP POLICY IF EXISTS + CREATE POLICY 패턴. 5개 서브태스크 직선 의존: helper(008-1) → categories(008-2) → posts(008-3) → comments(008-4) → 검증·ROADMAP(008-5).",
-      "summary": "7개 검증 시나리오 모두 PASS — A: categories type CHECK 23514, B: slug UNIQUE 23505, C: 임시 시드 정상, D: posts body 9자 23514, E: comments parent_id=id 자기참조 23514, F: is_deleted=true row anon SELECT 0건(RLS 정상 작동), G: is_admin() = false. get_advisors security 결과 본 Task 신규 경고 0건 (기존 7개 advisor 항목은 모두 사전부터 존재하던 이슈로 본 Task 무관). 임시 검증 데이터(test_free, test_dup, TestPost 등) 모두 DELETE 처리, categories/posts/comments 모두 0 row 로 Task 010 정식 시드 대기. docs/ROADMAP.md Task 008 항목에 ✅ + 9개 nested bullet 추가 완료.",
-      "completedAt": "2026-05-04T06:12:37.583Z"
-    },
-    {
-      "id": "9c0fdaca-9ad5-4e2f-8d4e-6c9883ddeaee",
-      "name": "Task 009-1: reactions 테이블 마이그레이션 (005)",
-      "description": "추천/비추천 1행 테이블. (user_id, target_type, target_id) UNIQUE 로 1인 1회 반응 보장, up↔down 토글은 reaction 컬럼 UPDATE. RLS 4정책: select_all(true) / insert_self / update_self / delete_self(본인 OR admin). target_type 별 FK 분기는 PostgreSQL 표준 FK 로 표현 불가하여 application 레이어 책임 (트리거 헤더 주석 명시). \n\nsupabase/migrations/20260504000005_create_reactions.sql 신규 작성. id UUID PK / user_id FK→profiles ON DELETE CASCADE / target_type CHECK in (post,comment) / target_id UUID NOT NULL / reaction CHECK in (up,down) / created_at. 인덱스 (target_type, target_id) + (user_id, created_at DESC). RLS 정책 4종 작성 후 Supabase MCP apply_migration 으로 dev 적용.",
-      "notes": "target_type 별 FK 분기는 application 책임 — 트리거 주석에 명시. reaction 컬럼만 UPDATE 가능하다는 의도는 application 레이어에서 강제, DB 정책은 user_id 만 가둠.",
-      "status": "completed",
-      "dependencies": [],
-      "createdAt": "2026-05-04T06:24:00.619Z",
-      "updatedAt": "2026-05-04T06:25:19.739Z",
-      "relatedFiles": [
-        {
-          "path": "supabase/migrations/20260504000005_create_reactions.sql",
-          "type": "CREATE",
-          "description": "reactions 테이블 + 인덱스 + RLS 4정책"
-        },
-        {
-          "path": "supabase/migrations/20260504000003_create_posts.sql",
-          "type": "REFERENCE",
-          "description": "정책 명명·헤더 주석·DROP-CREATE 순서 참조",
-          "lineStart": 1,
-          "lineEnd": 73
-        },
-        {
-          "path": "supabase/migrations/20260504000001_create_admin_helper.sql",
-          "type": "DEPENDENCY",
-          "description": "public.is_admin() 헬퍼 호출"
-        }
-      ],
-      "implementationGuide": "1) Read 로 supabase/migrations/20260504000003_create_posts.sql 확인 (정책 명명/헤더 주석/DROP-CREATE 순서 패턴)\n2) Write 로 supabase/migrations/20260504000005_create_reactions.sql 생성:\n   CREATE TABLE public.reactions (id, user_id FK CASCADE, target_type CHECK, target_id, reaction CHECK, created_at, UNIQUE(user_id,target_type,target_id))\n   CREATE INDEX idx_reactions_target / idx_reactions_user\n   ALTER TABLE ... ENABLE ROW LEVEL SECURITY\n   DROP POLICY IF EXISTS reactions_select_all/insert_self/update_self/delete_self\n   CREATE POLICY reactions_select_all  FOR SELECT USING (true)\n   CREATE POLICY reactions_insert_self FOR INSERT WITH CHECK (auth.uid()=user_id)\n   CREATE POLICY reactions_update_self FOR UPDATE USING (auth.uid()=user_id) WITH CHECK (auth.uid()=user_id)\n   CREATE POLICY reactions_delete_self FOR DELETE USING (auth.uid()=user_id OR public.is_admin())\n   COMMENT ON TABLE\n3) mcp__supabase__apply_migration name=create_reactions query=<파일 본문>\n4) mcp__supabase__list_tables 로 reactions 등장 확인",
-      "verificationCriteria": "mcp__supabase__list_tables 결과에 public.reactions 존재, 컬럼 6종(id/user_id/target_type/target_id/reaction/created_at) 정합, RLS enabled, 정책 4종 모두 등록, UNIQUE 제약 (user_id, target_type, target_id) 존재.",
-      "analysisResult": "Task 009 — Phase 3 의 마지막 마이그레이션 단계. Task 008 에서 만든 categories/posts/comments 위에 reactions/reports/bookmarks 3테이블 + posts 캐시 컬럼 자동 갱신 트리거 2종을 도입한다. 4개 SQL 파일(005=reactions, 006=reports, 007=bookmarks, 008=counter_triggers) 을 Supabase MCP `apply_migration` 으로 dev 프로젝트에 005→006→007→008 순서로 적용. 모든 정책은 Task 008 의 `{table}_{action}_{scope}` 명명과 `is_admin()` / `set_updated_at` 헬퍼 재사용 패턴을 그대로 따른다. 카운터 트리거는 SECURITY DEFINER + SET search_path=public + GREATEST(0,...) 음수 방지로 작성. 검증은 execute_sql 로 23505/23514 코드 매칭 + 트리거 증감 시퀀스 + advisor 0건 + 임시 row cleanup 까지 11건 (A~K). 본 Task 는 DB 만 다루므로 npm 회귀 영향 없음. 완료 시 ROADMAP.md Task 009 ✅ + 검증 결과 nested bullet 5~7줄 추가.",
-      "summary": "reactions 테이블 마이그레이션(005) 완료. public.reactions 등록(rls_enabled=true), 컬럼 6종 정합, RLS 정책 4종(select_all/insert_self/update_self/delete_self) 모두 등록, UNIQUE(user_id,target_type,target_id) 제약 활성. Task 008 의 명명 컨벤션·DROP-CREATE 순서 패턴 그대로 따름. is_admin() 헬퍼 재사용으로 delete_self 의 admin 분기 단일 출처 유지.",
-      "completedAt": "2026-05-04T06:25:19.738Z"
-    },
-    {
-      "id": "952ecfa1-04ed-4ab8-acad-637d1a39aa37",
-      "name": "Task 009-2: reports 테이블 마이그레이션 (006)",
-      "description": "신고 테이블. reporter_id / target_type / target_id / reason CHECK / description NULL 또는 ≤500자 / status CHECK (pending|processed|dismissed) DEFAULT pending. UNIQUE(reporter_id, target_type, target_id) 로 동일 신고자가 동일 대상 중복 신고 차단. RLS 4정책: select_admin_or_self / insert_self / update_admin / delete_admin. updated_at 트리거는 기존 public.set_updated_at() 재사용.\n\nsupabase/migrations/20260504000006_create_reports.sql 신규 작성. 인덱스 (status, created_at DESC) + (target_type, target_id). Supabase MCP apply_migration 으로 dev 적용.",
-      "notes": "select 정책이 reporter 본인까지 허용하는 이유는 마이페이지 신고 이력 UI 가능성 대비. PRD 의 어드민-only 보다 약하지만 본인 row 만 추가 노출이라 정보 유출 없음. 후속 Task 에서 좁힐지 확정.",
-      "status": "completed",
-      "dependencies": [
-        {
-          "taskId": "9c0fdaca-9ad5-4e2f-8d4e-6c9883ddeaee"
-        }
-      ],
-      "createdAt": "2026-05-04T06:24:00.619Z",
-      "updatedAt": "2026-05-04T06:26:06.630Z",
-      "relatedFiles": [
-        {
-          "path": "supabase/migrations/20260504000006_create_reports.sql",
-          "type": "CREATE",
-          "description": "reports 테이블 + 인덱스 + RLS 4정책 + updated_at 트리거"
-        },
-        {
-          "path": "supabase/migrations/20260502000000_create_profiles.sql",
-          "type": "DEPENDENCY",
-          "description": "public.set_updated_at() 함수 재사용",
-          "lineStart": 32,
-          "lineEnd": 43
-        },
-        {
-          "path": "supabase/migrations/20260504000001_create_admin_helper.sql",
-          "type": "DEPENDENCY",
-          "description": "public.is_admin() 헬퍼 호출"
-        }
-      ],
-      "implementationGuide": "1) Read 로 20260502000000_create_profiles.sql:32-43 확인 (set_updated_at 함수/트리거 패턴)\n2) Write 로 20260504000006_create_reports.sql 생성:\n   CREATE TABLE public.reports (id, reporter_id FK CASCADE, target_type CHECK, target_id, reason CHECK in (abuse,defamation,spam,illegal), description TEXT CHECK (description IS NULL OR char_length(description)<=500), status TEXT NOT NULL DEFAULT 'pending' CHECK in (pending,processed,dismissed), created_at, updated_at, UNIQUE(reporter_id,target_type,target_id))\n   CREATE INDEX idx_reports_status_created (status, created_at DESC)\n   CREATE INDEX idx_reports_target (target_type, target_id)\n   ENABLE RLS + 4 policies:\n     reports_select_admin_or_self  USING (public.is_admin() OR auth.uid()=reporter_id)\n     reports_insert_self           WITH CHECK (auth.uid()=reporter_id)\n     reports_update_admin          USING/CHECK (public.is_admin())\n     reports_delete_admin          USING (public.is_admin())\n   DROP/CREATE TRIGGER reports_set_updated_at BEFORE UPDATE EXECUTE FUNCTION public.set_updated_at()\n   COMMENT ON TABLE\n3) mcp__supabase__apply_migration name=create_reports\n4) list_tables 확인",
-      "verificationCriteria": "public.reports 테이블 존재, 컬럼 8종 정합, status DEFAULT 'pending', RLS enabled, 정책 4종 등록, UNIQUE(reporter_id,target_type,target_id) 존재, reports_set_updated_at 트리거 정상 등록.",
-      "analysisResult": "Task 009 — Phase 3 의 마지막 마이그레이션 단계. Task 008 에서 만든 categories/posts/comments 위에 reactions/reports/bookmarks 3테이블 + posts 캐시 컬럼 자동 갱신 트리거 2종을 도입한다. 4개 SQL 파일(005=reactions, 006=reports, 007=bookmarks, 008=counter_triggers) 을 Supabase MCP `apply_migration` 으로 dev 프로젝트에 005→006→007→008 순서로 적용. 모든 정책은 Task 008 의 `{table}_{action}_{scope}` 명명과 `is_admin()` / `set_updated_at` 헬퍼 재사용 패턴을 그대로 따른다. 카운터 트리거는 SECURITY DEFINER + SET search_path=public + GREATEST(0,...) 음수 방지로 작성. 검증은 execute_sql 로 23505/23514 코드 매칭 + 트리거 증감 시퀀스 + advisor 0건 + 임시 row cleanup 까지 11건 (A~K). 본 Task 는 DB 만 다루므로 npm 회귀 영향 없음. 완료 시 ROADMAP.md Task 009 ✅ + 검증 결과 nested bullet 5~7줄 추가.",
-      "summary": "reports 테이블 마이그레이션(006) 완료. public.reports 등록(rls_enabled=true), 컬럼 9종 정합 (id/reporter_id/target_type/target_id/reason/description/status/created_at/updated_at), status DEFAULT 'pending', RLS 정책 4종(select_admin_or_self/insert_self/update_admin/delete_admin) 모두 등록, UNIQUE(reporter_id,target_type,target_id) 활성, reports_set_updated_at 트리거 정상 등록 (set_updated_at 함수 재사용). is_admin() 헬퍼로 어드민 분기 단일 출처 유지.",
-      "completedAt": "2026-05-04T06:26:06.629Z"
-    },
-    {
-      "id": "0805168d-a1f7-4bfa-8897-2fb86c89bb24",
-      "name": "Task 009-3: bookmarks 테이블 마이그레이션 (007)",
-      "description": "북마크/스크랩 테이블. UNIQUE(user_id, post_id) 로 중복 북마크 차단. RLS 3정책 모두 본인. 마이페이지 북마크 목록 최신순 인덱스 (user_id, created_at DESC).\n\nsupabase/migrations/20260504000007_create_bookmarks.sql 신규 작성. id UUID PK / user_id FK→profiles ON DELETE CASCADE / post_id FK→posts ON DELETE CASCADE / created_at. Supabase MCP apply_migration 으로 dev 적용.",
-      "notes": "bookmarks 는 PRD 데이터 모델에서 가장 단순한 테이블. UPDATE 정책 없음 (북마크는 토글-only).",
-      "status": "completed",
-      "dependencies": [
-        {
-          "taskId": "952ecfa1-04ed-4ab8-acad-637d1a39aa37"
-        }
-      ],
-      "createdAt": "2026-05-04T06:24:00.619Z",
-      "updatedAt": "2026-05-04T06:26:39.820Z",
-      "relatedFiles": [
-        {
-          "path": "supabase/migrations/20260504000007_create_bookmarks.sql",
-          "type": "CREATE",
-          "description": "bookmarks 테이블 + 인덱스 + RLS 3정책"
-        },
-        {
-          "path": "supabase/migrations/20260504000003_create_posts.sql",
-          "type": "DEPENDENCY",
-          "description": "posts FK 참조"
-        }
-      ],
-      "implementationGuide": "1) Write 로 20260504000007_create_bookmarks.sql 생성:\n   CREATE TABLE public.bookmarks (id, user_id FK CASCADE, post_id FK CASCADE, created_at, UNIQUE(user_id,post_id))\n   CREATE INDEX idx_bookmarks_user_created (user_id, created_at DESC)\n   ENABLE RLS + 3 policies:\n     bookmarks_select_self  USING (auth.uid()=user_id)\n     bookmarks_insert_self  WITH CHECK (auth.uid()=user_id)\n     bookmarks_delete_self  USING (auth.uid()=user_id)\n   COMMENT ON TABLE\n2) mcp__supabase__apply_migration name=create_bookmarks\n3) list_tables 확인",
-      "verificationCriteria": "public.bookmarks 테이블 존재, 컬럼 4종 (id/user_id/post_id/created_at) 정합, RLS enabled, 정책 3종 등록, UNIQUE(user_id,post_id) 존재.",
-      "analysisResult": "Task 009 — Phase 3 의 마지막 마이그레이션 단계. Task 008 에서 만든 categories/posts/comments 위에 reactions/reports/bookmarks 3테이블 + posts 캐시 컬럼 자동 갱신 트리거 2종을 도입한다. 4개 SQL 파일(005=reactions, 006=reports, 007=bookmarks, 008=counter_triggers) 을 Supabase MCP `apply_migration` 으로 dev 프로젝트에 005→006→007→008 순서로 적용. 모든 정책은 Task 008 의 `{table}_{action}_{scope}` 명명과 `is_admin()` / `set_updated_at` 헬퍼 재사용 패턴을 그대로 따른다. 카운터 트리거는 SECURITY DEFINER + SET search_path=public + GREATEST(0,...) 음수 방지로 작성. 검증은 execute_sql 로 23505/23514 코드 매칭 + 트리거 증감 시퀀스 + advisor 0건 + 임시 row cleanup 까지 11건 (A~K). 본 Task 는 DB 만 다루므로 npm 회귀 영향 없음. 완료 시 ROADMAP.md Task 009 ✅ + 검증 결과 nested bullet 5~7줄 추가.",
-      "summary": "bookmarks 테이블 마이그레이션(007) 완료. public.bookmarks 등록(rls_enabled=true), 컬럼 4종(id/user_id/post_id/created_at) 정합, RLS 정책 3종(select_self/insert_self/delete_self) 모두 등록, UNIQUE(user_id,post_id) 활성. 토글-only 운영을 위해 UPDATE 정책 의도적으로 미작성. user_id/post_id 양쪽 ON DELETE CASCADE 로 게시글·계정 삭제 시 자동 정리.",
-      "completedAt": "2026-05-04T06:26:39.819Z"
-    },
-    {
-      "id": "987c1d3f-6642-41a8-8c4e-a741400a67dd",
-      "name": "Task 009-4: posts 카운터 트리거 마이그레이션 (008)",
-      "description": "reactions / comments 변경에 따라 posts.reaction_up / reaction_down / comment_count 캐시 컬럼을 자동 갱신하는 트리거 함수 2종 + AFTER 트리거 2종 도입. SECURITY DEFINER + SET search_path=public 으로 RLS 우회 + advisor 회피. 음수 방지 GREATEST(0, ...). reaction UPDATE 의 up↔down 토글 시 양쪽 카운터 보정.\n\nsupabase/migrations/20260504000008_create_counter_triggers.sql 신규 작성. 함수 reactions_apply_post_counter / comments_apply_post_counter + 트리거 reactions_after_change / comments_after_change. Supabase MCP apply_migration 으로 dev 적용.",
-      "notes": "SECURITY DEFINER 사용 이유: 일반 사용자는 posts_update_self 정책으로 타인 posts UPDATE 불가 → 함수 정의자(보통 postgres) 권한으로 우회. 함수 본문이 단순 UPDATE 만 수행하고 동적 SQL 미사용이라 escalation 위험 없음.",
-      "status": "completed",
-      "dependencies": [
-        {
-          "taskId": "0805168d-a1f7-4bfa-8897-2fb86c89bb24"
-        }
-      ],
-      "createdAt": "2026-05-04T06:24:00.619Z",
-      "updatedAt": "2026-05-04T06:27:31.630Z",
-      "relatedFiles": [
-        {
-          "path": "supabase/migrations/20260504000008_create_counter_triggers.sql",
-          "type": "CREATE",
-          "description": "reactions/comments 카운터 트리거 함수 2종 + AFTER 트리거 2종"
-        },
-        {
-          "path": "supabase/migrations/20260504000003_create_posts.sql",
-          "type": "DEPENDENCY",
-          "description": "posts.reaction_up/reaction_down/comment_count 캐시 컬럼 의존",
-          "lineStart": 19,
-          "lineEnd": 21
-        },
-        {
-          "path": "supabase/migrations/20260504000004_create_comments.sql",
-          "type": "DEPENDENCY",
-          "description": "comments.is_deleted soft-delete 컬럼 의존"
-        },
-        {
-          "path": "supabase/migrations/20260504000005_create_reactions.sql",
-          "type": "DEPENDENCY",
-          "description": "reactions 테이블 의존"
-        }
-      ],
-      "implementationGuide": "1) Write 로 20260504000008_create_counter_triggers.sql 생성:\n\n   CREATE OR REPLACE FUNCTION public.reactions_apply_post_counter() RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $$\n   BEGIN\n     IF TG_OP='INSERT' AND NEW.target_type='post' THEN\n       UPDATE posts SET reaction_up   = reaction_up   + (NEW.reaction='up')::int,\n                        reaction_down = reaction_down + (NEW.reaction='down')::int\n        WHERE id = NEW.target_id;\n     ELSIF TG_OP='DELETE' AND OLD.target_type='post' THEN\n       UPDATE posts SET reaction_up   = GREATEST(0, reaction_up   - (OLD.reaction='up')::int),\n                        reaction_down = GREATEST(0, reaction_down - (OLD.reaction='down')::int)\n        WHERE id = OLD.target_id;\n     ELSIF TG_OP='UPDATE' AND NEW.target_type='post' AND OLD.reaction <> NEW.reaction THEN\n       UPDATE posts SET reaction_up   = GREATEST(0, reaction_up   + (NEW.reaction='up')::int   - (OLD.reaction='up')::int),\n                        reaction_down = GREATEST(0, reaction_down + (NEW.reaction='down')::int - (OLD.reaction='down')::int)\n        WHERE id = NEW.target_id;\n     END IF;\n     RETURN NULL;\n   END $$;\n\n   DROP TRIGGER IF EXISTS reactions_after_change ON reactions;\n   CREATE TRIGGER reactions_after_change AFTER INSERT OR UPDATE OR DELETE ON reactions FOR EACH ROW EXECUTE FUNCTION reactions_apply_post_counter();\n\n   CREATE OR REPLACE FUNCTION public.comments_apply_post_counter() RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $$\n   BEGIN\n     IF TG_OP='INSERT' AND NEW.is_deleted=false THEN UPDATE posts SET comment_count = comment_count + 1 WHERE id = NEW.post_id;\n     ELSIF TG_OP='DELETE' AND OLD.is_deleted=false THEN UPDATE posts SET comment_count = GREATEST(0, comment_count - 1) WHERE id = OLD.post_id;\n     ELSIF TG_OP='UPDATE' AND OLD.is_deleted IS DISTINCT FROM NEW.is_deleted THEN\n       IF NEW.is_deleted THEN UPDATE posts SET comment_count = GREATEST(0, comment_count - 1) WHERE id = NEW.post_id;\n       ELSE UPDATE posts SET comment_count = comment_count + 1 WHERE id = NEW.post_id; END IF;\n     END IF;\n     RETURN NULL;\n   END $$;\n\n   DROP TRIGGER IF EXISTS comments_after_change ON comments;\n   CREATE TRIGGER comments_after_change AFTER INSERT OR UPDATE OR DELETE ON comments FOR EACH ROW EXECUTE FUNCTION comments_apply_post_counter();\n\n   COMMENT 함수 2종 + 헤더 주석 (target_type 변경 UPDATE 는 application 차단 가정 / comments 의 reactions 카운터는 본 Task 범위 밖)\n\n2) mcp__supabase__apply_migration name=create_counter_triggers\n3) execute_sql 로 pg_trigger / pg_proc 조회하여 함수·트리거 4건 모두 정상 등록 확인",
-      "verificationCriteria": "pg_proc 에 reactions_apply_post_counter / comments_apply_post_counter 2함수 등록, pg_trigger 에 reactions_after_change / comments_after_change 2트리거 등록, 함수 prosecdef=true (SECURITY DEFINER), proconfig 에 search_path=public 명시.",
-      "analysisResult": "Task 009 — Phase 3 의 마지막 마이그레이션 단계. Task 008 에서 만든 categories/posts/comments 위에 reactions/reports/bookmarks 3테이블 + posts 캐시 컬럼 자동 갱신 트리거 2종을 도입한다. 4개 SQL 파일(005=reactions, 006=reports, 007=bookmarks, 008=counter_triggers) 을 Supabase MCP `apply_migration` 으로 dev 프로젝트에 005→006→007→008 순서로 적용. 모든 정책은 Task 008 의 `{table}_{action}_{scope}` 명명과 `is_admin()` / `set_updated_at` 헬퍼 재사용 패턴을 그대로 따른다. 카운터 트리거는 SECURITY DEFINER + SET search_path=public + GREATEST(0,...) 음수 방지로 작성. 검증은 execute_sql 로 23505/23514 코드 매칭 + 트리거 증감 시퀀스 + advisor 0건 + 임시 row cleanup 까지 11건 (A~K). 본 Task 는 DB 만 다루므로 npm 회귀 영향 없음. 완료 시 ROADMAP.md Task 009 ✅ + 검증 결과 nested bullet 5~7줄 추가.",
-      "summary": "posts 카운터 트리거 마이그레이션(008) 완료. pg_proc 에 reactions_apply_post_counter / comments_apply_post_counter 2함수 등록 (prosecdef=true, proconfig=[search_path=public]). pg_trigger 에 reactions_after_change(reactions) / comments_after_change(comments) 2트리거 정상 등록. SECURITY DEFINER 로 RLS 우회, GREATEST(0,...) 음수 방지, OLD.reaction <> NEW.reaction 가드로 불필요한 UPDATE 회피. 다음 검증 단계(009-5)에서 트리거 증감 시퀀스 실측 예정.",
-      "completedAt": "2026-05-04T06:27:31.629Z"
-    },
-    {
-      "id": "d1597310-966f-469e-ac9c-389a2054b38c",
-      "name": "Task 009-5: RLS·CHECK·트리거 검증 11건 + advisor + ROADMAP ✅",
-      "description": "execute_sql 로 검증 시나리오 11건 수행:\nA) reactions UNIQUE → 23505\nB) reactions reaction CHECK ('sideways') → 23514\nC) reactions target_type CHECK ('profile') → 23514\nD) 트리거: posts.reaction_up=0 → INSERT(up) → 1 → UPDATE(up→down) → up=0,down=1 → DELETE → down=0\nE) reports reason CHECK ('other') → 23514\nF) reports description 501자 → 23514\nG) reports UNIQUE → 23505\nH) bookmarks UNIQUE → 23505\nI) comments INSERT → posts.comment_count +1 / soft-delete UPDATE(is_deleted=true) → -1\nJ) get_advisors security 본 Task 신규 경고 0건\nK) 임시 row cleanup → reactions/reports/bookmarks/comments/posts 0 row\n\n통과 시 ROADMAP.md Task 009 ✅ + 검증 결과 nested bullet 5~7줄 추가.",
-      "notes": "검증 시나리오는 Task 008-5 의 execute_sql 패턴을 그대로 따른다. SAVEPOINT/ROLLBACK 활용해 23505/23514 발생 후에도 트랜잭션 진행 가능. 본 Task 는 DB-only 라 npm 회귀 미실행.",
-      "status": "completed",
-      "dependencies": [
-        {
-          "taskId": "987c1d3f-6642-41a8-8c4e-a741400a67dd"
-        }
-      ],
-      "createdAt": "2026-05-04T06:24:00.619Z",
-      "updatedAt": "2026-05-04T06:31:17.457Z",
-      "relatedFiles": [
-        {
-          "path": "docs/ROADMAP.md",
-          "type": "TO_MODIFY",
-          "description": "Task 009 항목 ✅ 표기 + 검증 결과 nested bullet 추가",
-          "lineStart": 156,
-          "lineEnd": 162
-        },
-        {
-          "path": "supabase/migrations/20260504000005_create_reactions.sql",
-          "type": "DEPENDENCY",
-          "description": "검증 대상 1"
-        },
-        {
-          "path": "supabase/migrations/20260504000006_create_reports.sql",
-          "type": "DEPENDENCY",
-          "description": "검증 대상 2"
-        },
-        {
-          "path": "supabase/migrations/20260504000007_create_bookmarks.sql",
-          "type": "DEPENDENCY",
-          "description": "검증 대상 3"
-        },
-        {
-          "path": "supabase/migrations/20260504000008_create_counter_triggers.sql",
-          "type": "DEPENDENCY",
-          "description": "검증 대상 4 (트리거)"
-        }
-      ],
-      "implementationGuide": "1) execute_sql — 임시 user/category/post 시드 (RLS 우회 위해 service-role 또는 raw SQL 컨텍스트)\n2) 시나리오 A~I 순차 실행:\n   - A: 동일 (user,target) reactions INSERT 2회 → 두 번째에서 23505 캡처\n   - B,C: 잘못된 reaction/target_type INSERT → 23514 캡처\n   - D: SELECT reaction_up,reaction_down FROM posts WHERE id=... 를 INSERT/UPDATE/DELETE 사이에 매번 호출하여 1→{0,1}→{0,0} 변화 검증\n   - E,F,G: reports 시나리오 동일 패턴\n   - H: bookmarks 중복 INSERT → 23505\n   - I: comments INSERT → comment_count=1, UPDATE is_deleted=true → 0 검증\n3) mcp__supabase__get_advisors type=security → 본 Task 신규 경고 0건 (사전 이슈는 무관) 확인 → J PASS\n4) DELETE FROM reactions/reports/bookmarks/comments/posts (임시 데이터) + SELECT count(*) 0 확인 → K PASS\n5) Edit 로 docs/ROADMAP.md Task 009 항목을 ✅ 표기 + nested bullet 5~7줄 (마이그레이션 4개 / 트리거 2종 / 검증 11건 PASS / advisor 0건 / 임시 row cleanup 완료) 추가",
-      "verificationCriteria": "검증 11건 (A~K) 모두 PASS, advisor security 본 Task 신규 경고 0건, ROADMAP.md Task 009 항목이 ✅ 로 표기되고 검증 결과 nested bullet 5~7줄이 추가되어 있음, 검증용 임시 row 가 5테이블 모두 0 row 로 정리됨.",
-      "analysisResult": "Task 009 — Phase 3 의 마지막 마이그레이션 단계. Task 008 에서 만든 categories/posts/comments 위에 reactions/reports/bookmarks 3테이블 + posts 캐시 컬럼 자동 갱신 트리거 2종을 도입한다. 4개 SQL 파일(005=reactions, 006=reports, 007=bookmarks, 008=counter_triggers) 을 Supabase MCP `apply_migration` 으로 dev 프로젝트에 005→006→007→008 순서로 적용. 모든 정책은 Task 008 의 `{table}_{action}_{scope}` 명명과 `is_admin()` / `set_updated_at` 헬퍼 재사용 패턴을 그대로 따른다. 카운터 트리거는 SECURITY DEFINER + SET search_path=public + GREATEST(0,...) 음수 방지로 작성. 검증은 execute_sql 로 23505/23514 코드 매칭 + 트리거 증감 시퀀스 + advisor 0건 + 임시 row cleanup 까지 11건 (A~K). 본 Task 는 DB 만 다루므로 npm 회귀 영향 없음. 완료 시 ROADMAP.md Task 009 ✅ + 검증 결과 nested bullet 5~7줄 추가.",
-      "summary": "Task 009-5 검증 완료 — 시나리오 A~K 11건 전수 PASS. A:23505(reactions UNIQUE) / B:23514(reaction CHECK) / C:23514(target_type CHECK) / D:트리거 시퀀스 0→1→{0,1}→{0,0} / E:23514(reason CHECK) / F:23514(description 501자) / G:23505(reports UNIQUE) / H:23505(bookmarks UNIQUE) / I:comment_count 1→0 / J:advisor 신규 0건(보강 마이그레이션 009 로 lint 0028/0029 4건 회수) / K:6테이블 0 row cleanup. ROADMAP.md Task 009 ✅ 표기 + nested bullet 7줄 추가 완료. 보강 산출물: 20260504000009_revoke_counter_function_execute.sql 추가 작성으로 advisor 신규 경고 0건 달성.",
-      "completedAt": "2026-05-04T06:31:17.456Z"
-    },
-    {
-      "id": "888c6f69-d7c2-419d-8411-6929b5ecc22a",
-      "name": "Task 010-1: types/database.ts 자동 재생성 + 7테이블 단축 alias 보강",
-      "description": "mcp__supabase__generate_typescript_types 로 dev 프로젝트의 현재 7테이블 + view + 함수 타입을 자동 생성하고 types/database.ts 를 통째로 교체. 기존 Profile/ProfileInsert/ProfileUpdate alias 보존하고 게시판 6테이블 단축 alias 신규 추가 (Category/Post/Comment/Reaction/Report/Bookmark + 각 Insert/Update). user_list view 가 자동 결과에 누락되면 수동 보강.",
-      "notes": "generate 결과는 함수 카테고리(Functions)에 set_updated_at/handle_new_user/is_admin/reactions_apply_post_counter/comments_apply_post_counter 까지 자동 포함 — 정상 동작. profiles.role 의 enum 표현 방식은 자동 결과에 따름.",
-      "status": "completed",
-      "dependencies": [],
-      "createdAt": "2026-05-04T06:38:17.718Z",
-      "updatedAt": "2026-05-04T06:42:08.623Z",
-      "relatedFiles": [
         {
           "path": "types/database.ts",
           "type": "TO_MODIFY",
-          "description": "generate_typescript_types 출력으로 본문 교체 + 헬퍼·단축 alias 보강"
+          "description": "mcp 자동 갱신, alias 영역 보존"
+        }
+      ],
+      "implementationGuide": "1) supabase/migrations/20260509000000_profiles_agreed_at.sql 신규.\\n2) ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS agreed_terms_at TIMESTAMPTZ; 동일 패턴 agreed_guidelines_at.\\n3) COMMENT ON COLUMN 으로 일본어 의미 주석 추가.\\n4) CREATE OR REPLACE FUNCTION public.handle_user_metadata_update() — 기존 IF (password_set 동기화) + IF (nickname 동기화) 블록 모두 보존 + 신규 IF 블록 2개 추가:\\n   IF NEW.raw_user_meta_data ? 'agreed_terms_at' THEN UPDATE profiles SET agreed_terms_at=(...)::timestamptz, updated_at=now() WHERE id=NEW.id AND agreed_terms_at IS NULL; END IF;\\n   IF NEW.raw_user_meta_data ? 'agreed_guidelines_at' THEN UPDATE profiles SET agreed_guidelines_at=(...)::timestamptz, updated_at=now() WHERE id=NEW.id AND agreed_guidelines_at IS NULL; END IF;\\n5) WHERE 절에 'agreed_*_at IS NULL' 추가 — 첫 동의 시점만 기록, 재동의 시 덮어쓰기 방지.\\n6) mcp__supabase__apply_migration 적용.\\n7) mcp__supabase__execute_sql 검증: \\\\d public.profiles 또는 SELECT column_name FROM information_schema.columns WHERE table_name='profiles' 로 컬럼 추가 확인.\\n8) mcp__supabase__generate_typescript_types 재실행 → types/database.ts 갱신 (Profile / ProfileInsert / ProfileUpdate alias 영역 보존).",
+      "verificationCriteria": "profiles 테이블에 agreed_terms_at + agreed_guidelines_at 컬럼 추가 (NULL 허용). handle_user_metadata_update 함수 갱신 + 기존 password_set/nickname 동기화 정상 동작 확인. types/database.ts 의 Profile 인터페이스에 두 컬럼 추가 확인. advisors security 신규 0건.",
+      "analysisResult": "Task 022 — 가이드라인 + 법적 문서 + F013 동의 도입. 출시 직전 법적·운영 정합성 + 회원가입 동의 흐름 구축. 7청크: DB 마이그(profiles agreed_*_at + 트리거 확장) → shadcn checkbox + LegalPageShell → proxy PUBLIC_PATHS → guidelines/terms/privacy 3페이지(병렬) → setup 체크박스 + 마이페이지 진입점 + 검증. 모든 카피 일본어. 출시 후 약관·가이드라인 업데이트 시 LegalPageShell 재사용. 기존 가입자 재동의는 본 Task 외(P1)."
+    },
+    {
+      "id": "58865904-3ab3-4f2f-90d8-83f9f6d117e5",
+      "name": "[ui-infra] shadcn checkbox 설치 + LegalPageShell 공용 컴포넌트",
+      "description": "F013 체크박스용 shadcn Checkbox 컴포넌트 설치 + 정적 법적 페이지 3개의 공용 layout shell 작성. shell은 헤더(AuthHeader 재사용) + 타이틀 + 최종 갱신 일자 + 본문 슬롯의 단일 책임. 향후 약관 추가 시 재사용 가능.",
+      "notes": "AuthHeader 는 이미 (public)/_components/auth-header.tsx 에 「← 戻る」 + 로고 패턴으로 정의됨 — login/signup/setup 모두 사용. 정적 페이지에도 동일 헤더 적용으로 시각 일관성. checkbox 는 shadcn radix 기반 — 키보드/스크린리더 접근성 자동.",
+      "status": "pending",
+      "dependencies": [],
+      "createdAt": "2026-05-06T09:27:48.206Z",
+      "updatedAt": "2026-05-06T09:27:48.206Z",
+      "relatedFiles": [
+        {
+          "path": "app/(public)/_components/legal-page-shell.tsx",
+          "type": "CREATE",
+          "description": "정적 법적 페이지 공용 shell"
         },
+        {
+          "path": "app/(public)/_components/auth-header.tsx",
+          "type": "REFERENCE",
+          "description": "헤더 재사용"
+        },
+        {
+          "path": "components/ui/checkbox.tsx",
+          "type": "CREATE",
+          "description": "shadcn 자동 생성"
+        },
+        {
+          "path": "components.json",
+          "type": "TO_MODIFY",
+          "description": "shadcn add 후 자동 갱신"
+        }
+      ],
+      "implementationGuide": "1) `npx shadcn add checkbox` 실행 — components/ui/checkbox.tsx 자동 생성, components.json + radix-ui 의존성 자동 추가.\\n2) app/(public)/_components/legal-page-shell.tsx 신규 (Server Component, 'use client' 없음):\\n   import { AuthHeader } from './auth-header'\\n   interface LegalPageShellProps { title: string; lastUpdated: string; children: React.ReactNode }\\n   export function LegalPageShell({title, lastUpdated, children}) {\\n     return (\\n       <div className='min-h-dvh'>\\n         <AuthHeader />\\n         <article className='mx-auto max-w-2xl px-6 py-8'>\\n           <h1 className='text-3xl font-bold mb-2'>{title}</h1>\\n           <p className='text-sm text-muted-foreground mb-8'>最終更新: {lastUpdated}</p>\\n           <div className='space-y-6 text-base leading-relaxed'>{children}</div>\\n         </article>\\n       </div>\\n     )\\n   }\\n3) Tailwind v4: prose 플러그인 미사용 → 직접 typography 클래스 (h2 mb-3 text-xl, p mb-3, ol/ul list-decimal/disc pl-6 space-y-2). children 영역에서 페이지마다 직접 작성 권장.",
+      "verificationCriteria": "components/ui/checkbox.tsx 존재 + Checkbox export. LegalPageShell 빈 children 렌더 시 헤더 + 타이틀 + 메타 정상. npm run build 통과.",
+      "analysisResult": "Task 022 — 가이드라인 + 법적 문서 + F013 동의 도입. 출시 직전 법적·운영 정합성 + 회원가입 동의 흐름 구축. 7청크: DB 마이그(profiles agreed_*_at + 트리거 확장) → shadcn checkbox + LegalPageShell → proxy PUBLIC_PATHS → guidelines/terms/privacy 3페이지(병렬) → setup 체크박스 + 마이페이지 진입점 + 검증. 모든 카피 일본어. 출시 후 약관·가이드라인 업데이트 시 LegalPageShell 재사용. 기존 가입자 재동의는 본 Task 외(P1)."
+    },
+    {
+      "id": "d31a0912-5374-4e37-8552-a3c8eec986ba",
+      "name": "[middleware] proxy.ts PUBLIC_PATHS 확장",
+      "description": "미인증 사용자가 /guidelines, /terms, /privacy 페이지에 접근할 수 있도록 proxy.ts 의 화이트리스트 1줄 수정. redirect 분기는 isLandingPath/isLoginPath/isSignupPath/isSetupPath 4개만 인식하므로 신규 경로는 자유 통과 — 인증 사용자도 정상 접근.",
+      "notes": "1줄 변경. 영향 범위 좁음. 미들웨어 재실행 자동 (Next.js dev/prod 모두).",
+      "status": "pending",
+      "dependencies": [],
+      "createdAt": "2026-05-06T09:27:48.206Z",
+      "updatedAt": "2026-05-06T09:27:48.206Z",
+      "relatedFiles": [
+        {
+          "path": "proxy.ts",
+          "type": "TO_MODIFY",
+          "description": "PUBLIC_PATHS 확장",
+          "lineStart": 42,
+          "lineEnd": 42
+        }
+      ],
+      "implementationGuide": "proxy.ts:42 의\\n  const PUBLIC_PATHS = ['/landing', '/login', '/signup']\\n→\\n  const PUBLIC_PATHS = ['/landing', '/login', '/signup', '/guidelines', '/terms', '/privacy']\\n\\n다른 변경 없음. redirect 분기 (line 75 `if (isLandingPath || isLoginPath || isSignupPath || isSetupPath) redirect('/')`) 는 신규 경로 인식 안 함 → 인증 사용자도 정상 접근.",
+      "verificationCriteria": "미인증 상태에서 /guidelines/, /terms/, /privacy/ 직접 navigation 시 / 로 리다이렉트 안 됨 (정상 표시). 인증 상태에서도 동일.",
+      "analysisResult": "Task 022 — 가이드라인 + 법적 문서 + F013 동의 도입. 출시 직전 법적·운영 정합성 + 회원가입 동의 흐름 구축. 7청크: DB 마이그(profiles agreed_*_at + 트리거 확장) → shadcn checkbox + LegalPageShell → proxy PUBLIC_PATHS → guidelines/terms/privacy 3페이지(병렬) → setup 체크박스 + 마이페이지 진입점 + 검증. 모든 카피 일본어. 출시 후 약관·가이드라인 업데이트 시 LegalPageShell 재사용. 기존 가입자 재동의는 본 Task 외(P1)."
+    },
+    {
+      "id": "ff3d817e-2cbd-4235-811b-6656b9a3788d",
+      "name": "[content] /guidelines 페이지 작성 (コミュニティガイドライン)",
+      "description": "커뮤니티 가이드라인 정적 페이지. LegalPageShell 사용. 6 섹션 일본어 카피 직접 작성 — 욕설/명예훼손/실명/성희롱/불법/스팸 금지 + 본인 책임 + 신고/삭제 기준 + 어드민 권한 + 改정 안내.",
+      "notes": "Server Component (정적 콘텐츠 — 'use client' 불필요, prefetch 친화). 향후 운영자 검토 후 카피 일부 조정 가능.",
+      "status": "pending",
+      "dependencies": [
+        {
+          "taskId": "58865904-3ab3-4f2f-90d8-83f9f6d117e5"
+        }
+      ],
+      "createdAt": "2026-05-06T09:27:48.206Z",
+      "updatedAt": "2026-05-06T09:27:48.206Z",
+      "relatedFiles": [
+        {
+          "path": "app/(public)/guidelines/page.tsx",
+          "type": "CREATE",
+          "description": "가이드라인 페이지"
+        },
+        {
+          "path": "app/(public)/_components/legal-page-shell.tsx",
+          "type": "DEPENDENCY",
+          "description": "공용 shell"
+        }
+      ],
+      "implementationGuide": "app/(public)/guidelines/page.tsx 신규 (Server Component):\\n  import { LegalPageShell } from '../_components/legal-page-shell'\\n  export default function GuidelinesPage() {\\n    return (\\n      <LegalPageShell title='コミュニティガイドライン' lastUpdated='2026年5月8日'>\\n        <section><h2>1. KEIO SHAREの目的</h2><p>慶應義塾大学の在学生による匿名コミュニティ。学業・キャンパスライフ・進路など、学生同士の本音を安全に共有することを目的とします。</p></section>\\n        <section><h2>2. 投稿時のルール</h2><p>以下の行為は禁止します。</p><ul><li>暴言・誹謗中傷</li><li>名誉毀損</li><li>個人を特定できる情報の投稿</li><li>性的ハラスメント</li><li>違法行為の勧誘・薬物・器物損壊など</li><li>スパム・無関係な広告</li></ul></section>\\n        <section><h2>3. 匿名性とプライバシー</h2><p>匿名投稿でも、書き込みの責任は投稿者本人にあります。他人の個人情報の投稿は禁止です。</p></section>\\n        <section><h2>4. 通報と運営対応</h2><p>違反を発見した場合は通報機能をご利用ください。運営は48時間以内の対応を目標とし、削除または棄却を判断します。</p></section>\\n        <section><h2>5. 違反時の措置</h2><p>違反内容に応じて、警告 / 投稿削除 / 一時利用停止 / アカウント永久停止 のいずれかを行います。</p></section>\\n        <section><h2>6. 改訂について</h2><p>本ガイドラインは予告なく改訂される場合があります。改訂後の利用は新しい内容に同意したものとみなします。</p></section>\\n      </LegalPageShell>\\n    )\\n  }\\nh2 className='text-xl font-semibold mb-3', ul className='list-disc pl-6 space-y-1', p className='leading-relaxed' 등 직접 클래스 적용.",
+      "verificationCriteria": "/guidelines 진입 시 6 섹션 모두 표시. 모바일 375px 가독성 (헤딩 위계 + 본문 line-height + 섹션 spacing). 「← 戻る」 정상 동작.",
+      "analysisResult": "Task 022 — 가이드라인 + 법적 문서 + F013 동의 도입. 출시 직전 법적·운영 정합성 + 회원가입 동의 흐름 구축. 7청크: DB 마이그(profiles agreed_*_at + 트리거 확장) → shadcn checkbox + LegalPageShell → proxy PUBLIC_PATHS → guidelines/terms/privacy 3페이지(병렬) → setup 체크박스 + 마이페이지 진입점 + 검증. 모든 카피 일본어. 출시 후 약관·가이드라인 업데이트 시 LegalPageShell 재사용. 기존 가입자 재동의는 본 Task 외(P1)."
+    },
+    {
+      "id": "2400c2f4-c0f6-4fd1-89ba-14fb4f5fbb25",
+      "name": "[content] /terms 페이지 작성 (利用規約 第1~10条)",
+      "description": "이용약관 정적 페이지. 第1条 ~ 第10条 구성으로 法 정합 표준 템플릿. 第9条 準拠法・管轄 = 日本法 / 東京地方裁判소.",
+      "notes": "법무 검토는 운영자 책임 (out of scope). 표준 SaaS 약관 템플릿 기반.",
+      "status": "pending",
+      "dependencies": [
+        {
+          "taskId": "58865904-3ab3-4f2f-90d8-83f9f6d117e5"
+        }
+      ],
+      "createdAt": "2026-05-06T09:27:48.206Z",
+      "updatedAt": "2026-05-06T09:27:48.206Z",
+      "relatedFiles": [
+        {
+          "path": "app/(public)/terms/page.tsx",
+          "type": "CREATE",
+          "description": "이용약관 페이지"
+        },
+        {
+          "path": "app/(public)/_components/legal-page-shell.tsx",
+          "type": "DEPENDENCY",
+          "description": "공용 shell"
+        }
+      ],
+      "implementationGuide": "app/(public)/terms/page.tsx 신규 (Server Component):\\n  import { LegalPageShell } from '../_components/legal-page-shell'\\n  export default function TermsPage() {\\n    return (\\n      <LegalPageShell title='利用規約' lastUpdated='2026年5月8日'>\\n        <section><h2>第1条 (定義)</h2><p>本規約において「本サービス」とは、当方が提供する『KEIO SHARE』を指します。「会員」とは、本規約に同意のうえ本サービスを利用する者を指します。</p></section>\\n        <section><h2>第2条 (会員資格)</h2><p>会員資格は、慶應義塾の正規 keio.jp ドメインメールアドレスを保有する在学生に限ります。1人1アカウントとします。</p></section>\\n        <section><h2>第3条 (本サービスの内容)</h2><p>会員は本サービスを通じて、匿名で投稿・コメント・いいね・ブックマーク等を行うことができます。</p></section>\\n        <section><h2>第4条 (禁止事項)</h2><p>会員は別途定める『コミュニティガイドライン』に従うものとし、違反があった場合は本規約違反とみなします。</p></section>\\n        <section><h2>第5条 (会員の責任)</h2><p>投稿内容の責任は投稿者本人にあります。匿名投稿であっても、法令違反があった場合は適切に対応します。</p></section>\\n        <section><h2>第6条 (運営者の権限)</h2><p>運営者は、本規約またはガイドライン違反の投稿を予告なく削除し、また会員の利用を一時的または永久的に停止することができます。</p></section>\\n        <section><h2>第7条 (本サービスの変更・終了)</h2><p>運営者は、事前の通知をもって本サービスの内容を変更または終了することができます。</p></section>\\n        <section><h2>第8条 (免責事項)</h2><p>本サービスの利用に伴う損害について、運営者は故意または重大な過失がない限り責任を負いません。</p></section>\\n        <section><h2>第9条 (準拠法・管轄)</h2><p>本規約の解釈は日本法に準拠し、本サービスに関する紛争は東京地方裁判所を第一審の専属的合意管轄とします。</p></section>\\n        <section><h2>第10条 (本規約の改訂)</h2><p>運営者は、必要に応じて本規約を改訂することができます。改訂後の利用は新しい規約に同意したものとみなします。</p></section>\\n      </LegalPageShell>\\n    )\\n  }",
+      "verificationCriteria": "/terms 진입 시 10 조항 모두 표시 (第1条~第10条). 모바일 가독성. 第9条 準拠法·管轄 명시.",
+      "analysisResult": "Task 022 — 가이드라인 + 법적 문서 + F013 동의 도입. 출시 직전 법적·운영 정합성 + 회원가입 동의 흐름 구축. 7청크: DB 마이그(profiles agreed_*_at + 트리거 확장) → shadcn checkbox + LegalPageShell → proxy PUBLIC_PATHS → guidelines/terms/privacy 3페이지(병렬) → setup 체크박스 + 마이페이지 진입점 + 검증. 모든 카피 일본어. 출시 후 약관·가이드라인 업데이트 시 LegalPageShell 재사용. 기존 가입자 재동의는 본 Task 외(P1)."
+    },
+    {
+      "id": "a2522e3f-4d5a-4d9f-aa13-ccf4a4c9afb0",
+      "name": "[content] /privacy 페이지 작성 (プライバシーポリシー)",
+      "description": "개인정보처리방침 정적 페이지. 일본 个人情報保護法 준거. 11 섹션: 정의 / 수집 / 이용 / 제3자 / 위탁(Supabase·Vercel 越境) / 보관 / 사용자 권리 / 쿠키 / 法 준수 / 改정 / 문의.",
+      "notes": "11 섹션 お問い合わせ 의 메일 주소는 placeholder 텍스트로 두고 운영자가 후 입력. 越境移転 명시 (Supabase·Vercel 미국 처리).",
+      "status": "pending",
+      "dependencies": [
+        {
+          "taskId": "58865904-3ab3-4f2f-90d8-83f9f6d117e5"
+        }
+      ],
+      "createdAt": "2026-05-06T09:27:48.206Z",
+      "updatedAt": "2026-05-06T09:27:48.206Z",
+      "relatedFiles": [
+        {
+          "path": "app/(public)/privacy/page.tsx",
+          "type": "CREATE",
+          "description": "개인정보처리방침 페이지"
+        },
+        {
+          "path": "app/(public)/_components/legal-page-shell.tsx",
+          "type": "DEPENDENCY",
+          "description": "공용 shell"
+        }
+      ],
+      "implementationGuide": "app/(public)/privacy/page.tsx 신규 (Server Component):\\n  import { LegalPageShell } from '../_components/legal-page-shell'\\n  export default function PrivacyPage() {\\n    return (\\n      <LegalPageShell title='プライバシーポリシー' lastUpdated='2026年5月8日'>\\n        <section><h2>1. 個人情報の定義</h2><p>本ポリシーにおいて「個人情報」とは、個人情報の保護に関する法律(平成15年法律第57号)に定める個人情報を指します。</p></section>\\n        <section><h2>2. 収集する情報</h2><ul><li>メールアドレス (keio.jp ドメイン)</li><li>キャンパス・学年・学部</li><li>ニックネーム</li><li>投稿・コメント・いいね・ブックマーク等の利用情報</li><li>アクセスログ (IP・User-Agent・タイムスタンプ)</li></ul></section>\\n        <section><h2>3. 利用目的</h2><ul><li>本サービスの提供・運営</li><li>会員資格(keio.jp 在学者)の確認</li><li>不正利用・違反行為の調査・対応</li><li>サービス改善のための統計分析(個人を特定しない形で)</li></ul></section>\\n        <section><h2>4. 第三者提供</h2><p>法令に基づく場合を除き、原則として個人情報を第三者に提供しません。</p></section>\\n        <section><h2>5. 業務委託先</h2><p>サービス運営のため、以下の業者に業務を委託しています。これらの業者はデータを米国で処理する可能性があります(越境移転)。</p><ul><li>Supabase Inc. (米国) — 認証・データベース</li><li>Vercel Inc. (米国) — ホスティング</li></ul></section>\\n        <section><h2>6. 保管期間</h2><p>会員資格が継続する期間、または法令で定める期間保存します。退会された場合、関連する個人情報は速やかに削除します。</p></section>\\n        <section><h2>7. ユーザーの権利</h2><p>会員は、自己の個人情報について以下の権利を行使できます: 閲覧 / 訂正 / 削除 / 利用停止 / 退会。マイページから操作可能です。</p></section>\\n        <section><h2>8. Cookie とアクセス解析</h2><p>サービスの利便性向上のため、Cookie および類似技術を使用します。</p></section>\\n        <section><h2>9. 個人情報保護法の遵守</h2><p>本サービスは、日本の個人情報の保護に関する法律を遵守します。</p></section>\\n        <section><h2>10. 改訂について</h2><p>本ポリシーは予告なく改訂される場合があります。改訂後の利用は新しい内容に同意したものとみなします。</p></section>\\n        <section><h2>11. お問い合わせ</h2><p>本ポリシーに関するお問い合わせは、運営チームまでご連絡ください。<br />(連絡先: 運営者により後日公表)</p></section>\\n      </LegalPageShell>\\n    )\\n  }",
+      "verificationCriteria": "/privacy 진입 시 11 섹션 모두 표시. 越境移転 (Supabase·Vercel) 명시. 個人情報保護法 준거 표기. 모바일 가독성.",
+      "analysisResult": "Task 022 — 가이드라인 + 법적 문서 + F013 동의 도입. 출시 직전 법적·운영 정합성 + 회원가입 동의 흐름 구축. 7청크: DB 마이그(profiles agreed_*_at + 트리거 확장) → shadcn checkbox + LegalPageShell → proxy PUBLIC_PATHS → guidelines/terms/privacy 3페이지(병렬) → setup 체크박스 + 마이페이지 진입점 + 검증. 모든 카피 일본어. 출시 후 약관·가이드라인 업데이트 시 LegalPageShell 재사용. 기존 가입자 재동의는 본 Task 외(P1)."
+    },
+    {
+      "id": "c3ef2ce7-b435-4e21-9978-d9a52972fede",
+      "name": "[integration] setup 동의 체크박스 + zod schema + 마이페이지 진입점 + Playwright 검증",
+      "description": "통합 청크: (a) types/auth.ts SetupFormSchema 에 agreedToTerms 필드 추가, (b) signup/setup 페이지에 Checkbox + Controller + 미체크 시 에러 표시, (c) submit 시 user_metadata 에 agreed_*_at timestamp 저장 → 트리거가 profiles 동기화, (d) 마이페이지 하단에 진입점 row 추가, (e) Playwright + DB + lint/build 회귀.",
+      "notes": "Setup form unmount 위험은 target='_blank' 로 회피 (새 탭 진입 → setup 페이지 unmount 안 됨). admin createUser 시 .env.local SUPABASE_SERVICE_ROLE_KEY 가 이미 추가된 상태.",
+      "status": "pending",
+      "dependencies": [
+        {
+          "taskId": "2106f71f-ba34-4ccb-ab19-9b2e07c32a94"
+        },
+        {
+          "taskId": "58865904-3ab3-4f2f-90d8-83f9f6d117e5"
+        },
+        {
+          "taskId": "d31a0912-5374-4e37-8552-a3c8eec986ba"
+        },
+        {
+          "taskId": "ff3d817e-2cbd-4235-811b-6656b9a3788d"
+        },
+        {
+          "taskId": "2400c2f4-c0f6-4fd1-89ba-14fb4f5fbb25"
+        },
+        {
+          "taskId": "a2522e3f-4d5a-4d9f-aa13-ccf4a4c9afb0"
+        }
+      ],
+      "createdAt": "2026-05-06T09:27:48.206Z",
+      "updatedAt": "2026-05-06T09:27:48.206Z",
+      "relatedFiles": [
         {
           "path": "types/auth.ts",
-          "type": "REFERENCE",
-          "description": "파일 헤더 주석·import 컨벤션 참고",
-          "lineStart": 1,
-          "lineEnd": 15
-        }
-      ],
-      "implementationGuide": "1) mcp__supabase__generate_typescript_types 호출 → 출력 결과 검토\n2) Write 로 types/database.ts 본문을 자동 생성 결과로 교체\n3) 파일 하단에 헬퍼 alias 추가:\n   export type Tables<T extends keyof Database['public']['Tables']> = Database['public']['Tables'][T]['Row']\n   export type TablesInsert<T> = ['Insert']\n   export type TablesUpdate<T> = ['Update']\n4) 단축 alias 7종 (Profile/Category/Post/Comment/Reaction/Report/Bookmark + Insert/Update)\n5) user_list view 누락 시 수동 보강\n6) npm run build 로 TS strict 회귀 0건 확인",
-      "verificationCriteria": "types/database.ts 의 Database['public']['Tables'] 에 7테이블(profiles/categories/posts/comments/reactions/reports/bookmarks) 모두 등록, user_list view 보존, Profile/Category/Post/Comment/Reaction/Report/Bookmark + Insert/Update 단축 alias 7종 export 가능, npm run build TS strict 회귀 0건.",
-      "analysisResult": "Task 010 — Phase 3 의 마지막 단계. dev 프로젝트의 7테이블(profiles + categories + posts + comments + reactions + reports + bookmarks) + 트리거 함수 4종이 적용된 상태에서, types/database.ts 를 mcp__supabase__generate_typescript_types 로 자동 갱신하고, 게시판 도메인 enum/zod (types/community.ts) 와 카테고리 메타 (lib/community/categories.ts) 를 신규 작성한다. 마지막으로 9개 카테고리 시드 마이그레이션(20260504000010_seed_categories.sql) 을 dev 에 적용. 표시명은 일본어(雑談/恋愛/学業·授業/就活/日常/質問/三田/日吉/SFC), sort_order 는 topic 10~60 + campus 110~130. 패턴은 types/auth.ts 의 *_VALUES + Type + *Schema + FormSchema 를 100% 재사용. 검증은 SELECT 9건 정합 + npm run build TS strict 회귀 0건. ROADMAP.md Task 010 ✅ + nested bullet 4~5줄.",
-      "summary": "types/database.ts 자동 재생성 + 단축 alias 보강 완료. mcp__supabase__generate_typescript_types 출력으로 본문 교체, Database['public']['Tables'] 에 7테이블(bookmarks/categories/comments/posts/profiles/reactions/reports) 모두 등록, user_list view + Functions(is_admin/show_limit/show_trgm) 자동 포함, Tables/TablesInsert/TablesUpdate 제너릭 헬퍼 + 7종 단축 alias(Profile/Category/Post/Comment/Reaction/Report/Bookmark + 각 Insert/Update) export. tsc --noEmit 회귀 0건.",
-      "completedAt": "2026-05-04T06:42:08.621Z"
-    },
-    {
-      "id": "a4f35cac-bbd5-4ae2-acc6-fdae150e7885",
-      "name": "Task 010-2: types/community.ts 신규 — 게시판 도메인 enum + zod 폼 스키마",
-      "description": "게시판 도메인의 enum 값과 폼 검증 zod 스키마 단일 출처. types/auth.ts 의 *_VALUES + Type + *Schema 컨벤션 그대로 따름.\n\n포함 항목:\n- CategorySlug (9건: free/love/study/job/daily/question/mita/hiyoshi/sfc) + zod\n- CategoryType (topic|campus) + zod\n- ReactionTargetType (post|comment) + zod\n- ReactionKind (up|down) + zod\n- ReportReason (abuse|defamation|spam|illegal) + zod\n- ReportStatus (pending|processed|dismissed) + zod\n- PostFormSchema (title 1~100자 + body 10~5000자 + categorySlug + isAnonymous)\n- CommentFormSchema (postId UUID + parentId nullable UUID + body 1~1000자 + isAnonymous)\n- ReportFormSchema (targetType + targetId UUID + reason + description max 500자 nullable optional)",
-      "notes": "types/auth.ts 와 동일한 컨벤션. Form 검증 메시지는 일본어로 작성 (CLAUDE.md 운영 지침 — 일본인 대상 서비스).",
-      "status": "completed",
-      "dependencies": [
-        {
-          "taskId": "888c6f69-d7c2-419d-8411-6929b5ecc22a"
-        }
-      ],
-      "createdAt": "2026-05-04T06:38:17.718Z",
-      "updatedAt": "2026-05-04T06:42:52.164Z",
-      "relatedFiles": [
-        {
-          "path": "types/community.ts",
-          "type": "CREATE",
-          "description": "게시판 도메인 enum + zod 폼 스키마"
-        },
-        {
-          "path": "types/auth.ts",
-          "type": "REFERENCE",
-          "description": "*_VALUES + Type + *Schema + FormSchema 컨벤션 출처",
-          "lineStart": 16,
-          "lineEnd": 83
-        },
-        {
-          "path": "types/domain.ts",
-          "type": "REFERENCE",
-          "description": "as const + literal type 패턴 참고",
-          "lineStart": 17,
-          "lineEnd": 31
-        }
-      ],
-      "implementationGuide": "1) types/community.ts Write 로 신규 작성\n2) 파일 헤더 주석: '게시판 도메인 enum + zod 스키마 (Single Source of Truth)' + import 처:\n   - Task 011 API 라우트 (z.parse 검증)\n   - Task 012~ 폼 컴포넌트 (RHF zodResolver)\n3) 6 enum 그룹 — 각각 *_VALUES as const, type 선언, *Schema = z.enum(*_VALUES)\n4) 3 FormSchema — z.object 후 type *FormData = z.infer\n5) ReportFormSchema 의 description 은 z.string().max(500).nullable().optional() — null/undefined 둘 다 허용\n6) PostFormSchema 의 에러 메시지는 일본어 ('タイトルを入力してください' 등) 또는 한국어 — 본 프로젝트가 일본인 대상이므로 일본어 채택",
-      "verificationCriteria": "types/community.ts 가 9종 enum/스키마 (CategorySlug/Type, ReactionTargetType/Kind, ReportReason/Status) + 3 FormSchema (Post/Comment/Report) export. PostFormSchema.parse 가 잘못된 입력에 ZodError throw. npm run build 회귀 0건.",
-      "analysisResult": "Task 010 — Phase 3 의 마지막 단계. dev 프로젝트의 7테이블(profiles + categories + posts + comments + reactions + reports + bookmarks) + 트리거 함수 4종이 적용된 상태에서, types/database.ts 를 mcp__supabase__generate_typescript_types 로 자동 갱신하고, 게시판 도메인 enum/zod (types/community.ts) 와 카테고리 메타 (lib/community/categories.ts) 를 신규 작성한다. 마지막으로 9개 카테고리 시드 마이그레이션(20260504000010_seed_categories.sql) 을 dev 에 적용. 표시명은 일본어(雑談/恋愛/学業·授業/就活/日常/質問/三田/日吉/SFC), sort_order 는 topic 10~60 + campus 110~130. 패턴은 types/auth.ts 의 *_VALUES + Type + *Schema + FormSchema 를 100% 재사용. 검증은 SELECT 9건 정합 + npm run build TS strict 회귀 0건. ROADMAP.md Task 010 ✅ + nested bullet 4~5줄.",
-      "summary": "types/community.ts 신규 작성 완료. types/auth.ts 의 *_VALUES + Type + *Schema 컨벤션 100% 준수. 6 enum 그룹(CategorySlug/Type, ReactionTargetType/Kind, ReportReason/Status) + 3 FormSchema(PostFormSchema title 1~100자/body 10~5000자, CommentFormSchema body 1~1000자, ReportFormSchema description ≤500자 nullable optional) + 각 FormData 타입 export. 검증 메시지는 일본어(タイトルを入力してください 등). DB CHECK 제약과 1:1 정합. tsc --noEmit 회귀 0건.",
-      "completedAt": "2026-05-04T06:42:52.163Z"
-    },
-    {
-      "id": "035a498d-f28b-4dcc-a931-914de719b584",
-      "name": "Task 010-3: lib/community/categories.ts 신규 — 9건 메타 + 헬퍼",
-      "description": "카테고리 9건의 런타임 메타데이터 + 슬러그 lookup 헬퍼. 표시명은 일본어. F015 갤러리 아이콘 행에서 즉시 사용 가능한 emoji 포함.\n\nCATEGORIES 배열 (readonly as const):\n- topic 6개 (sort_order 10·20·30·40·50·60): free=雑談🌸 / love=恋愛❤️ / study=学業·授業📚 / job=就活💼 / daily=日常🍱 / question=質問❓\n- campus 3개 (sort_order 110·120·130): mita=三田🏛️ / hiyoshi=日吉🌳 / sfc=SFC🌊\n\n헬퍼:\n- getCategoryBySlug(slug: string): CategoryMeta | undefined — .find() 기반\n- getCategoryEmoji(slug: CategorySlug): string — fallback '📌'",
-      "notes": "CATEGORIES 의 sort_order 와 010-4 시드 INSERT 의 sort_order 가 1:1 일치해야 함. 변경 시 양쪽 동시 수정 — 본 단계에서 단일 출처화는 over-engineering 이라 제외, Task 024 운영 SOP 에 메모.",
-      "status": "completed",
-      "dependencies": [
-        {
-          "taskId": "a4f35cac-bbd5-4ae2-acc6-fdae150e7885"
-        }
-      ],
-      "createdAt": "2026-05-04T06:38:17.718Z",
-      "updatedAt": "2026-05-04T06:43:35.442Z",
-      "relatedFiles": [
-        {
-          "path": "lib/community/categories.ts",
-          "type": "CREATE",
-          "description": "9건 카테고리 메타 + 헬퍼"
-        },
-        {
-          "path": "types/community.ts",
-          "type": "DEPENDENCY",
-          "description": "CategorySlug / CategoryType 타입 import"
-        },
-        {
-          "path": "docs/PRD.md",
-          "type": "REFERENCE",
-          "description": "카테고리 9건 슬러그·표시명 출처",
-          "lineStart": 179,
-          "lineEnd": 201
-        }
-      ],
-      "implementationGuide": "1) lib/community/categories.ts Write (디렉토리 자동 생성)\n2) import { CategorySlug, CategoryType } from '@/types/community'\n3) interface CategoryMeta { slug; name; type; sort_order; is_active; emoji }\n4) export const CATEGORIES: readonly CategoryMeta[] = [9건] as const\n5) getCategoryBySlug / getCategoryEmoji 헬퍼\n6) JSDoc 한국어 주석 (운영 인텐트: 향후 야가미/시나노마치/시바공립은 sort_order 140~160 슬롯 사용 예정)",
-      "verificationCriteria": "CATEGORIES.length === 9, 각 row 의 slug 가 CategorySlug 타입과 정합, getCategoryBySlug('mita').name === '三田', getCategoryEmoji('free') === '🌸', npm run build 회귀 0건.",
-      "analysisResult": "Task 010 — Phase 3 의 마지막 단계. dev 프로젝트의 7테이블(profiles + categories + posts + comments + reactions + reports + bookmarks) + 트리거 함수 4종이 적용된 상태에서, types/database.ts 를 mcp__supabase__generate_typescript_types 로 자동 갱신하고, 게시판 도메인 enum/zod (types/community.ts) 와 카테고리 메타 (lib/community/categories.ts) 를 신규 작성한다. 마지막으로 9개 카테고리 시드 마이그레이션(20260504000010_seed_categories.sql) 을 dev 에 적용. 표시명은 일본어(雑談/恋愛/学業·授業/就活/日常/質問/三田/日吉/SFC), sort_order 는 topic 10~60 + campus 110~130. 패턴은 types/auth.ts 의 *_VALUES + Type + *Schema + FormSchema 를 100% 재사용. 검증은 SELECT 9건 정합 + npm run build TS strict 회귀 0건. ROADMAP.md Task 010 ✅ + nested bullet 4~5줄.",
-      "summary": "lib/community/categories.ts 신규 작성 완료. CategoryMeta 인터페이스 + CATEGORIES readonly 배열 9건 (topic 6: free=雑談🌸/love=恋愛❤️/study=学業·授業📚/job=就活💼/daily=日常🍱/question=質問❓ + campus 3: mita=三田🏛️/hiyoshi=日吉🌳/sfc=SFC🌊) + getCategoryBySlug / getCategoryEmoji 헬퍼 export. sort_order 100단위 슬롯(topic 10~60, campus 110~130)으로 향후 야가미·시나노마치·시바공립 자동 확장 가능. CategorySlug/CategoryType 타입 import 로 enum 정합성 컴파일 타임 보장. tsc --noEmit 회귀 0건.",
-      "completedAt": "2026-05-04T06:43:35.441Z"
-    },
-    {
-      "id": "b479b1f0-0c37-48be-a861-ea5ffe77058e",
-      "name": "Task 010-4: 카테고리 시드 마이그레이션 (20260504000010_seed_categories.sql)",
-      "description": "9개 카테고리 INSERT 마이그레이션. 표시명·sort_order·type 은 010-3 의 CATEGORIES 와 정확히 1:1 일치. ON CONFLICT (slug) DO NOTHING 으로 idempotent. apply_migration 은 service_role 권한이라 RLS insert_admin 정책 우회 통과.",
-      "notes": "파일 인코딩 UTF-8. 일본어 single quote escape 불필요 (단일 인용부호 미포함).",
-      "status": "completed",
-      "dependencies": [
-        {
-          "taskId": "035a498d-f28b-4dcc-a931-914de719b584"
-        }
-      ],
-      "createdAt": "2026-05-04T06:38:17.718Z",
-      "updatedAt": "2026-05-04T06:44:26.959Z",
-      "relatedFiles": [
-        {
-          "path": "supabase/migrations/20260504000010_seed_categories.sql",
-          "type": "CREATE",
-          "description": "9건 카테고리 시드"
-        },
-        {
-          "path": "supabase/migrations/20260504000002_create_categories.sql",
-          "type": "DEPENDENCY",
-          "description": "categories 테이블 스키마"
-        },
-        {
-          "path": "lib/community/categories.ts",
-          "type": "REFERENCE",
-          "description": "CATEGORIES 배열과 sort_order/표시명 1:1 일치 검증"
-        }
-      ],
-      "implementationGuide": "1) Write 로 supabase/migrations/20260504000010_seed_categories.sql 신규:\n   INSERT INTO public.categories (slug, name, type, sort_order, is_active) VALUES\n     ('free',     '雑談',         'topic',  10,  true),\n     ('love',     '恋愛',         'topic',  20,  true),\n     ('study',    '学業・授業',   'topic',  30,  true),\n     ('job',      '就活',         'topic',  40,  true),\n     ('daily',    '日常',         'topic',  50,  true),\n     ('question', '質問',         'topic',  60,  true),\n     ('mita',     '三田',         'campus', 110, true),\n     ('hiyoshi',  '日吉',         'campus', 120, true),\n     ('sfc',      'SFC',          'campus', 130, true)\n   ON CONFLICT (slug) DO NOTHING;\n2) 헤더 주석: 운영 인텐트 (향후 야가미/시나노마치/시바공립 sort_order 140~160 슬롯)\n3) mcp__supabase__apply_migration name=seed_categories\n4) mcp__supabase__execute_sql: SELECT count(*) FROM categories — 9 확인",
-      "verificationCriteria": "apply_migration success, SELECT count(*) FROM categories = 9, SELECT slug FROM categories ORDER BY sort_order 결과가 free→love→study→job→daily→question→mita→hiyoshi→sfc 순서로 일치.",
-      "analysisResult": "Task 010 — Phase 3 의 마지막 단계. dev 프로젝트의 7테이블(profiles + categories + posts + comments + reactions + reports + bookmarks) + 트리거 함수 4종이 적용된 상태에서, types/database.ts 를 mcp__supabase__generate_typescript_types 로 자동 갱신하고, 게시판 도메인 enum/zod (types/community.ts) 와 카테고리 메타 (lib/community/categories.ts) 를 신규 작성한다. 마지막으로 9개 카테고리 시드 마이그레이션(20260504000010_seed_categories.sql) 을 dev 에 적용. 표시명은 일본어(雑談/恋愛/学業·授業/就活/日常/質問/三田/日吉/SFC), sort_order 는 topic 10~60 + campus 110~130. 패턴은 types/auth.ts 의 *_VALUES + Type + *Schema + FormSchema 를 100% 재사용. 검증은 SELECT 9건 정합 + npm run build TS strict 회귀 0건. ROADMAP.md Task 010 ✅ + nested bullet 4~5줄.",
-      "summary": "카테고리 시드 마이그레이션(010) 완료. 20260504000010_seed_categories.sql 작성 후 apply_migration success. SELECT 결과 9건 정확 정합 — free/love/study/job/daily/question(topic, sort_order 10·20·30·40·50·60) + mita/hiyoshi/sfc(campus, 110·120·130). 표시명 일본어(雑談/恋愛/学業・授業/就活/日常/質問/三田/日吉/SFC) 모두 lib/community/categories.ts 의 CATEGORIES 와 1:1 일치. ON CONFLICT (slug) DO NOTHING 으로 idempotent — 재실행 안전.",
-      "completedAt": "2026-05-04T06:44:26.959Z"
-    },
-    {
-      "id": "3b14e61b-9eda-422d-81c5-665c32818e70",
-      "name": "Task 010-5: 통합 검증 + npm run build + ROADMAP ✅",
-      "description": "전 단계 산출물 통합 검증 + ROADMAP.md Task 010 항목 ✅ 표기 + nested bullet 4~5줄 추가.\n\n검증:\nV1) execute_sql: SELECT slug, name, type, sort_order FROM categories ORDER BY sort_order — 9 row 정합\nV2) types 컴파일 정합: import 가능 여부 (Tables<'reactions'> / CategorySlug / PostFormSchema)\nV3) npm run build — TS strict 회귀 0건\nV4) (선택) npm run lint — 사전 1건 외 신규 0건",
-      "notes": "npm run build 가 실패하면 회귀 분석 후 generate_typescript_types 결과 누락 view·함수 보강 또는 community.ts import 경로 재검토.",
-      "status": "completed",
-      "dependencies": [
-        {
-          "taskId": "b479b1f0-0c37-48be-a861-ea5ffe77058e"
-        }
-      ],
-      "createdAt": "2026-05-04T06:38:17.718Z",
-      "updatedAt": "2026-05-04T06:45:29.313Z",
-      "relatedFiles": [
-        {
-          "path": "docs/ROADMAP.md",
           "type": "TO_MODIFY",
-          "description": "Task 010 ✅ + nested bullet 추가",
-          "lineStart": 165,
-          "lineEnd": 170
+          "description": "SetupFormSchema 에 agreedToTerms 필드 추가"
         },
         {
-          "path": "types/database.ts",
-          "type": "DEPENDENCY",
-          "description": "V2 컴파일 검증 대상"
-        },
-        {
-          "path": "types/community.ts",
-          "type": "DEPENDENCY",
-          "description": "V2 컴파일 검증 대상"
-        },
-        {
-          "path": "lib/community/categories.ts",
-          "type": "DEPENDENCY",
-          "description": "V2 컴파일 검증 대상"
-        }
-      ],
-      "implementationGuide": "1) mcp__supabase__execute_sql 로 V1 실행 → 결과 9 row 확인\n2) Bash npm run build 실행 → 회귀 0건 확인 (timeout 5분)\n3) Edit 로 docs/ROADMAP.md Task 010 항목을 ✅ 표기 + nested bullet 4~5줄:\n   - types/database.ts 7테이블 자동 재생성 + 단축 alias 7종\n   - types/community.ts 9 enum/스키마 + 3 FormSchema\n   - lib/community/categories.ts 9건 메타 + 헬퍼\n   - 시드 9건 (topic 6 + campus 3) sort_order 정합\n   - npm run build 회귀 0건 / Phase 3 종료",
-      "verificationCriteria": "SELECT 결과 9 row + 정확한 순서, npm run build 회귀 0건, ROADMAP.md Task 010 항목이 ✅ 로 표기되고 nested bullet 4~5줄이 추가되어 Phase 3 완료 상태 명시.",
-      "analysisResult": "Task 010 — Phase 3 의 마지막 단계. dev 프로젝트의 7테이블(profiles + categories + posts + comments + reactions + reports + bookmarks) + 트리거 함수 4종이 적용된 상태에서, types/database.ts 를 mcp__supabase__generate_typescript_types 로 자동 갱신하고, 게시판 도메인 enum/zod (types/community.ts) 와 카테고리 메타 (lib/community/categories.ts) 를 신규 작성한다. 마지막으로 9개 카테고리 시드 마이그레이션(20260504000010_seed_categories.sql) 을 dev 에 적용. 표시명은 일본어(雑談/恋愛/学業·授業/就活/日常/質問/三田/日吉/SFC), sort_order 는 topic 10~60 + campus 110~130. 패턴은 types/auth.ts 의 *_VALUES + Type + *Schema + FormSchema 를 100% 재사용. 검증은 SELECT 9건 정합 + npm run build TS strict 회귀 0건. ROADMAP.md Task 010 ✅ + nested bullet 4~5줄.",
-      "summary": "Task 010-5 통합 검증 완료 — V1(SELECT 9 row 정확 순서) + V2(tsc --noEmit 회귀 0건) + V3(npm run build 성공, 12 페이지 생성, TS 1514ms) 모두 PASS. ROADMAP.md Task 010 ✅ 표기 + nested bullet 6줄 추가 (database.ts 자동 재생성·alias 7종 / community.ts 6 enum + 3 FormSchema / categories.ts 9건 메타 / seed 9건 idempotent / 검증 결과 / Phase 3 종료). Phase 3(데이터 모델) 완전 종료, Task 011(데이터 액세스 레이어) 진입 준비.",
-      "completedAt": "2026-05-04T06:45:29.312Z"
-    },
-    {
-      "id": "852cfc24-7859-43a7-bc48-1bd249eaf6c3",
-      "name": "Task 011-1: lib/community 데이터 액세스 5모듈 + cursor 헬퍼",
-      "description": "Server Component / Route Handler 가 공유할 데이터 액세스 함수 5종. 모두 supabase 클라이언트를 첫 인자로 받는 DI 패턴. 익명 게시글 author 마스킹(server-side), is_deleted=false 이중 보장, RLS 컨텍스트 안에서 동작. cursor 인코딩 헬퍼는 posts.ts 내부에 둠.\n\n파일:\n- lib/community/posts.ts — fetchPosts(supabase, opts) + encodeCursor/decodeCursor 내부 함수\n- lib/community/post-detail.ts — fetchPostWithComments(supabase, postId) + buildCommentTree 내부\n- lib/community/hot-feed.ts — fetchHotPosts(supabase) — 24h reaction_up TOP 3\n- lib/community/reactions.ts — toggleReaction(supabase, opts)\n- lib/community/bookmarks.ts — toggleBookmark(supabase, postId)",
-      "notes": "profiles JOIN 의 author 가 RLS 로 비어오면 본 Task 끝에 profiles 의 SELECT 정책을 'authenticated 모두 허용 + nickname 만 노출' 형태로 보강 마이그레이션 추가. 일단 함수는 그대로 두고 검증 단계에서 발견.",
-      "status": "completed",
-      "dependencies": [],
-      "createdAt": "2026-05-04T06:51:01.689Z",
-      "updatedAt": "2026-05-04T06:57:22.693Z",
-      "relatedFiles": [
-        {
-          "path": "lib/community/posts.ts",
-          "type": "CREATE",
-          "description": "fetchPosts + cursor"
-        },
-        {
-          "path": "lib/community/post-detail.ts",
-          "type": "CREATE",
-          "description": "fetchPostWithComments + 트리 빌드"
-        },
-        {
-          "path": "lib/community/hot-feed.ts",
-          "type": "CREATE",
-          "description": "fetchHotPosts 24h TOP3"
-        },
-        {
-          "path": "lib/community/reactions.ts",
-          "type": "CREATE",
-          "description": "toggleReaction"
-        },
-        {
-          "path": "lib/community/bookmarks.ts",
-          "type": "CREATE",
-          "description": "toggleBookmark"
-        },
-        {
-          "path": "types/database.ts",
-          "type": "DEPENDENCY",
-          "description": "Post/Category/Comment alias"
-        },
-        {
-          "path": "types/community.ts",
-          "type": "DEPENDENCY",
-          "description": "CategorySlug/ReactionKind 등"
-        },
-        {
-          "path": "lib/supabase/server.ts",
-          "type": "REFERENCE",
-          "description": "createClient 시그니처",
-          "lineStart": 1,
-          "lineEnd": 26
-        }
-      ],
-      "implementationGuide": "1) lib/community/posts.ts:\n   - export type FetchPostsOpts / PostListItem / FetchPostsResult\n   - encodeCursor(state) = base64url(JSON), decodeCursor(s) = parse 또는 null\n   - .from('posts').select('*, category:categories(slug,name,type), author:profiles(nickname)').eq('is_deleted', false).limit(limit+1)\n   - categorySlug → categories.id 변환 후 .eq\n   - search → .or('title.ilike.%q%,body.ilike.%q%')\n   - sort latest: .order('created_at', desc).order('id', desc) + cursor lt\n   - sort popular: .order('reaction_up', desc).order('created_at', desc).order('id', desc) + cursor lt(reaction_up)\n   - is_anonymous=true → author=null 매핑 (server-side)\n2) lib/community/post-detail.ts:\n   - posts SELECT (categories+profiles JOIN) maybeSingle\n   - comments SELECT (profiles JOIN) order created_at\n   - buildCommentTree(comments): top + replies map\n   - getUser → my_reaction maybeSingle + my_bookmark maybeSingle\n   - is_anonymous 처리: maskAuthor(post|comment)\n   - 반환: PostDetailResult | null\n3) lib/community/hot-feed.ts:\n   - 24h ISO + .gt + order reaction_up DESC, created_at DESC + limit 3 + author 마스킹\n4) lib/community/reactions.ts:\n   - toggleReaction(supabase, { targetType, targetId, kind }):\n     auth.getUser → SELECT existing → INSERT/DELETE/UPDATE 분기\n     반환 { before, after }\n5) lib/community/bookmarks.ts:\n   - toggleBookmark(supabase, postId):\n     auth.getUser → SELECT existing → INSERT/DELETE\n     반환 { bookmarked }\n6) 모든 함수의 반환 타입 explicit. PostgrestError 는 throw 그대로 (라우트에서 변환)\n7) tsc --noEmit 통과 확인",
-      "verificationCriteria": "5개 모듈 모두 export 정합, 반환 타입 explicit, tsc --noEmit 회귀 0건. 모듈 import 가능 여부는 후속 011-2 라우트가 검증.",
-      "analysisResult": "Task 011 — 백엔드 골격. lib/community 5모듈(posts/post-detail/hot-feed/reactions/bookmarks) + api-helpers(withAuth + PostgrestError→HTTP 매핑) + app/api 6라우트(posts·posts/[id]·comments·reactions·bookmarks·reports). 모든 lib 함수는 supabase 클라이언트 DI(첫 인자), 라우트는 await createClient() + getUser() 인증 게이트 + zod safeParse 검증. types/community.ts 의 PostFormSchema/CommentFormSchema/ReportFormSchema 100% 재사용, types/database.ts 의 단축 alias 직접 사용. 일본어 사용자 메시지, 영어 시스템 코드. 응답 envelope `{ ok, data | error }`. Next.js 16 의 params Promise 시그니처 적용. 검증은 execute_sql 로 토글 시퀀스(reactions/bookmarks) + 시드 기반 fetchPosts/post-detail/hot-feed schema 정합 + npm run build/lint 회귀 0건. 4 서브태스크로 분할.",
-      "summary": "lib/community 5모듈 신규 작성 완료. posts.ts(fetchPosts + encode/decodeCursor base64url + latest/popular keyset + categorySlug→id 변환 + ILIKE 검색 + author 마스킹), post-detail.ts(fetchPostWithComments + buildCommentTree 1단계 + my reaction/bookmark + 익명 마스킹), hot-feed.ts(24h reaction_up TOP 3), reactions.ts(toggleReaction SELECT-then-INSERT/DELETE/UPDATE 분기, 트리거가 카운터 자동 갱신), bookmarks.ts(toggleBookmark 토글-only). 모두 supabase 클라이언트 DI 첫 인자, 반환 타입 explicit, tsc --noEmit 회귀 0건.",
-      "completedAt": "2026-05-04T06:57:22.692Z"
-    },
-    {
-      "id": "875fd220-87f5-4414-ab4d-72b67be824b0",
-      "name": "Task 011-2: api-helpers + app/api 6라우트 신규",
-      "description": "공통 라우트 헬퍼 + 6개 REST 라우트 신규. withAuth 가 createClient + getUser + try/catch + PostgrestError→HTTP 변환 통합. 모든 라우트는 zod safeParse 후 422 또는 핵심 로직 위임. 응답 envelope `{ ok, data | error }`.\n\n파일:\n- lib/community/api-helpers.ts — withAuth() / pgErrorToResponse()\n- app/api/posts/route.ts — GET 목록 + POST 작성\n- app/api/posts/[id]/route.ts — GET 상세 + DELETE 본인\n- app/api/comments/route.ts — POST\n- app/api/reactions/route.ts — POST 토글\n- app/api/bookmarks/route.ts — POST 토글\n- app/api/reports/route.ts — POST",
-      "notes": "app/api 디렉토리는 현재 비어있음 — 본 Task 에서 신규 생성. 기존 코드 충돌 없음.",
-      "status": "completed",
-      "dependencies": [
-        {
-          "taskId": "852cfc24-7859-43a7-bc48-1bd249eaf6c3"
-        }
-      ],
-      "createdAt": "2026-05-04T06:51:01.689Z",
-      "updatedAt": "2026-05-04T06:58:29.636Z",
-      "relatedFiles": [
-        {
-          "path": "lib/community/api-helpers.ts",
-          "type": "CREATE",
-          "description": "withAuth + 에러 매핑"
-        },
-        {
-          "path": "app/api/posts/route.ts",
-          "type": "CREATE",
-          "description": "GET 목록 + POST 작성"
-        },
-        {
-          "path": "app/api/posts/[id]/route.ts",
-          "type": "CREATE",
-          "description": "GET 상세 + DELETE 본인"
-        },
-        {
-          "path": "app/api/comments/route.ts",
-          "type": "CREATE",
-          "description": "POST 댓글"
-        },
-        {
-          "path": "app/api/reactions/route.ts",
-          "type": "CREATE",
-          "description": "POST 토글"
-        },
-        {
-          "path": "app/api/bookmarks/route.ts",
-          "type": "CREATE",
-          "description": "POST 토글"
-        },
-        {
-          "path": "app/api/reports/route.ts",
-          "type": "CREATE",
-          "description": "POST 신고"
-        }
-      ],
-      "implementationGuide": "1) lib/community/api-helpers.ts:\n   - withAuth(handler: (sb, user) => Promise<unknown>): Promise<NextResponse>\n     · createClient → getUser → null 시 401\n     · try { return ok(data) } catch (e) { return pgErrorToResponse(e) }\n   - pgErrorToResponse: 23505→409, 23514→422, 23503→400, 기타→500\n   - ok/err helper: NextResponse.json({ ok, ... }, { status })\n\n2) app/api/posts/route.ts:\n   GET: searchParams 파싱 (categorySlug/sort/cursor/limit/q) → fetchPosts → ok\n   POST: body=PostFormSchema.safeParse → 422 또는 → categorySlug→category_id 변환 → posts INSERT (user_id=user.id) → ok(insertedRow)\n\n3) app/api/posts/[id]/route.ts (params: Promise<{id:string}>):\n   GET: const {id} = await params → fetchPostWithComments → null 시 404, 아니면 ok\n   DELETE: posts UPDATE is_deleted=true WHERE id=$1 (RLS 가 본인/admin 만 통과). 영향 0건이면 403/404\n\n4) app/api/comments/route.ts:\n   POST: CommentFormSchema.safeParse → 422 또는 INSERT (user_id=user.id) → ok(row)\n\n5) app/api/reactions/route.ts:\n   POST: zod.object({ targetType: ReactionTargetTypeSchema, targetId: uuid, kind: ReactionKindSchema }).safeParse → toggleReaction 위임 → ok({ before, after })\n\n6) app/api/bookmarks/route.ts:\n   POST: zod.object({ postId: uuid }).safeParse → toggleBookmark → ok({ bookmarked })\n\n7) app/api/reports/route.ts:\n   POST: ReportFormSchema.safeParse → reports INSERT (reporter_id=user.id) → ok(row). 23505 는 '동일 신고가 이미 존재합니다' 메시지 + 409\n\n8) 모든 라우트의 시그니처를 Next.js 16 표준 (Request + (params Promise))",
-      "verificationCriteria": "7개 파일 신규. tsc --noEmit + npm run build 회귀 0건. zod 스키마 import 정합. params Promise 시그니처 적용.",
-      "analysisResult": "Task 011 — 백엔드 골격. lib/community 5모듈(posts/post-detail/hot-feed/reactions/bookmarks) + api-helpers(withAuth + PostgrestError→HTTP 매핑) + app/api 6라우트(posts·posts/[id]·comments·reactions·bookmarks·reports). 모든 lib 함수는 supabase 클라이언트 DI(첫 인자), 라우트는 await createClient() + getUser() 인증 게이트 + zod safeParse 검증. types/community.ts 의 PostFormSchema/CommentFormSchema/ReportFormSchema 100% 재사용, types/database.ts 의 단축 alias 직접 사용. 일본어 사용자 메시지, 영어 시스템 코드. 응답 envelope `{ ok, data | error }`. Next.js 16 의 params Promise 시그니처 적용. 검증은 execute_sql 로 토글 시퀀스(reactions/bookmarks) + 시드 기반 fetchPosts/post-detail/hot-feed schema 정합 + npm run build/lint 회귀 0건. 4 서브태스크로 분할.",
-      "summary": "api-helpers + 6 라우트 신규 작성 완료. lib/community/api-helpers.ts (withAuth + ok/err + pgErrorToResponse 23505→409/23514→422/23503→400/기타→500). 6 라우트: app/api/posts/route.ts(GET 목록 + POST PostFormSchema), posts/[id]/route.ts(GET 상세 + DELETE soft, params Promise), comments/route.ts(POST CommentFormSchema), reactions/route.ts(POST 토글 + zod uuid), bookmarks/route.ts(POST 토글), reports/route.ts(POST ReportFormSchema). 응답 envelope { ok, data | error } 일관, 일본어 사용자 메시지/영어 시스템 코드, Next.js 16 params Promise 시그니처 적용. tsc --noEmit 회귀 0건.",
-      "completedAt": "2026-05-04T06:58:29.635Z"
-    },
-    {
-      "id": "78e69908-9641-456d-b5f0-11410d001d76",
-      "name": "Task 011-3: execute_sql 동등 쿼리 검증 + 토글 시퀀스",
-      "description": "각 데이터 액세스 함수의 동등 SQL 을 supabase MCP execute_sql 로 직접 실행하여 응답 schema 와 트리거 카운터 정합 검증. 임시 시드 (categories 9건은 이미 있음 + 1 user 기존 + 1 post + 2 comments) 후 6 시나리오:\n\nW1) fetchPosts latest — 1 row 반환 (방금 생성한 post)\nW2) fetchPosts categorySlug='free' — 0 row\nW3) fetchPostWithComments — post + comments 2건 + 트리(top 1, reply 1) + myReaction null + myBookmark false\nW4) toggleReaction up→update(down)→delete 시퀀스 — posts.reaction_up/reaction_down 각 단계 정합\nW5) toggleBookmark insert→delete — bookmarks 0/1 row\nW6) reports INSERT (정상 입력) → status='pending'\n\nW7) 임시 row 모두 cleanup → 6테이블 0 row",
-      "notes": "본 Task 는 SQL 검증만 — 라우트 단위 fetch 테스트는 Task 020 통합 E2E 에서 처리. 본 Task 의 라우트는 npm run build 의 TS 컴파일로만 검증.",
-      "status": "completed",
-      "dependencies": [
-        {
-          "taskId": "875fd220-87f5-4414-ab4d-72b67be824b0"
-        }
-      ],
-      "createdAt": "2026-05-04T06:51:01.689Z",
-      "updatedAt": "2026-05-04T06:59:50.529Z",
-      "relatedFiles": [
-        {
-          "path": "lib/community/posts.ts",
-          "type": "DEPENDENCY",
-          "description": "검증 대상"
-        },
-        {
-          "path": "lib/community/post-detail.ts",
-          "type": "DEPENDENCY",
-          "description": "검증 대상"
-        },
-        {
-          "path": "lib/community/reactions.ts",
-          "type": "DEPENDENCY",
-          "description": "트리거 시퀀스 검증"
-        },
-        {
-          "path": "lib/community/bookmarks.ts",
-          "type": "DEPENDENCY",
-          "description": "토글 검증"
-        }
-      ],
-      "implementationGuide": "1) 임시 시드:\n   기존 profile 1건 활용\n   posts INSERT category_id=(SELECT id FROM categories WHERE slug='free') user_id=existing\n   comments INSERT 2건 (top + reply parent_id=top)\n2) W1: SELECT * FROM posts WHERE is_deleted=false ORDER BY created_at DESC LIMIT 1 — id 매칭\n3) W2: SELECT count(*) WHERE category_id=(...free) — 1 (방금 시드)\n4) W3: posts/comments/reactions/bookmarks 4쿼리 — comments 트리 매핑은 SQL 단에선 row 만 확인, 트리 빌드는 lib 함수가 처리\n5) W4: INSERT reactions(up) → SELECT reaction_up=1, INSERT 두 번째는 23505 회피 위해 UPDATE reaction='down' → reaction_up=0, reaction_down=1, DELETE → 0,0\n6) W5: bookmarks INSERT → count=1, DELETE → 0\n7) W6: reports INSERT (reason='spam') → status='pending'\n8) cleanup: DELETE comments/posts/reactions/bookmarks/reports 임시 row → 6테이블 count 0\n9) get_advisors security 본 Task 신규 경고 0건 확인",
-      "verificationCriteria": "W1~W7 모두 PASS, get_advisors security 본 Task 신규 경고 0건, 검증용 임시 row 6테이블 모두 0 row 로 정리됨.",
-      "analysisResult": "Task 011 — 백엔드 골격. lib/community 5모듈(posts/post-detail/hot-feed/reactions/bookmarks) + api-helpers(withAuth + PostgrestError→HTTP 매핑) + app/api 6라우트(posts·posts/[id]·comments·reactions·bookmarks·reports). 모든 lib 함수는 supabase 클라이언트 DI(첫 인자), 라우트는 await createClient() + getUser() 인증 게이트 + zod safeParse 검증. types/community.ts 의 PostFormSchema/CommentFormSchema/ReportFormSchema 100% 재사용, types/database.ts 의 단축 alias 직접 사용. 일본어 사용자 메시지, 영어 시스템 코드. 응답 envelope `{ ok, data | error }`. Next.js 16 의 params Promise 시그니처 적용. 검증은 execute_sql 로 토글 시퀀스(reactions/bookmarks) + 시드 기반 fetchPosts/post-detail/hot-feed schema 정합 + npm run build/lint 회귀 0건. 4 서브태스크로 분할.",
-      "summary": "Task 011-3 검증 완료 — W1~W7 모두 PASS. W1(latest 1 row) / W2(categorySlug=free 필터 1 row) / W3(post + comments 트리(top+reply) + myReaction 0 + myBookmark 0) / W4(reactions INSERT(up)→{1,0} → UPDATE(down)→{0,1} → DELETE→{0,0}, 트리거 정합) / W5(bookmarks INSERT→1 / DELETE→0) / W6(reports INSERT status='pending') / W7(임시 row 5테이블 모두 0). advisor security 본 Task 신규 경고 0건 — 기존 사전 이슈(user_list/set_updated_at/pg_trgm/handle_new_user/leaked_password)만 잔존. 데이터 액세스 함수 시그니처와 트리거 카운터 동작 모두 검증.",
-      "completedAt": "2026-05-04T06:59:50.528Z"
-    },
-    {
-      "id": "be70ee37-02f4-4b4f-ae2e-e96d14b1008f",
-      "name": "Task 011-4: npm run build/lint 회귀 + ROADMAP ✅",
-      "description": "통합 회귀 + ROADMAP.md Task 011 항목 ✅ 표기. 본 Task 는 백엔드만 다루므로 lint/build 가 핵심. UI 는 Task 012~ 에서 dev 서버로 검증.\n\n검증:\n- npm run build TS strict 회귀 0건 (12 페이지 + 6 신규 API 라우트 컴파일 통과)\n- npm run lint 신규 경고 0건 (사전 1건 setState-in-effect 는 무관)\n- ROADMAP.md Task 011 항목 ✅ + nested bullet 5~7줄",
-      "notes": "build 가 실패하면 회귀 분석 후 즉시 수정. 가장 흔한 사고: params Promise 미적용 / zod import 경로 / FK select 별칭 타입 누락.",
-      "status": "completed",
-      "dependencies": [
-        {
-          "taskId": "78e69908-9641-456d-b5f0-11410d001d76"
-        }
-      ],
-      "createdAt": "2026-05-04T06:51:01.689Z",
-      "updatedAt": "2026-05-04T07:00:44.400Z",
-      "relatedFiles": [
-        {
-          "path": "docs/ROADMAP.md",
+          "path": "app/(public)/signup/setup/page.tsx",
           "type": "TO_MODIFY",
-          "description": "Task 011 ✅ 표기 + nested bullet",
-          "lineStart": 172,
-          "lineEnd": 180
-        }
-      ],
-      "implementationGuide": "1) Bash: npm run build (timeout 5분) — 출력 tail 검토\n2) Bash: npm run lint — 사전 1건 외 신규 0건 확인\n3) Edit docs/ROADMAP.md Task 011 ✅ + nested bullet:\n   - lib/community 5모듈 (posts/post-detail/hot-feed/reactions/bookmarks) + cursor 헬퍼\n   - api-helpers (withAuth + PG→HTTP) + app/api 6라우트\n   - DI 패턴 + zod safeParse + envelope { ok, data|error }\n   - execute_sql 검증 W1~W7 PASS\n   - npm run build/lint 회귀 0건\n   - Phase 4 (UI) 진입 준비",
-      "verificationCriteria": "npm run build / lint 회귀 0건, ROADMAP.md Task 011 항목이 ✅ + nested bullet 5~7줄로 갱신되어 있음.",
-      "analysisResult": "Task 011 — 백엔드 골격. lib/community 5모듈(posts/post-detail/hot-feed/reactions/bookmarks) + api-helpers(withAuth + PostgrestError→HTTP 매핑) + app/api 6라우트(posts·posts/[id]·comments·reactions·bookmarks·reports). 모든 lib 함수는 supabase 클라이언트 DI(첫 인자), 라우트는 await createClient() + getUser() 인증 게이트 + zod safeParse 검증. types/community.ts 의 PostFormSchema/CommentFormSchema/ReportFormSchema 100% 재사용, types/database.ts 의 단축 alias 직접 사용. 일본어 사용자 메시지, 영어 시스템 코드. 응답 envelope `{ ok, data | error }`. Next.js 16 의 params Promise 시그니처 적용. 검증은 execute_sql 로 토글 시퀀스(reactions/bookmarks) + 시드 기반 fetchPosts/post-detail/hot-feed schema 정합 + npm run build/lint 회귀 0건. 4 서브태스크로 분할.",
-      "summary": "Task 011-4 통합 회귀 + ROADMAP ✅ 완료. npm run build 성공 — 12 페이지 + 6 신규 API 라우트(/api/bookmarks, comments, posts, posts/[id], reactions, reports) 모두 컴파일 통과 (TS 1702ms, 17 페이지 생성). npm run lint 본 Task 신규 0건 — 사전 1건(signup/page.tsx:56 setState-in-effect, Task 007 P1 항목)만 잔존. ROADMAP.md Task 011 항목 ✅ + nested bullet 8줄 추가, Phase 4(UI) 진입 준비 완료 명시.",
-      "completedAt": "2026-05-04T07:00:44.399Z"
-    },
-    {
-      "id": "3715a357-8663-42bf-aaf0-cc1138cecc47",
-      "name": "Task 011.5-1: 페이지형 와이어프레임 4건 (home/post-detail/explore/my)",
-      "description": "docs/wireframes/ 폴더 신규 + 페이지형 4 markdown 파일 작성. 모두 (app) 라우트 그룹의 BottomTabBar + 중앙 FAB 공통 푸터 포함. Unicode box drawing(┌─┐│└┘) + 박스 폭 ~50자, 일본어 카피, shadcn/lucide 매핑.\n\n파일:\n- docs/wireframes/home.md — 1층 핫피드(가로 스와이프) / 2층 갤러리 아이콘 9 / 3층 정렬 토글 sticky / 4층 카드 피드 무한 스크롤 / 5층 BottomTab+FAB. 데이터: fetchHotPosts + fetchPosts(latest)\n- docs/wireframes/post-detail.md — 헤더(뒤로/⋯) / 카테고리 배지 / 제목 / 작성자·시간 / 본문 / 액션 바(❤👎💬🔖) / 댓글 트리(top + 1단계 reply 인덴트) / 댓글 폼(fixed). 데이터: fetchPostWithComments + toggleReaction + toggleBookmark + POST /api/comments\n- docs/wireframes/explore.md — 검색창 sticky(자동 포커스 + 디바운스 300ms) / 카테고리 칩 / 빈 상태 = 인기 TOP10 / 검색 상태 = pg_trgm 결과 / BottomTab+FAB. 데이터: fetchPosts(sort=popular) + fetchPosts(search=q)\n- docs/wireframes/my.md — 프로필 헤더(닉네임·캠퍼스·학부 + 修正 링크) / 탭(投稿/コメント/ブックマーク) / 카드 리스트 / 로그아웃(하단). 데이터: my posts/comments/bookmarks SELECT",
-      "notes": "각 파일 80~150 lines 예상. 합산 600 lines 정도. 일본어 카피는 PRD/community.ts 출처 명시.",
-      "status": "completed",
-      "dependencies": [],
-      "createdAt": "2026-05-04T07:07:21.807Z",
-      "updatedAt": "2026-05-04T07:11:35.538Z",
-      "relatedFiles": [
-        {
-          "path": "docs/wireframes/home.md",
-          "type": "CREATE",
-          "description": "게시판 홈"
+          "description": "Checkbox 필드 + submit 시 timestamp 저장"
         },
-        {
-          "path": "docs/wireframes/post-detail.md",
-          "type": "CREATE",
-          "description": "게시글 상세"
-        },
-        {
-          "path": "docs/wireframes/explore.md",
-          "type": "CREATE",
-          "description": "탐색·인기"
-        },
-        {
-          "path": "docs/wireframes/my.md",
-          "type": "CREATE",
-          "description": "마이페이지"
-        },
-        {
-          "path": "docs/PRD.md",
-          "type": "REFERENCE",
-          "description": "디자인 원칙·메뉴 구조 출처",
-          "lineStart": 107,
-          "lineEnd": 170
-        },
-        {
-          "path": "types/community.ts",
-          "type": "REFERENCE",
-          "description": "일본어 zod 메시지 출처"
-        }
-      ],
-      "implementationGuide": "1) docs/wireframes/ 폴더 자동 생성 (Write 시)\n2) 각 파일 표준 구조:\n   # {페이지명}\n   > **라우트:** `/path` | **인증:** ... | **관련 기능:** F00X\n   > **데이터 의존:** lib/community/{함수} · /api/{라우트}\n   > **Phase 4 Task 매핑:** Task 0XX\n\n   ## レイアウト (Mobile 390px)\n   ```\n   ┌──...50자...──┐\n   │ HEADER       │\n   ├──────────────┤\n   ...\n   └──────────────┘\n   ```\n   ## 컴포넌트 매핑\n   | 영역 | shadcn / lucide | 비고 |\n\n   ## 상호작용 노트 (5건+)\n   1. ...\n\n   ## 데이터 흐름\n   - GET ...\n   - POST/DELETE ...\n   - 트리거 ...\n\n   ## 일본어 카피 출처\n   - types/community.ts:PostFormSchema 등\n3) home.md 박스 5층 (Hot 캐러셀 / 갤러리 / sticky 정렬 / 카드 / BottomTab+FAB)\n4) post-detail.md — 본문/액션/댓글/폼 4층\n5) explore.md — 검색/필터/결과 3층\n6) my.md — 프로필/탭/리스트/로그아웃 4층\n7) 4 파일 모두 BottomTabBar + WriteFab 박스를 푸터로 (공통 `(app)/layout.tsx`)",
-      "verificationCriteria": "4 markdown 파일 신규, 표준 구조 7섹션 모두 포함, ASCII 박스 폭 ~50자 일관, BottomTab+FAB 공통 푸터 포함, 데이터 흐름이 lib/community/* 함수·API 라우트와 정합.",
-      "analysisResult": "Task 011.5 — Phase 3.5 디자인 시안 OK 게이트. docs/wireframes/ 폴더 + 7 markdown 파일(Unicode box drawing, ASCII 박스 폭~50자, 일본어 카피, shadcn 컴포넌트·lucide 아이콘 매핑). 표준 구조: 메타헤더 → ASCII 다이어그램 → 컴포넌트 매핑 표 → 상호작용 노트 5+ → 데이터 흐름(lib/community 함수·API 라우트 명시) → Phase 4 Task 매핑. 일본어 카피 출처는 types/community.ts(zod 메시지) + PRD 일본어 변환. (app) 라우트 공통 BottomTabBar+FAB 푸터 박스를 W1·W2·W4·W5 모두 표시. write-sheet(W3)·report-sheet(W6) 는 Bottom Sheet 80vh 오버레이. (admin)/admin (W7) 는 탭 미노출. 본 Task 는 코드 변경 0건 — 사용자 OK 사인이 검증 게이트. 3 서브태스크: 페이지형 4건 + 시트·어드민 3건 + ROADMAP ✅.",
-      "summary": "Task 011.5-1 페이지형 와이어프레임 4건 작성 완료. docs/wireframes/ 폴더 신규 + home.md(5층: 핫피드 캐러셀/갤러리 9 아이콘/sticky 정렬/카드 피드/BottomTab+FAB) / post-detail.md(헤더/카테고리·제목/본문/액션바/댓글 트리 1단계 인덴트/하단 fixed 폼) / explore.md(sticky 검색창/카테고리 칩/빈 상태 인기 TOP10/검색 결과/빈 결과 안내) / my.md(프로필 헤더/3탭/탭별 카드 액션/로그아웃). 모두 Unicode box drawing + 박스 폭 ~50자 + 일본어 카피(雑談·恋愛·学業·就活·日常·質問·三田·日吉·SFC·投稿/コメント/ブックマーク) + shadcn/lucide 매핑 표 + 상호작용 노트 10건 + 데이터 흐름(lib/community 함수·API 라우트·트리거 명시) + 일본어 카피 출처. (app) 라우트 공통 BottomTabBar+FAB 푸터 4 파일 모두 포함.",
-      "completedAt": "2026-05-04T07:11:35.537Z"
-    },
-    {
-      "id": "01703a92-2c91-4f7d-9934-4fcd47e33aeb",
-      "name": "Task 011.5-2: 시트·어드민 와이어프레임 3건 (write-sheet/report-sheet/admin-reports)",
-      "description": "Bottom Sheet 2건 + 어드민 큐 1건. 시트는 80vh 슬라이드 업, 다른 페이지 위에 오버레이.\n\n파일:\n- docs/wireframes/write-sheet.md — 시트 헤더(X · 投稿する · 등록 버튼) / 카테고리 칩 가로 스크롤 / 제목 입력(0/100 카운터) / 본문 textarea(자동 확장 + 0/5000) / 익명 토글(default 익명) / 자동 임시저장 표시(localStorage draft:post). 데이터: POST /api/posts (PostFormSchema), 트리거: comments_apply_post_counter 미관여 / 진입: 모든 페이지 FAB\n- docs/wireframes/report-sheet.md — 시트 헤더(X · 通報 · 提出) / 사유 라디오 4건(暴言·名誉毀損·スパム·違法) / 보충 설명 textarea(0/500 옵션) / UNIQUE 중복 방지 안내. 데이터: POST /api/reports (ReportFormSchema), 23505→409 안내 / 진입: 게시글·댓글 점3개 → 通報\n- docs/wireframes/admin-reports.md — 어드민 게이트 안내(role=admin 전용) / 미처리 신고 목록(신고대상 / 유형 / 시간 / 신고자수 / 인라인 미리보기) / 처리 버튼(削除 / 棄却) / 처리 완료 이력 탭. 데이터: reports SELECT(status=pending) + UPDATE status, 삭제는 posts/comments soft delete + reports.status=processed",
-      "notes": "Bottom Sheet 박스는 페이지 박스 위에 겹친 형태로 표현 — 별도 박스로 \"진입 직전 페이지 (어두워짐)\" + \"Sheet (80vh)\" 두 박스 그리기.",
-      "status": "completed",
-      "dependencies": [
-        {
-          "taskId": "3715a357-8663-42bf-aaf0-cc1138cecc47"
-        }
-      ],
-      "createdAt": "2026-05-04T07:07:21.807Z",
-      "updatedAt": "2026-05-04T07:13:44.044Z",
-      "relatedFiles": [
-        {
-          "path": "docs/wireframes/write-sheet.md",
-          "type": "CREATE",
-          "description": "글쓰기 Bottom Sheet"
-        },
-        {
-          "path": "docs/wireframes/report-sheet.md",
-          "type": "CREATE",
-          "description": "신고 Bottom Sheet"
-        },
-        {
-          "path": "docs/wireframes/admin-reports.md",
-          "type": "CREATE",
-          "description": "어드민 신고 큐"
-        },
-        {
-          "path": "types/community.ts",
-          "type": "REFERENCE",
-          "description": "PostFormSchema/ReportFormSchema 카피 출처"
-        }
-      ],
-      "implementationGuide": "1) 011.5-1 과 동일 표준 구조\n2) write-sheet.md — Sheet 80vh 박스 가시화, 키보드 올라올 때 textarea 자동 스크롤 노트 (PRD F017)\n3) report-sheet.md — 라디오 4건 박스, UNIQUE 중복 시 '既に通報済みです' 메시지\n4) admin-reports.md — 어드민 게이트 박스 + 큐 카드 + 처리 버튼 2개. 본 페이지는 BottomTab 미노출 ((admin) 라우트)",
-      "verificationCriteria": "3 markdown 파일 신규, write-sheet/report-sheet 가 Bottom Sheet 80vh 표현, admin-reports 가 BottomTab 미노출 명시, 데이터 흐름이 /api/posts·/api/reports 와 정합.",
-      "analysisResult": "Task 011.5 — Phase 3.5 디자인 시안 OK 게이트. docs/wireframes/ 폴더 + 7 markdown 파일(Unicode box drawing, ASCII 박스 폭~50자, 일본어 카피, shadcn 컴포넌트·lucide 아이콘 매핑). 표준 구조: 메타헤더 → ASCII 다이어그램 → 컴포넌트 매핑 표 → 상호작용 노트 5+ → 데이터 흐름(lib/community 함수·API 라우트 명시) → Phase 4 Task 매핑. 일본어 카피 출처는 types/community.ts(zod 메시지) + PRD 일본어 변환. (app) 라우트 공통 BottomTabBar+FAB 푸터 박스를 W1·W2·W4·W5 모두 표시. write-sheet(W3)·report-sheet(W6) 는 Bottom Sheet 80vh 오버레이. (admin)/admin (W7) 는 탭 미노출. 본 Task 는 코드 변경 0건 — 사용자 OK 사인이 검증 게이트. 3 서브태스크: 페이지형 4건 + 시트·어드민 3건 + ROADMAP ✅.",
-      "summary": "Task 011.5-2 시트·어드민 와이어프레임 3건 작성 완료. write-sheet.md(80vh Sheet, 핸들+드래그 닫기, 카테고리 칩 9건+✓, 제목 0/100, 본문 0/5000 auto-grow, 익명/닉네임 라디오 default 익명, localStorage:draft:post 자동 저장 30s, F017 키보드 자동 스크롤). report-sheet.md(50vh Sheet, 사유 라디오 4건 暴言/名誉毀損/スパム/違法 DB CHECK 1:1, 보충 0/500 옵션, UNIQUE 23505→409 既に通報済みです 토스트). admin-reports.md(어드민 게이트, BottomTab+FAB 미노출, 미처리/처리완료 탭, 削除/棄却 버튼, 신고자수 = UNIQUE 행수, idx_reports_status_created 인덱스 활용). 모두 표준 7섹션 구조 + 일본어 카피 출처 명시.",
-      "completedAt": "2026-05-04T07:13:44.041Z"
-    },
-    {
-      "id": "cb14fdea-0fe1-4d6b-af98-7666d0386153",
-      "name": "Task 011.5-3: ROADMAP ✅ + 사용자 OK 게이트",
-      "description": "Task 011.5 의 7 와이어프레임 작성 완료 후 ROADMAP.md 의 Task 011.5 항목을 ✅ 로 표기 + nested bullet 4~5줄 추가. 본 Task 는 사용자(요청자)의 OK 사인이 최종 검증.\n\nnested bullet 예:\n- docs/wireframes/ 7 파일 (home/post-detail/explore/my/write-sheet/report-sheet/admin-reports)\n- Unicode box drawing + 박스 폭 ~50자 + 일본어 카피\n- shadcn 컴포넌트(Sheet/Tabs/RadioGroup/Card) + lucide 아이콘(Home/Search/PenSquare/User/Heart/Bookmark/MoreHorizontal) 매핑\n- 데이터 흐름이 Task 011 의 lib/community 함수 + /api 라우트와 1:1 정합\n- 사용자 OK 사인 → Phase 4(Task 012~018) 진입 게이트 해제",
-      "notes": "본 Task 는 사용자 검토를 핵심 게이트로 둠 — verify_task 호출 시점은 사용자 OK 후. 만약 시안 변경 요청이 있으면 split_tasks 로 011.5-수정 서브태스크 추가.",
-      "status": "completed",
-      "dependencies": [
-        {
-          "taskId": "01703a92-2c91-4f7d-9934-4fcd47e33aeb"
-        }
-      ],
-      "createdAt": "2026-05-04T07:07:21.807Z",
-      "updatedAt": "2026-05-04T07:14:31.973Z",
-      "relatedFiles": [
-        {
-          "path": "docs/ROADMAP.md",
-          "type": "TO_MODIFY",
-          "description": "Task 011.5 ✅ + nested bullet",
-          "lineStart": 190,
-          "lineEnd": 202
-        }
-      ],
-      "implementationGuide": "1) Edit docs/ROADMAP.md Task 011.5 항목 (line 190 부근) — 'Task 011.5: 게시판 페이지 ASCII 와이어프레임 작성' 앞에 ✅ 추가 후 nested bullet 4~5줄 보강\n2) 사용자에게 docs/wireframes/ 7 파일 검토 요청 메시지\n3) 사용자 OK 사인이 떨어지면 본 Task 종료, Phase 4 Task 012 진입 가능",
-      "verificationCriteria": "ROADMAP.md Task 011.5 항목이 ✅ + nested bullet 4~5줄로 갱신, docs/wireframes/ 7 파일 모두 작성됨, 사용자가 검토 후 OK 사인.",
-      "analysisResult": "Task 011.5 — Phase 3.5 디자인 시안 OK 게이트. docs/wireframes/ 폴더 + 7 markdown 파일(Unicode box drawing, ASCII 박스 폭~50자, 일본어 카피, shadcn 컴포넌트·lucide 아이콘 매핑). 표준 구조: 메타헤더 → ASCII 다이어그램 → 컴포넌트 매핑 표 → 상호작용 노트 5+ → 데이터 흐름(lib/community 함수·API 라우트 명시) → Phase 4 Task 매핑. 일본어 카피 출처는 types/community.ts(zod 메시지) + PRD 일본어 변환. (app) 라우트 공통 BottomTabBar+FAB 푸터 박스를 W1·W2·W4·W5 모두 표시. write-sheet(W3)·report-sheet(W6) 는 Bottom Sheet 80vh 오버레이. (admin)/admin (W7) 는 탭 미노출. 본 Task 는 코드 변경 0건 — 사용자 OK 사인이 검증 게이트. 3 서브태스크: 페이지형 4건 + 시트·어드민 3건 + ROADMAP ✅.",
-      "summary": "Task 011.5-3 완료. ROADMAP.md Task 011.5 항목 ✅ 표기(작성 완료, 사용자 OK 게이트 대기) + nested bullet 11줄 추가 — W1~W7 각 와이어프레임의 핵심 레이아웃 + 데이터 흐름 + 표준 7섹션 명시. docs/wireframes/ 7 파일 모두 작성됨 (home/post-detail/explore/my/write-sheet/report-sheet/admin-reports). 본 Task 의 최종 게이트는 사용자 OK 사인 — 7 와이어프레임 검토 후 동의 시 Phase 4(Task 012~018) 진입 가능.",
-      "completedAt": "2026-05-04T07:14:31.972Z"
-    },
-    {
-      "id": "4de41415-ba80-407f-a0aa-e6a9114ed98c",
-      "name": "Task 012-1: 의존 추가 + Zustand store + Toaster 루트 통합",
-      "description": "본 Task 의 인프라 — 신규 의존 패키지 설치 + Zustand store + Toaster root 배치. 후속 컴포넌트들이 이 인프라를 import.\n\n작업:\n1) npm i zustand\n2) npx shadcn add radio-group sonner\n3) lib/stores/write-sheet-store.ts 신규 — Zustand create<{isOpen, open, close}>\n4) app/layout.tsx (root) 에 <Toaster /> 추가 (sonner from shadcn)\n5) tsc --noEmit 검증",
-      "notes": "sonner 의 Toaster 는 root layout 에 한 번만. richColors 옵션으로 색상 활성화. zustand 5.x 가 React 19 호환.",
-      "status": "pending",
-      "dependencies": [],
-      "createdAt": "2026-05-04T07:19:12.101Z",
-      "updatedAt": "2026-05-04T07:19:12.101Z",
-      "relatedFiles": [
-        {
-          "path": "lib/stores/write-sheet-store.ts",
-          "type": "CREATE",
-          "description": "Zustand store"
-        },
-        {
-          "path": "app/layout.tsx",
-          "type": "TO_MODIFY",
-          "description": "<Toaster /> 추가"
-        },
-        {
-          "path": "package.json",
-          "type": "TO_MODIFY",
-          "description": "zustand 신규"
-        },
-        {
-          "path": "components/ui/radio-group.tsx",
-          "type": "CREATE",
-          "description": "shadcn radio-group"
-        },
-        {
-          "path": "components/ui/sonner.tsx",
-          "type": "CREATE",
-          "description": "shadcn sonner"
-        }
-      ],
-      "implementationGuide": "1) Bash: npm i zustand && npx shadcn add radio-group sonner --yes\n2) Write lib/stores/write-sheet-store.ts:\n   import { create } from 'zustand'\n   export const useWriteSheet = create<{isOpen:boolean; open:()=>void; close:()=>void}>((set)=>({\n     isOpen: false, open: ()=>set({isOpen:true}), close: ()=>set({isOpen:false})\n   }))\n3) Edit app/layout.tsx — body 마지막에 <Toaster richColors closeButton />\n4) tsc --noEmit",
-      "verificationCriteria": "npm i 성공, components/ui/radio-group.tsx + components/ui/sonner.tsx 생성, lib/stores/write-sheet-store.ts export useWriteSheet, app/layout.tsx 에 <Toaster /> 추가, tsc 회귀 0건.",
-      "analysisResult": "Task 012 — Phase 4(UI) 첫 단계. (app) 라우트 그룹의 공통 푸터(3탭 + 중앙 부유 FAB) + 글쓰기 Bottom Sheet 80vh 구현. components/community/{bottom-tab-bar, write-fab, write-bottom-sheet} 신규, lib/stores/write-sheet-store.ts(Zustand) 신규, app/(app)/layout.tsx 통합, 기존 components/bottom-tab-bar.tsx 폐기. RHF + zodResolver(PostFormSchema) + fetch /api/posts 로 실제 게시글 INSERT 동작. localStorage `jukulog:draft:post` 자동 저장 + 복원 토스트. 와이어프레임 W3 1:1. 의존 추가: zustand, shadcn radio-group, shadcn sonner. 4 서브태스크: 의존 추가 + store / 탭+FAB / 시트(가장 무거움) / 통합·검증·ROADMAP."
-    },
-    {
-      "id": "d44c1649-3c99-4a59-a859-9cb63484f70d",
-      "name": "Task 012-2: components/community/bottom-tab-bar.tsx (3탭 재작성) + write-fab.tsx",
-      "description": "기존 components/bottom-tab-bar.tsx 패턴(Framer Motion 슬라이딩 인디케이터 + whileTap)을 유지하면서 components/community/ 폴더로 이동 + 3탭(掲示板/探索/マイ) + 중앙 FAB 슬롯(w-14 spacer). 동시에 write-fab.tsx 신규 — 56×56 부유 PenSquare 버튼.\n\n파일:\n- components/community/bottom-tab-bar.tsx (이동 + 재작성)\n- components/community/write-fab.tsx (신규)\n- 기존 components/bottom-tab-bar.tsx 삭제",
-      "notes": "이동 후 import 경로 갱신은 (app)/layout.tsx 한 곳 — Task 012-4 에서 처리. WriteFab 의 z-40 은 BottomTabBar(z-30) 위.",
-      "status": "pending",
-      "dependencies": [
-        {
-          "taskId": "4de41415-ba80-407f-a0aa-e6a9114ed98c"
-        }
-      ],
-      "createdAt": "2026-05-04T07:19:12.101Z",
-      "updatedAt": "2026-05-04T07:19:12.101Z",
-      "relatedFiles": [
-        {
-          "path": "components/community/bottom-tab-bar.tsx",
-          "type": "CREATE",
-          "description": "3탭 + FAB 슬롯"
-        },
-        {
-          "path": "components/community/write-fab.tsx",
-          "type": "CREATE",
-          "description": "56×56 부유 FAB"
-        },
-        {
-          "path": "components/bottom-tab-bar.tsx",
-          "type": "OTHER",
-          "description": "삭제 대상"
-        },
-        {
-          "path": "lib/stores/write-sheet-store.ts",
-          "type": "DEPENDENCY",
-          "description": "open() 호출"
-        }
-      ],
-      "implementationGuide": "1) Read 기존 components/bottom-tab-bar.tsx 전체 (motion 패턴 인용)\n2) Write components/community/bottom-tab-bar.tsx:\n   const TABS_LEFT = [{href:'/', icon:Home, label:'掲示板'}]\n   const TABS_RIGHT = [{href:'/explore', icon:Search, label:'探索'}, {href:'/my', icon:User, label:'マイ'}]\n   nav: pb-safe fixed bottom-0 left-1/2 w-full max-w-[768px] -translate-x-1/2 border-t bg-background/95 backdrop-blur-sm z-30\n   div: flex h-14 items-stretch\n     {TABS_LEFT.map(...)} <div className=\"w-14\" aria-hidden /> {TABS_RIGHT.map(...)}\n   active 인디케이터 + whileTap 0.82 + spring 동일\n3) Write components/community/write-fab.tsx:\n   'use client'\n   import { useWriteSheet } from '@/lib/stores/write-sheet-store'\n   import { PenSquare } from 'lucide-react'\n   import { motion, useReducedMotion } from 'framer-motion'\n   export function WriteFab() {\n     const open = useWriteSheet(s=>s.open)\n     const reduce = useReducedMotion()\n     return <motion.button onClick={open} aria-label=\"新しい投稿を作成\"\n       whileTap={reduce?{}:{ scale:0.92 }}\n       className=\"fixed left-1/2 -translate-x-1/2 z-40 size-14 rounded-full bg-primary text-primary-foreground shadow-lg flex items-center justify-center\"\n       style={{ bottom: 'calc(56px + env(safe-area-inset-bottom) + 8px)' }}>\n       <PenSquare size={24} strokeWidth={2.4} />\n     </motion.button>\n   }\n4) Bash: rm components/bottom-tab-bar.tsx (혹은 git rm)\n5) tsc --noEmit 검증",
-      "verificationCriteria": "3탭(掲示板/探索/マイ) + 가운데 spacer + active 인디케이터 + whileTap 동작, WriteFab 가 탭바 위 8px 부유 + z-40, 기존 components/bottom-tab-bar.tsx 삭제, tsc 0건.",
-      "analysisResult": "Task 012 — Phase 4(UI) 첫 단계. (app) 라우트 그룹의 공통 푸터(3탭 + 중앙 부유 FAB) + 글쓰기 Bottom Sheet 80vh 구현. components/community/{bottom-tab-bar, write-fab, write-bottom-sheet} 신규, lib/stores/write-sheet-store.ts(Zustand) 신규, app/(app)/layout.tsx 통합, 기존 components/bottom-tab-bar.tsx 폐기. RHF + zodResolver(PostFormSchema) + fetch /api/posts 로 실제 게시글 INSERT 동작. localStorage `jukulog:draft:post` 자동 저장 + 복원 토스트. 와이어프레임 W3 1:1. 의존 추가: zustand, shadcn radio-group, shadcn sonner. 4 서브태스크: 의존 추가 + store / 탭+FAB / 시트(가장 무거움) / 통합·검증·ROADMAP."
-    },
-    {
-      "id": "9b8bbdbf-b222-4e04-96b1-5d3d4e5bfd6e",
-      "name": "Task 012-3: components/community/write-bottom-sheet.tsx (RHF + /api/posts)",
-      "description": "W3 와이어프레임 1:1 구현. shadcn Sheet(80vh) + RHF + zodResolver(PostFormSchema) + 카테고리 칩 9건 + 제목/본문 카운터 + 익명 라디오 + localStorage draft 자동 저장 + 복원 토스트 + POST /api/posts.\n\n파일: components/community/write-bottom-sheet.tsx",
-      "notes": "localStorage 키 prefix 'jukulog:'. categorySlug 가 undefined 일 때 RHF zod 가 enum 위반 → 등록 disabled. 본 Task 가 가장 무거움 — 200~280 줄 예상.",
-      "status": "pending",
-      "dependencies": [
-        {
-          "taskId": "d44c1649-3c99-4a59-a859-9cb63484f70d"
-        }
-      ],
-      "createdAt": "2026-05-04T07:19:12.101Z",
-      "updatedAt": "2026-05-04T07:19:12.101Z",
-      "relatedFiles": [
-        {
-          "path": "components/community/write-bottom-sheet.tsx",
-          "type": "CREATE",
-          "description": "글쓰기 Bottom Sheet 80vh"
-        },
-        {
-          "path": "types/community.ts",
-          "type": "DEPENDENCY",
-          "description": "PostFormSchema + PostFormData"
-        },
-        {
-          "path": "lib/community/categories.ts",
-          "type": "DEPENDENCY",
-          "description": "CATEGORIES + getCategoryEmoji"
-        },
-        {
-          "path": "app/api/posts/route.ts",
-          "type": "DEPENDENCY",
-          "description": "POST 응답 envelope"
-        },
-        {
-          "path": "docs/wireframes/write-sheet.md",
-          "type": "REFERENCE",
-          "description": "W3 와이어프레임 1:1"
-        }
-      ],
-      "implementationGuide": "1) 'use client'\n2) imports: Sheet/SheetContent/SheetHeader, Input, Textarea, RadioGroup, Button, Label, useForm, zodResolver, PostFormSchema, CATEGORIES, getCategoryEmoji, useWriteSheet, useRouter, toast\n3) const form = useForm<PostFormData>({ resolver: zodResolver(PostFormSchema), defaultValues: { title:'', body:'', categorySlug: undefined as any, isAnonymous: true } })\n4) draft 복원: useEffect when isOpen → localStorage.getItem('jukulog:draft:post') 있으면 toast 'continue?' 와 함께 setValue 자동 채움\n5) 자동 저장: watch + useEffect debounce 1s → localStorage.setItem (formState.isDirty 일 때만)\n6) onSubmit: POST /api/posts → res.json() envelope 처리 (ok→push /posts/{id} + draft 삭제 / 422→setError / 401→/login / 기타→toast)\n7) Sheet onOpenChange: dirty 면 close 차단 → confirm toast 'draft 保存しますか?' → 사용자 결정 후 close + 저장\n8) UI 구조 (SheetContent 80vh, side='bottom'):\n   header [X 닫기] 投稿する [送信 RHF.handleSubmit] (loading 시 Loader2)\n   카테고리 칩 가로 스크롤 (Controller 또는 setValue로 categorySlug)\n   Input title maxLength=100, watch length 카운터\n   Textarea body autoresize, watch length 카운터\n   RadioGroup [匿名で投稿 / ニックネーム表示] default 匿名\n   isLoading + 에러 인라인 (RHF formState.errors)\n9) 키보드 자동 스크롤: visualViewport.height 변화 감지 useEffect (P1 — MVP 에선 brief 처리)\n10) tsc --noEmit",
-      "verificationCriteria": "Sheet 80vh + 9 카테고리 칩 + 제목 0/100 + 본문 0/5000 카운터 + 匿名 default 라디오 + draft localStorage 자동 저장 + 등록 시 fetch /api/posts → 응답 envelope 처리, tsc 0건.",
-      "analysisResult": "Task 012 — Phase 4(UI) 첫 단계. (app) 라우트 그룹의 공통 푸터(3탭 + 중앙 부유 FAB) + 글쓰기 Bottom Sheet 80vh 구현. components/community/{bottom-tab-bar, write-fab, write-bottom-sheet} 신규, lib/stores/write-sheet-store.ts(Zustand) 신규, app/(app)/layout.tsx 통합, 기존 components/bottom-tab-bar.tsx 폐기. RHF + zodResolver(PostFormSchema) + fetch /api/posts 로 실제 게시글 INSERT 동작. localStorage `jukulog:draft:post` 자동 저장 + 복원 토스트. 와이어프레임 W3 1:1. 의존 추가: zustand, shadcn radio-group, shadcn sonner. 4 서브태스크: 의존 추가 + store / 탭+FAB / 시트(가장 무거움) / 통합·검증·ROADMAP."
-    },
-    {
-      "id": "c6e2199c-c46e-417e-83dd-9597b0e8cc2b",
-      "name": "Task 012-4: (app)/layout.tsx 통합 + npm run build + ROADMAP ✅",
-      "description": "3 컴포넌트를 (app)/layout.tsx 에 배치 + main pb 조정 + 통합 검증 + ROADMAP.\n\n작업:\n1) Edit app/(app)/layout.tsx — import 경로 갱신 (community/bottom-tab-bar) + WriteFab + WriteBottomSheet 추가, main pb-[88px]\n2) npm run build — 16+ 라우트 컴파일 통과 확인\n3) (선택) npm run lint\n4) Edit docs/ROADMAP.md Task 012 항목 ✅ + nested bullet 5~7줄",
-      "notes": "build 가 실패하면 회귀 분석 — 가장 흔한 사고: zustand 의 SSR/CSR 경계, Sheet 의 Controlled state 미스매치, Toaster 의 client/server 경계. 'use client' 누락 점검.",
-      "status": "pending",
-      "dependencies": [
-        {
-          "taskId": "9b8bbdbf-b222-4e04-96b1-5d3d4e5bfd6e"
-        }
-      ],
-      "createdAt": "2026-05-04T07:19:12.101Z",
-      "updatedAt": "2026-05-04T07:19:12.101Z",
-      "relatedFiles": [
-        {
-          "path": "app/(app)/layout.tsx",
-          "type": "TO_MODIFY",
-          "description": "3 컴포넌트 배치"
-        },
-        {
-          "path": "docs/ROADMAP.md",
-          "type": "TO_MODIFY",
-          "description": "Task 012 ✅",
-          "lineStart": 208,
-          "lineEnd": 214
-        }
-      ],
-      "implementationGuide": "1) Edit app/(app)/layout.tsx:\n   import { BottomTabBar } from '@/components/community/bottom-tab-bar'\n   import { WriteFab } from '@/components/community/write-fab'\n   import { WriteBottomSheet } from '@/components/community/write-bottom-sheet'\n   <main className=\"pb-[88px]\">{children}</main>\n   <BottomTabBar /> <WriteFab /> <WriteBottomSheet />\n2) Bash npm run build (timeout 5min) — 출력 tail 검토\n3) Edit docs/ROADMAP.md Task 012 ✅ + nested bullet:\n   - components/community/{bottom-tab-bar(3탭), write-fab(56 부유), write-bottom-sheet(80vh)}\n   - lib/stores/write-sheet-store.ts (Zustand) + Toaster 루트\n   - RHF + zodResolver(PostFormSchema) + fetch /api/posts envelope\n   - localStorage 'jukulog:draft:post' 자동 저장 + 복원 토스트\n   - npm run build 회귀 0건\n   - Phase 4 진입 — Task 013(핫 피드+갤러리 행) 준비",
-      "verificationCriteria": "app/(app)/layout.tsx 에 BottomTabBar+WriteFab+WriteBottomSheet 모두 배치, npm run build 회귀 0건, ROADMAP.md Task 012 ✅ + nested bullet 5~7줄.",
-      "analysisResult": "Task 012 — Phase 4(UI) 첫 단계. (app) 라우트 그룹의 공통 푸터(3탭 + 중앙 부유 FAB) + 글쓰기 Bottom Sheet 80vh 구현. components/community/{bottom-tab-bar, write-fab, write-bottom-sheet} 신규, lib/stores/write-sheet-store.ts(Zustand) 신규, app/(app)/layout.tsx 통합, 기존 components/bottom-tab-bar.tsx 폐기. RHF + zodResolver(PostFormSchema) + fetch /api/posts 로 실제 게시글 INSERT 동작. localStorage `jukulog:draft:post` 자동 저장 + 복원 토스트. 와이어프레임 W3 1:1. 의존 추가: zustand, shadcn radio-group, shadcn sonner. 4 서브태스크: 의존 추가 + store / 탭+FAB / 시트(가장 무거움) / 통합·검증·ROADMAP."
-    },
-    {
-      "id": "d88b7531-6ea3-42c2-b9e7-4ea94859565b",
-      "name": "Task 013-1: hot-feed-carousel.tsx (F014, Framer Motion drag)",
-      "description": "24h 추천 TOP3 가로 스와이프 캐러셀. 'use client'. props: posts: PostListItem[] (lib/community/posts.ts). Framer Motion motion.div drag='x' + dragConstraints + dragElastic. 슬라이드 1장 = w-[280px] mx-2, 카테고리 배지 + 제목 line-clamp-2 + ❤ count. 빈 배열 시 회색 placeholder. 슬라이드 클릭 → next/link to /posts/{id}. 점 인디케이터 1·2·3.\n\n파일: components/community/hot-feed-carousel.tsx",
-      "notes": "motion drag 가 Link 의 클릭과 충돌 — onPointerUp 에서 dragged 거리 작으면 navigate 허용. 또는 motion 의 dragSnapToOrigin + Link 안 motion 으로 처리.",
-      "status": "pending",
-      "dependencies": [],
-      "createdAt": "2026-05-04T07:33:31.346Z",
-      "updatedAt": "2026-05-04T07:33:31.346Z",
-      "relatedFiles": [
-        {
-          "path": "components/community/hot-feed-carousel.tsx",
-          "type": "CREATE",
-          "description": "핫피드 캐러셀"
-        },
-        {
-          "path": "lib/community/posts.ts",
-          "type": "DEPENDENCY",
-          "description": "PostListItem 타입"
-        },
-        {
-          "path": "lib/community/categories.ts",
-          "type": "DEPENDENCY",
-          "description": "getCategoryEmoji"
-        },
-        {
-          "path": "docs/wireframes/home.md",
-          "type": "REFERENCE",
-          "description": "W1 1층"
-        }
-      ],
-      "implementationGuide": "1) 'use client'\n2) imports: motion, useState (활성 인덱스), Link, Card, Badge, Heart icon, getCategoryEmoji, PostListItem\n3) export function HotFeedCarousel({ posts }: { posts: PostListItem[] })\n4) 빈 배열: <div className='py-8 text-center text-muted-foreground'>まだ人気の投稿がありません</div>\n5) const SLIDE_W = 288 (w-72) + gap 16\n6) const constraints = { left: -((posts.length-1) * (SLIDE_W + 16)), right: 0 }\n7) <motion.div drag='x' dragConstraints={constraints} dragElastic={0.15} ... className='flex gap-4 px-4 cursor-grab active:cursor-grabbing'>\n   {posts.map((p) => (\n     <Link key={p.id} href={`/posts/${p.id}`} className='shrink-0 w-72'>\n       <Card className='p-4 h-32 flex flex-col justify-between'>\n         <div className='flex items-center gap-2'>\n           <Badge variant='secondary'>{getCategoryEmoji(p.category?.slug as any)} {p.category?.name}</Badge>\n         </div>\n         <h3 className='line-clamp-2 font-semibold text-sm'>{p.title}</h3>\n         <div className='flex items-center gap-1 text-xs text-muted-foreground'>\n           <Heart className='size-3.5' /> {p.reaction_up}\n         </div>\n       </Card>\n     </Link>\n   ))}\n   </motion.div>\n8) 인디케이터 점: <div className='flex justify-center gap-1.5 mt-2'>{posts.map((_, i) => <span className={cn('size-1.5 rounded-full', activeIdx===i ? 'bg-foreground' : 'bg-muted')} />)}</div>\n9) onDragEnd 으로 활성 인덱스 갱신 (offsetX / SLIDE_W 으로 nearest)\n10) tsc --noEmit",
-      "verificationCriteria": "빈 배열 시 placeholder 노출, 1+ 배열 시 가로 스와이프 + 점 인디케이터, 슬라이드 클릭 시 /posts/{id} 이동, tsc 0건.",
-      "analysisResult": "Task 013 — 게시판 홈 W1 의 1·2·3 층 마크업 + Server Component 통합. components/community/{hot-feed-carousel(F014), category-icon-row(F015), sort-toggle(sticky)} 3개 + app/(app)/page.tsx 신규. 4층 카드 피드는 Task 014 에서 채울 placeholder. URL ?sort=latest|popular + ?category=slug 로 SSR 재실행. Task 011 의 fetchHotPosts/fetchPosts/CATEGORIES 활용. 카피는 와이어프레임 W1 의 일본어 (掲示板/おすすめ/全て/最新/人気/まだ人気の投稿がありません). Framer Motion drag 캐러셀 (slideWidth 300px 고정 + dragConstraints 정적), 자체 segment control(ToggleGroup 미설치 회피), 64×64 원형 아이콘 가로 스크롤 + scroll-snap-x. 3 서브태스크: 캐러셀 / 아이콘 행+토글 / 페이지 통합·빌드·ROADMAP."
-    },
-    {
-      "id": "5df5a4ad-ba49-4cac-ab7a-c51d68e7ed73",
-      "name": "Task 013-2: category-icon-row.tsx (F015) + sort-toggle.tsx",
-      "description": "두 client 컴포넌트. URL 변경 (useRouter + useSearchParams) 동일 패턴.\n\n파일:\n- components/community/category-icon-row.tsx — 64×64 원형 아이콘 가로 스크롤 + 全て + CATEGORIES 9건 + active 표시 + scroll-snap-x\n- components/community/sort-toggle.tsx — 자체 segment (button × 2) + sticky top-0 z-20 + bg-background/95 backdrop-blur",
-      "notes": "scrollbar-hide 는 tailwind plugin 이 없으므로 inline style 또는 CSS-in-tailwind 무시. 본 Task 에서는 native scrollbar 그대로 (또는 className 'scrollbar-hide' 두고 Phase 7 에서 plugin 설치).",
-      "status": "pending",
-      "dependencies": [
-        {
-          "taskId": "d88b7531-6ea3-42c2-b9e7-4ea94859565b"
-        }
-      ],
-      "createdAt": "2026-05-04T07:33:31.346Z",
-      "updatedAt": "2026-05-04T07:33:31.346Z",
-      "relatedFiles": [
-        {
-          "path": "components/community/category-icon-row.tsx",
-          "type": "CREATE",
-          "description": "갤러리 아이콘 행"
-        },
-        {
-          "path": "components/community/sort-toggle.tsx",
-          "type": "CREATE",
-          "description": "sticky 정렬 토글"
-        },
-        {
-          "path": "lib/community/categories.ts",
-          "type": "DEPENDENCY",
-          "description": "CATEGORIES"
-        },
-        {
-          "path": "docs/wireframes/home.md",
-          "type": "REFERENCE",
-          "description": "W1 2·3층"
-        }
-      ],
-      "implementationGuide": "1) category-icon-row.tsx:\n   'use client'\n   import { useRouter, useSearchParams, usePathname } from 'next/navigation'\n   import { CATEGORIES } from '@/lib/community/categories'\n   const ITEMS = [{ slug: null, name: '全て', emoji: '⭕' }, ...CATEGORIES.map(c=>({slug:c.slug, name:c.name, emoji:c.emoji}))]\n   props 미사용 (URL 직접 읽음). 또는 props.active?: string\n   현재 active = useSearchParams().get('category')\n   onClick(slug):\n     const sp = new URLSearchParams(searchParams)\n     if (slug === null) sp.delete('category'); else sp.set('category', slug)\n     router.push(`${pathname}?${sp.toString()}`)\n   container: <div className='flex gap-3 overflow-x-auto px-4 py-3 snap-x snap-mandatory scrollbar-hide'>\n   item: <button className='shrink-0 snap-start flex flex-col items-center gap-1.5 min-w-16'>\n     <div className={cn('size-14 rounded-full flex items-center justify-center text-2xl', isActive ? 'bg-primary/10 ring-2 ring-primary' : 'bg-muted')}>{emoji}</div>\n     <span className='text-xs'>{name}</span>\n   </button>\n\n2) sort-toggle.tsx:\n   'use client'\n   const OPTIONS = [{ value:'latest', label:'最新' }, { value:'popular', label:'人気' }]\n   const sort = useSearchParams().get('sort') === 'popular' ? 'popular' : 'latest'\n   onClick(v):\n     const sp = new URLSearchParams(searchParams)\n     sp.set('sort', v)\n     router.push(`${pathname}?${sp.toString()}`)\n   container: <div className='sticky top-0 z-20 bg-background/95 backdrop-blur border-b'>\n     <div className='flex gap-1 p-2 mx-4 my-2 rounded-full bg-muted'>\n       {OPTIONS.map(o => (\n         <button onClick={()=>onSelect(o.value)} className={cn('flex-1 py-2 text-sm rounded-full transition-colors', sort===o.value ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground')}>\n           {o.label}\n         </button>\n       ))}\n     </div>\n   </div>\n\n3) tsc --noEmit",
-      "verificationCriteria": "category-icon-row 클릭 시 URL ?category={slug} 갱신 + active 표시 변경, sort-toggle 클릭 시 ?sort 갱신 + sticky top-0 동작, 全て 클릭 시 ?category 제거. tsc 0건.",
-      "analysisResult": "Task 013 — 게시판 홈 W1 의 1·2·3 층 마크업 + Server Component 통합. components/community/{hot-feed-carousel(F014), category-icon-row(F015), sort-toggle(sticky)} 3개 + app/(app)/page.tsx 신규. 4층 카드 피드는 Task 014 에서 채울 placeholder. URL ?sort=latest|popular + ?category=slug 로 SSR 재실행. Task 011 의 fetchHotPosts/fetchPosts/CATEGORIES 활용. 카피는 와이어프레임 W1 의 일본어 (掲示板/おすすめ/全て/最新/人気/まだ人気の投稿がありません). Framer Motion drag 캐러셀 (slideWidth 300px 고정 + dragConstraints 정적), 자체 segment control(ToggleGroup 미설치 회피), 64×64 원형 아이콘 가로 스크롤 + scroll-snap-x. 3 서브태스크: 캐러셀 / 아이콘 행+토글 / 페이지 통합·빌드·ROADMAP."
-    },
-    {
-      "id": "c2a43bf7-c614-425f-bb16-a028fe3eb4c4",
-      "name": "Task 013-3: app/(app)/page.tsx Server Component + npm run build + ROADMAP ✅",
-      "description": "Server Component 페이지 신규(또는 교체). searchParams 파싱 + Promise.all로 fetchHotPosts + fetchPosts 병렬 + 3 컴포넌트 배치 + Task 014 카드 피드 placeholder.\n\n파일: app/(app)/page.tsx",
-      "notes": "페이지 자체는 Server Component, 3 자식 컴포넌트는 client. searchParams 가 변경되면 Next.js 가 자동 SSR 재실행. 카드 영역은 Task 014 가 PostCard + 무한 스크롤로 교체.",
-      "status": "pending",
-      "dependencies": [
-        {
-          "taskId": "5df5a4ad-ba49-4cac-ab7a-c51d68e7ed73"
-        }
-      ],
-      "createdAt": "2026-05-04T07:33:31.346Z",
-      "updatedAt": "2026-05-04T07:33:31.346Z",
-      "relatedFiles": [
-        {
-          "path": "app/(app)/page.tsx",
-          "type": "CREATE",
-          "description": "홈 Server Component"
-        },
-        {
-          "path": "components/community/hot-feed-carousel.tsx",
-          "type": "DEPENDENCY",
-          "description": "props 전달"
-        },
-        {
-          "path": "components/community/category-icon-row.tsx",
-          "type": "DEPENDENCY",
-          "description": "URL 자동 읽기"
-        },
-        {
-          "path": "components/community/sort-toggle.tsx",
-          "type": "DEPENDENCY",
-          "description": "URL 자동 읽기"
-        },
-        {
-          "path": "lib/community/hot-feed.ts",
-          "type": "DEPENDENCY",
-          "description": "fetchHotPosts"
-        },
-        {
-          "path": "lib/community/posts.ts",
-          "type": "DEPENDENCY",
-          "description": "fetchPosts"
-        },
-        {
-          "path": "docs/ROADMAP.md",
-          "type": "TO_MODIFY",
-          "description": "Task 013 ✅"
-        }
-      ],
-      "implementationGuide": "1) 현재 / 라우트 처리 위치 확인 — Glob 'app/(app)/page.tsx' 또는 'app/page.tsx'. 기존 미존재면 신규 작성.\n\n2) Write app/(app)/page.tsx:\n   import { createClient } from '@/lib/supabase/server'\n   import { fetchHotPosts } from '@/lib/community/hot-feed'\n   import { fetchPosts } from '@/lib/community/posts'\n   import { CATEGORY_SLUG_VALUES } from '@/types/community'\n   import { HotFeedCarousel } from '@/components/community/hot-feed-carousel'\n   import { CategoryIconRow } from '@/components/community/category-icon-row'\n   import { SortToggle } from '@/components/community/sort-toggle'\n   import { Badge } from '@/components/ui/badge' (없으면 작성)\n\n   export default async function HomePage({ searchParams }: { searchParams: Promise<{ sort?: string; category?: string }> }) {\n     const sp = await searchParams\n     const sort: 'latest' | 'popular' = sp.sort === 'popular' ? 'popular' : 'latest'\n     const categorySlug = (CATEGORY_SLUG_VALUES as readonly string[]).includes(sp.category ?? '') ? sp.category as any : undefined\n     const supabase = await createClient()\n     const [hot, list] = await Promise.all([\n       fetchHotPosts(supabase),\n       fetchPosts(supabase, { sort, categorySlug, limit: 20 }),\n     ])\n     return (\n       <div>\n         <header className='sticky top-0 z-30 bg-background/95 backdrop-blur border-b px-4 h-14 flex items-center'>\n           <h1 className='text-lg font-bold'>掲示板</h1>\n         </header>\n         <section className='py-3 border-b'>\n           <h2 className='text-xs font-semibold text-muted-foreground px-4 mb-2'>🔥 おすすめ</h2>\n           <HotFeedCarousel posts={hot} />\n         </section>\n         <section className='border-b'>\n           <CategoryIconRow />\n         </section>\n         <SortToggle />\n         <section className='px-4 py-4 space-y-3'>\n           {/* Task 014 에서 PostCard + 무한 스크롤로 교체 */}\n           {list.items.length === 0 ? (\n             <div className='py-12 text-center text-muted-foreground text-sm'>まだ投稿がありません — FAB を押して最初の投稿を作成しましょう</div>\n           ) : list.items.map(p => (\n             <article key={p.id} className='border rounded-lg p-4'>\n               <div className='flex items-center gap-2 mb-2'>\n                 <Badge variant='secondary'>{p.category?.name ?? p.category_id}</Badge>\n                 <span className='text-xs text-muted-foreground'>{p.author?.nickname ?? '匿名'} · {new Date(p.created_at).toLocaleDateString('ja-JP')}</span>\n               </div>\n               <h3 className='font-semibold mb-1'>{p.title}</h3>\n               <p className='text-sm text-muted-foreground line-clamp-2'>{p.body}</p>\n               <div className='flex items-center gap-3 mt-2 text-xs text-muted-foreground'>\n                 <span>❤ {p.reaction_up}</span>\n                 <span>💬 {p.comment_count}</span>\n               </div>\n             </article>\n           ))}\n         </section>\n       </div>\n     )\n   }\n\n3) Badge 컴포넌트 미설치 시 npx shadcn add badge\n\n4) npm run build (timeout 5분)\n5) Edit docs/ROADMAP.md Task 013 ✅ + nested bullet 5~7줄",
-      "verificationCriteria": "app/(app)/page.tsx 가 SSR 동작, ?sort/?category 변경 시 fetch 결과 갱신, npm run build 회귀 0건, ROADMAP Task 013 ✅.",
-      "analysisResult": "Task 013 — 게시판 홈 W1 의 1·2·3 층 마크업 + Server Component 통합. components/community/{hot-feed-carousel(F014), category-icon-row(F015), sort-toggle(sticky)} 3개 + app/(app)/page.tsx 신규. 4층 카드 피드는 Task 014 에서 채울 placeholder. URL ?sort=latest|popular + ?category=slug 로 SSR 재실행. Task 011 의 fetchHotPosts/fetchPosts/CATEGORIES 활용. 카피는 와이어프레임 W1 의 일본어 (掲示板/おすすめ/全て/最新/人気/まだ人気の投稿がありません). Framer Motion drag 캐러셀 (slideWidth 300px 고정 + dragConstraints 정적), 자체 segment control(ToggleGroup 미설치 회피), 64×64 원형 아이콘 가로 스크롤 + scroll-snap-x. 3 서브태스크: 캐러셀 / 아이콘 행+토글 / 페이지 통합·빌드·ROADMAP."
-    },
-    {
-      "id": "7db48c89-3bf8-4b0e-afe5-d9bc11c602bd",
-      "name": "Task 014-1: post-card.tsx (낙관적 ❤/🔖 + role='button' + ⋯ placeholder)",
-      "description": "카드 1장 컴포넌트. 'use client'. PostListItem props + 낙관적 useState (myReaction/up/down/bookmarked) + Framer Motion whileTap 0.92 + fetch /api/reactions·/api/bookmarks envelope 처리 + 실패 시 즉시 롤백 + sonner toast.\n\n파일: components/community/post-card.tsx",
-      "notes": "카드 본문과 액션 버튼의 클릭 분리: outer onClick={navigate} + 내부 button onClick={(e) => { e.stopPropagation(); ... }}. nested anchor 회피. min-h-[44px] 으로 모바일 터치 영역 확보.",
-      "status": "pending",
-      "dependencies": [],
-      "createdAt": "2026-05-04T07:46:01.301Z",
-      "updatedAt": "2026-05-04T07:46:01.301Z",
-      "relatedFiles": [
-        {
-          "path": "components/community/post-card.tsx",
-          "type": "CREATE",
-          "description": "카드 컴포넌트 + 낙관적 토글"
-        },
-        {
-          "path": "lib/community/posts.ts",
-          "type": "DEPENDENCY",
-          "description": "PostListItem 타입"
-        },
-        {
-          "path": "types/community.ts",
-          "type": "DEPENDENCY",
-          "description": "ReactionKind/CategorySlug"
-        },
-        {
-          "path": "lib/community/categories.ts",
-          "type": "DEPENDENCY",
-          "description": "getCategoryEmoji"
-        },
-        {
-          "path": "app/api/reactions/route.ts",
-          "type": "DEPENDENCY",
-          "description": "POST 토글 응답 envelope"
-        },
-        {
-          "path": "app/api/bookmarks/route.ts",
-          "type": "DEPENDENCY",
-          "description": "POST 토글 응답 envelope"
-        },
-        {
-          "path": "docs/wireframes/home.md",
-          "type": "REFERENCE",
-          "description": "W1 카드 디자인"
-        }
-      ],
-      "implementationGuide": "1) 사전 확인: lib/community/posts.ts 에서 FetchPostsResult / PostListItem export 여부 확인. PostListItem 은 Task 011-1 에서 export 됨. FetchPostsResult 도 export 확인.\n2) 'use client' + imports: useState, useRouter, motion/useReducedMotion, Heart/MessageCircle/Bookmark/MoreHorizontal, toast(sonner), PostListItem, ReactionKind, getCategoryEmoji, CategorySlug, cn\n3) interface PostCardProps { post: PostListItem; initialMyReaction?: ReactionKind | null; initialMyBookmark?: boolean }\n4) 4 useState — myReaction(default initialMyReaction ?? null) / reactionUp(post.reaction_up) / reactionDown(post.reaction_down) / bookmarked(initialMyBookmark) / isReacting / isBookmarking\n5) handleReaction: e.preventDefault + stopPropagation, before/next 분기, 낙관적 setState, fetch /api/reactions, 401 → router.replace('/login'), 실패 시 롤백 + toast.error('反応に失敗しました')\n6) handleBookmark: 동일 패턴, fetch /api/bookmarks, 응답 data.bookmarked 로 정합 체크\n7) JSX: <article role='button' tabIndex={0} onClick={() => router.push(`/posts/${post.id}`)} onKeyDown={Enter/Space → push} className='border rounded-lg p-4 transition-colors hover:bg-muted/50 cursor-pointer'>\n   상단 row: 카테고리 배지(인라인 span + getCategoryEmoji) + 작성자(匿名 default) + 시간 toLocaleDateString('ja-JP') + ml-auto ⋯ button (e.stopPropagation + toast('準備中', { description: 'メニューは Task 016 で実装予定' }))\n   제목 line-clamp-1 / 본문 line-clamp-2\n   액션 row: ❤ button (motion.button, whileTap 0.92, aria-label='推薦する', aria-pressed) / 💬 (read-only div) / 🔖 button (ml-auto, aria-label='ブックマーク')\n8) tsc --noEmit 검증",
-      "verificationCriteria": "PostCard 가 PostListItem 받아 카테고리 배지·작성자·시간·제목·본문·액션 행 렌더, ❤️ 클릭 시 즉시 카운트 변동(낙관적), fetch 실패 시 롤백 + toast, 본문 클릭 시 router.push(`/posts/${id}`), tsc 0건.",
-      "analysisResult": "Task 014 — Phase 4 카드 피드 본격 구축. components/community/{post-card, post-feed} 신규 + app/(app)/page.tsx 의 인라인 article 영역 교체. PostCard: 'use client' + Framer Motion whileTap 0.92 + 낙관적 ❤/🔖 토글(useState 4개) + /api/reactions·/api/bookmarks fetch + 401 redirect + 실패 시 롤백 + sonner toast 에러 + role='button' + ⋯ placeholder. PostFeed: IntersectionObserver(rootMargin '200px 0px') + cursor 페이징 + AbortController + props 변경 시 key 재마운트. page.tsx 5층 인라인 → <PostFeed key={`${sort}-${categorySlug}`} initial={list} sort={sort} categorySlug={categorySlug} />. 일본어 카피(W1: 匿名 / 推薦する / ブックマーク / 準備中 / 投稿の読み込みに失敗しました / 反応に失敗しました / まだ投稿がありません). 사전 확인: FetchPostsResult export + /api/posts GET 응답 envelope. 3 서브태스크."
-    },
-    {
-      "id": "777b9c2f-c877-4e7f-a612-e6a7d6e1a16a",
-      "name": "Task 014-2: post-feed.tsx (IntersectionObserver + AbortController + cursor 페이징)",
-      "description": "클라이언트 무한 스크롤 컴포넌트. 'use client'. props.initial 로 첫 페이지 보존, sentinel 200px 전 IntersectionObserver 트리거, /api/posts GET cursor 페이징, AbortController race 차단, 빈 상태/로딩/에러 처리.\n\n파일: components/community/post-feed.tsx",
-      "notes": "이전 fetch 가 진행 중일 때 새 fetchMore 호출되면 abortRef 가 이전 신호 abort. AbortError 는 무시. props.initial 은 첫 마운트만 사용 — 부모가 key 변경으로 unmount/remount 시 자동 reset.",
-      "status": "pending",
-      "dependencies": [
-        {
-          "taskId": "7db48c89-3bf8-4b0e-afe5-d9bc11c602bd"
-        }
-      ],
-      "createdAt": "2026-05-04T07:46:01.301Z",
-      "updatedAt": "2026-05-04T07:46:01.301Z",
-      "relatedFiles": [
-        {
-          "path": "components/community/post-feed.tsx",
-          "type": "CREATE",
-          "description": "무한 스크롤 + 카드 리스트"
-        },
-        {
-          "path": "components/community/post-card.tsx",
-          "type": "DEPENDENCY",
-          "description": "카드 렌더"
-        },
-        {
-          "path": "lib/community/posts.ts",
-          "type": "DEPENDENCY",
-          "description": "FetchPostsResult / PostListItem"
-        },
-        {
-          "path": "app/api/posts/route.ts",
-          "type": "DEPENDENCY",
-          "description": "GET cursor 페이징"
-        }
-      ],
-      "implementationGuide": "1) 사전 확인: app/api/posts/route.ts 의 GET 응답 envelope 확인 (Task 011-2). { ok:true, data: { items, nextCursor } } 형식 가정.\n2) 'use client' + imports: useEffect/useRef/useState, useRouter, Loader2, toast, PostCard, PostListItem, FetchPostsResult\n3) interface PostFeedProps { initial: FetchPostsResult; sort: 'latest' | 'popular'; categorySlug?: string; search?: string }\n4) state: items / cursor / hasMore / isLoading. abortRef = useRef<AbortController | null>(null)\n5) fetchMore async:\n   - if (!cursor || isLoading || !hasMore) return\n   - abortRef.current?.abort()\n   - const ctrl = new AbortController(); abortRef.current = ctrl\n   - URLSearchParams 으로 sort/categorySlug/q/cursor 조합\n   - res = await fetch(`/api/posts?${qs}`, { signal: ctrl.signal })\n   - json = await res.json()\n   - !json.ok && status===401 → router.replace('/login')\n   - !json.ok → throw\n   - setItems(prev => [...prev, ...json.data.items]); setCursor(json.data.nextCursor); setHasMore(json.data.nextCursor !== null)\n   - catch e — e.name === 'AbortError' return; 그 외 toast.error\n6) IntersectionObserver useEffect:\n   - sentinelRef.current 와 hasMore 가드\n   - new IntersectionObserver(([entry]) => { if (entry.isIntersecting) fetchMore() }, { rootMargin: '200px 0px' })\n   - observer.observe + cleanup observer.disconnect\n7) unmount 시 abortRef abort\n8) 빈 상태 (items.length === 0): <div className='py-12 text-center text-sm text-muted-foreground'>まだ投稿がありません — 右下のボタンから最初の投稿を作成しましょう</div>\n9) 렌더: items.map(p => <PostCard key={p.id} post={p} />) + sentinel div (hasMore && {isLoading && Loader2 spin})\n10) tsc --noEmit",
-      "verificationCriteria": "PostFeed 가 props.initial 로 시작, 스크롤 다운 시 IntersectionObserver 트리거 → fetchMore → 다음 페이지 append, AbortController 가 race 차단, 빈 상태 placeholder, 로딩 시 Loader2, tsc 0건.",
-      "analysisResult": "Task 014 — Phase 4 카드 피드 본격 구축. components/community/{post-card, post-feed} 신규 + app/(app)/page.tsx 의 인라인 article 영역 교체. PostCard: 'use client' + Framer Motion whileTap 0.92 + 낙관적 ❤/🔖 토글(useState 4개) + /api/reactions·/api/bookmarks fetch + 401 redirect + 실패 시 롤백 + sonner toast 에러 + role='button' + ⋯ placeholder. PostFeed: IntersectionObserver(rootMargin '200px 0px') + cursor 페이징 + AbortController + props 변경 시 key 재마운트. page.tsx 5층 인라인 → <PostFeed key={`${sort}-${categorySlug}`} initial={list} sort={sort} categorySlug={categorySlug} />. 일본어 카피(W1: 匿名 / 推薦する / ブックマーク / 準備中 / 投稿の読み込みに失敗しました / 反応に失敗しました / まだ投稿がありません). 사전 확인: FetchPostsResult export + /api/posts GET 응답 envelope. 3 서브태스크."
-    },
-    {
-      "id": "b8e97e21-e479-421d-86fc-5c484cb27368",
-      "name": "Task 014-3: app/(app)/page.tsx 인라인 article → <PostFeed> 통합 + npm run build + ROADMAP ✅",
-      "description": "page.tsx 의 5층 (Task 014 placeholder) 영역을 PostFeed 컴포넌트로 교체. key 로 props 변경 시 자동 reset. 통합 검증.",
-      "notes": "key={`${sort}-${categorySlug ?? 'all'}`} — categorySlug 가 undefined 면 'all' 로 고유. 다른 카테고리 또는 정렬 변경 시 key 변경 → React 가 unmount + 새 마운트.",
-      "status": "pending",
-      "dependencies": [
-        {
-          "taskId": "777b9c2f-c877-4e7f-a612-e6a7d6e1a16a"
-        }
-      ],
-      "createdAt": "2026-05-04T07:46:01.301Z",
-      "updatedAt": "2026-05-04T07:46:01.301Z",
-      "relatedFiles": [
-        {
-          "path": "app/(app)/page.tsx",
-          "type": "TO_MODIFY",
-          "description": "5층 PostFeed 통합"
-        },
-        {
-          "path": "components/community/post-feed.tsx",
-          "type": "DEPENDENCY",
-          "description": "신규 컴포넌트"
-        },
-        {
-          "path": "docs/ROADMAP.md",
-          "type": "TO_MODIFY",
-          "description": "Task 014 ✅"
-        }
-      ],
-      "implementationGuide": "1) Edit app/(app)/page.tsx:\n   import { PostFeed } from '@/components/community/post-feed'\n   5층 section:\n   <section className='px-4 py-4'>\n     <PostFeed\n       key={`${sort}-${categorySlug ?? 'all'}`}\n       initial={list}\n       sort={sort}\n       categorySlug={categorySlug}\n     />\n   </section>\n   기존 인라인 article map 제거. 빈 상태 placeholder 도 PostFeed 내부에서 처리되므로 page.tsx 의 빈 분기 제거.\n2) npm run build (timeout 5분) — 17 라우트 컴파일, /(app) 페이지 동적 ƒ 유지\n3) Edit docs/ROADMAP.md Task 014 ✅ + nested bullet 5~7줄:\n   - components/community/{post-card(role=button + 낙관적 ❤/🔖 + ⋯ placeholder), post-feed(IntersectionObserver 200px + AbortController + cursor 페이징)}\n   - 카드 ❤ 클릭 → /api/reactions POST + 낙관적 업데이트 + 실패 시 롤백 + toast\n   - 🔖 동일 패턴 + /api/bookmarks 토글\n   - 무한 스크롤 — sentinel 200px 전 트리거, race 차단\n   - page.tsx 의 5층 인라인 article → <PostFeed key=...> 교체, key 로 sort/categorySlug 변경 시 자동 reset\n   - npm run build 회귀 0건\n   - Task 015 진입 — /posts/[id] 페이지 + 댓글 트리",
-      "verificationCriteria": "app/(app)/page.tsx 의 5층이 <PostFeed key=...> 만 렌더, npm run build 회귀 0건, ROADMAP Task 014 ✅ + nested bullet.",
-      "analysisResult": "Task 014 — Phase 4 카드 피드 본격 구축. components/community/{post-card, post-feed} 신규 + app/(app)/page.tsx 의 인라인 article 영역 교체. PostCard: 'use client' + Framer Motion whileTap 0.92 + 낙관적 ❤/🔖 토글(useState 4개) + /api/reactions·/api/bookmarks fetch + 401 redirect + 실패 시 롤백 + sonner toast 에러 + role='button' + ⋯ placeholder. PostFeed: IntersectionObserver(rootMargin '200px 0px') + cursor 페이징 + AbortController + props 변경 시 key 재마운트. page.tsx 5층 인라인 → <PostFeed key={`${sort}-${categorySlug}`} initial={list} sort={sort} categorySlug={categorySlug} />. 일본어 카피(W1: 匿名 / 推薦する / ブックマーク / 準備中 / 投稿の読み込みに失敗しました / 反応に失敗しました / まだ投稿がありません). 사전 확인: FetchPostsResult export + /api/posts GET 응답 envelope. 3 서브태스크."
-    },
-    {
-      "id": "5a3f29a5-3212-4699-b669-a4877e26d560",
-      "name": "Task 015-1: app/api/comments/[id]/route.ts (DELETE soft delete)",
-      "description": "댓글 본인/admin soft delete 라우트 신규. Next.js 16 params Promise 시그니처. withAuth + UPDATE comments SET is_deleted=true. RLS 가 본인/admin 만 통과. 영향 0행이면 403.\n\n파일: app/api/comments/[id]/route.ts",
-      "notes": "트리거 comments_apply_post_counter 가 is_deleted=true → posts.comment_count 자동 -1. 별도 갱신 불필요.",
-      "status": "pending",
-      "dependencies": [],
-      "createdAt": "2026-05-04T08:08:44.157Z",
-      "updatedAt": "2026-05-04T08:08:44.157Z",
-      "relatedFiles": [
-        {
-          "path": "app/api/comments/[id]/route.ts",
-          "type": "CREATE",
-          "description": "DELETE soft delete"
-        },
-        {
-          "path": "app/api/posts/[id]/route.ts",
-          "type": "REFERENCE",
-          "description": "DELETE 패턴 참조"
-        },
-        {
-          "path": "lib/community/api-helpers.ts",
-          "type": "DEPENDENCY",
-          "description": "withAuth/err"
-        }
-      ],
-      "implementationGuide": "1) Write app/api/comments/[id]/route.ts:\n   import { NextResponse } from 'next/server'\n   import { withAuth, err } from '@/lib/community/api-helpers'\n   import { z } from 'zod'\n\n   const ParamsSchema = z.object({ id: z.string().uuid() })\n\n   export async function DELETE(_req: Request, ctx: { params: Promise<{ id: string }> }): Promise<NextResponse> {\n     const { id } = await ctx.params\n     const parsed = ParamsSchema.safeParse({ id })\n     if (!parsed.success) return err('VALIDATION', 'IDが正しくありません', 422)\n\n     return withAuth(async (supabase) => {\n       const { data, error } = await supabase\n         .from('comments')\n         .update({ is_deleted: true })\n         .eq('id', parsed.data.id)\n         .select('id')\n       if (error) throw error\n       if (!data || data.length === 0) throw new Error('FORBIDDEN_OR_NOT_FOUND')\n       return { id: parsed.data.id }\n     })\n   }\n2) tsc --noEmit",
-      "verificationCriteria": "DELETE 라우트 정상 응답 (200/422/403/500), tsc 0건. /api/comments/[id] 라우트 npm run build 시 ƒ 추가.",
-      "analysisResult": "Task 015 — Phase 4 게시글 상세 + 댓글 (W2). app/(app)/posts/[id]/page.tsx Server Component 가 fetchPostWithComments 를 호출하여 post + 카테고리 + 작성자 + 1단계 대댓글 트리 + myReaction + myBookmark 를 SSR. 본인 판정은 Server Component 에서 supabase.auth.getUser() 로 currentUserId 추출 → Client 컴포넌트 props 전달. 컴포넌트 4개: post-detail-actions(Client, 낙관적 ❤👎🔖 + 본인 글 削除 + ⋯ placeholder) / post-detail-thread(Client wrapper, replyTo state 보유) / comment-list(Client, 1단계 대댓글 트리 + 본인 댓글 削除) / comment-form(Client, RHF + zodResolver(CommentFormSchema) + 하단 fixed + 返信 모드). 신규 라우트 1개: app/api/comments/[id]/route.ts DELETE (withAuth + soft delete). 댓글 즉시 반영은 router.refresh(). 댓글 추천 토글은 Phase 7+ 로 미룸 (read-only 카운트도 본 Task 에선 미노출, 단순화). FAB 와 댓글 폼 z-index 충돌은 미해결 (Task 020 통합 시 결정). 일본어 카피 W2 1:1 (戻る / 削除 / 返信 / 送信 / コメントを入力 / まだコメントがありません / 投稿を削除しました / 投稿が見つかりません 등). 4 서브태스크."
-    },
-    {
-      "id": "65166ead-3813-4a48-806f-a780e2be8c99",
-      "name": "Task 015-2: components/community/post-detail-actions.tsx (❤👎🔖 + 본인 글 削除 + ⋯)",
-      "description": "게시글 상세 액션 바. 'use client'. PostCard 와 동일한 낙관적 ❤👎🔖 토글 패턴 + 본인이면 [削除] confirm dialog + ⋯ menu placeholder.\n\n파일: components/community/post-detail-actions.tsx",
-      "notes": "PostCard 의 낙관적 패턴 거의 동일 — 일관 톤 유지. min-h-[44px] 모바일 터치. Loader2 disabled spinner.",
-      "status": "pending",
-      "dependencies": [
-        {
-          "taskId": "5a3f29a5-3212-4699-b669-a4877e26d560"
-        }
-      ],
-      "createdAt": "2026-05-04T08:08:44.157Z",
-      "updatedAt": "2026-05-04T08:08:44.157Z",
-      "relatedFiles": [
-        {
-          "path": "components/community/post-detail-actions.tsx",
-          "type": "CREATE",
-          "description": "상세 액션 바"
-        },
-        {
-          "path": "components/community/post-card.tsx",
-          "type": "REFERENCE",
-          "description": "낙관적 패턴 참조"
-        },
-        {
-          "path": "types/community.ts",
-          "type": "DEPENDENCY",
-          "description": "ReactionKind"
-        }
-      ],
-      "implementationGuide": "1) imports: useState, useRouter, motion/useReducedMotion, Heart/ThumbsDown/Bookmark/Trash2/MoreHorizontal/Loader2, toast(sonner), ReactionKind, cn\n2) interface PostDetailActionsProps { postId: string; ownerUserId: string; currentUserId: string|null; reactionUp: number; reactionDown: number; commentCount: number; initialMyReaction: ReactionKind|null; initialMyBookmark: boolean }\n3) isOwner = currentUserId === ownerUserId\n4) useState 4개 — myReaction / reactionUp / reactionDown / bookmarked / 3 isBusy 플래그\n5) handleReaction(kind: ReactionKind):\n   const before = myReaction; const next = before === kind ? null : kind\n   낙관적: setMyReaction(next), 카운터 분기:\n     · before==null && next==='up' → up+1\n     · before==null && next==='down' → down+1\n     · before==='up' && next==null → up-1\n     · before==='down' && next==null → down-1\n     · before==='up' && next==='down' → up-1, down+1\n     · before==='down' && next==='up' → down-1, up+1\n   fetch /api/reactions POST { targetType:'post', targetId: postId, kind }\n   401 → /login, 실패 → 롤백 + toast.error\n6) handleBookmark — fetch /api/bookmarks POST { postId }, 응답 data.bookmarked\n7) handleDelete (isOwner only):\n   if (!confirm('この投稿を削除しますか?')) return\n   fetch DELETE /api/posts/[id]\n   ok → toast.success('投稿を削除しました') + router.replace('/')\n   실패 → toast.error('削除に失敗しました')\n8) handleMenu — toast('準備中', { description: 'メニューは Task 016 で実装予定' })\n9) JSX flex justify-between gap-2 items-center px-4 py-3 border-y bg-background\n   좌측 그룹: ❤ button + 👎 button + 💬 div(read-only count)\n   우측 그룹: 🔖 button + isOwner && 🗑 button + ⋯ button\n10) tsc --noEmit",
-      "verificationCriteria": "❤/👎/🔖 낙관적 토글 + 401 redirect + 실패 롤백 + 본인 글 [削除] confirm → router.replace('/'), tsc 0건.",
-      "analysisResult": "Task 015 — Phase 4 게시글 상세 + 댓글 (W2). app/(app)/posts/[id]/page.tsx Server Component 가 fetchPostWithComments 를 호출하여 post + 카테고리 + 작성자 + 1단계 대댓글 트리 + myReaction + myBookmark 를 SSR. 본인 판정은 Server Component 에서 supabase.auth.getUser() 로 currentUserId 추출 → Client 컴포넌트 props 전달. 컴포넌트 4개: post-detail-actions(Client, 낙관적 ❤👎🔖 + 본인 글 削除 + ⋯ placeholder) / post-detail-thread(Client wrapper, replyTo state 보유) / comment-list(Client, 1단계 대댓글 트리 + 본인 댓글 削除) / comment-form(Client, RHF + zodResolver(CommentFormSchema) + 하단 fixed + 返信 모드). 신규 라우트 1개: app/api/comments/[id]/route.ts DELETE (withAuth + soft delete). 댓글 즉시 반영은 router.refresh(). 댓글 추천 토글은 Phase 7+ 로 미룸 (read-only 카운트도 본 Task 에선 미노출, 단순화). FAB 와 댓글 폼 z-index 충돌은 미해결 (Task 020 통합 시 결정). 일본어 카피 W2 1:1 (戻る / 削除 / 返信 / 送信 / コメントを入力 / まだコメントがありません / 投稿を削除しました / 投稿が見つかりません 등). 4 서브태스크."
-    },
-    {
-      "id": "aeb571a0-5949-4710-b23d-e740d50389da",
-      "name": "Task 015-3: comment-list.tsx + comment-form.tsx + post-detail-thread.tsx (wrapper)",
-      "description": "댓글 트리 + 댓글 폼 + Client wrapper(replyTo state 공유).\n\n파일:\n- components/community/comment-list.tsx — 1단계 대댓글 트리 렌더 + 본인 댓글 삭제 + 返信 버튼\n- components/community/comment-form.tsx — 하단 fixed RHF + zodResolver(CommentFormSchema) + replyTo 모드\n- components/community/post-detail-thread.tsx — 'use client' wrapper, replyTo state",
-      "notes": "댓글 추천 카운트 노출 미구현 — body 옆에 reactions count 표시 안 함. ⋯ 메뉴는 본인이면 削除 만 노출, 신고는 Task 016 별도. preview = c.body.slice(0, 30).",
-      "status": "pending",
-      "dependencies": [
-        {
-          "taskId": "65166ead-3813-4a48-806f-a780e2be8c99"
-        }
-      ],
-      "createdAt": "2026-05-04T08:08:44.157Z",
-      "updatedAt": "2026-05-04T08:08:44.157Z",
-      "relatedFiles": [
-        {
-          "path": "components/community/comment-list.tsx",
-          "type": "CREATE",
-          "description": "댓글 트리 + 삭제"
-        },
-        {
-          "path": "components/community/comment-form.tsx",
-          "type": "CREATE",
-          "description": "하단 fixed 폼"
-        },
-        {
-          "path": "components/community/post-detail-thread.tsx",
-          "type": "CREATE",
-          "description": "client wrapper"
-        },
-        {
-          "path": "types/community.ts",
-          "type": "DEPENDENCY",
-          "description": "CommentFormSchema"
-        },
-        {
-          "path": "lib/community/post-detail.ts",
-          "type": "DEPENDENCY",
-          "description": "CommentNode 타입"
-        }
-      ],
-      "implementationGuide": "1) comment-list.tsx ('use client'):\n   props: { comments: CommentNode[]; currentUserId: string|null; onReply: (parent: { id: string; preview: string }) => void }\n   if (comments.length===0) return <div className='py-8 text-center text-sm text-muted-foreground'>まだコメントがありません</div>\n   comments.map(top => (\n     <div key={top.id} className='space-y-2'>\n       <CommentItem c={top} canReply currentUserId onReply />\n       {top.replies?.map(r => <div className='ml-6 border-l pl-4'><CommentItem c={r} canReply={false} ... /></div>)}\n     </div>\n   ))\n   CommentItem (내부 함수): 작성자(c.is_anonymous? '匿名' : c.author?.nickname) + 시간 + body + (canReply && [返信]) + (currentUserId === c.user_id && [⋯ menu → 削除])\n   handleDelete: confirm + fetch DELETE /api/comments/[id] + ok → router.refresh() + toast.success('コメントを削除しました')\n\n2) comment-form.tsx ('use client'):\n   props: { postId: string; replyTo: { id: string; preview: string } | null; onSubmitted: () => void; onCancelReply: () => void }\n   const form = useForm<CommentFormData>({ resolver: zodResolver(CommentFormSchema), defaultValues: { postId, parentId: null, body:'', isAnonymous: true } })\n   useEffect on replyTo: form.setValue('parentId', replyTo?.id ?? null)\n   onSubmit: fetch POST /api/comments → ok → form.reset(...) + router.refresh() + onSubmitted() / 401 → /login / 422 → setError / 기타 → toast.error\n   JSX: fixed bottom-[calc(56px+env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 w-full max-w-[768px] z-30 bg-background border-t px-4 py-2 space-y-2\n     replyTo && <div className='text-xs text-muted-foreground flex items-center gap-2'>返信先: {preview} <button onClick={onCancelReply}><X size=14 /></button></div>\n     <div className='flex gap-2 items-end'>\n       <Textarea rows=2 minHeight={40} maxLength=1000 + auto-grow\n       <Button onClick={form.handleSubmit(onSubmit)} disabled={!form.formState.isValid || form.formState.isSubmitting}>送信</Button>\n     </div>\n     <Controller name='isAnonymous' ... 匿名으로 게시 / ニックネーム表示 — small radio inline>\n   visualViewport 키보드 자동 스크롤은 brief\n\n3) post-detail-thread.tsx ('use client'):\n   props: { comments, postId, currentUserId }\n   const [replyTo, setReplyTo] = useState<{ id, preview } | null>(null)\n   return <>\n     <CommentList comments currentUserId onReply={(r) => setReplyTo(r)} />\n     <CommentForm postId replyTo onSubmitted={() => setReplyTo(null)} onCancelReply={() => setReplyTo(null)} />\n   </>\n\n4) tsc --noEmit",
-      "verificationCriteria": "빈 상태 placeholder, 댓글 작성 시 router.refresh + 즉시 목록 반영, 返信 모드 → parent_id 세팅, 본인 댓글 削除 confirm → soft delete, 1단계 대댓글 인덴트, tsc 0건.",
-      "analysisResult": "Task 015 — Phase 4 게시글 상세 + 댓글 (W2). app/(app)/posts/[id]/page.tsx Server Component 가 fetchPostWithComments 를 호출하여 post + 카테고리 + 작성자 + 1단계 대댓글 트리 + myReaction + myBookmark 를 SSR. 본인 판정은 Server Component 에서 supabase.auth.getUser() 로 currentUserId 추출 → Client 컴포넌트 props 전달. 컴포넌트 4개: post-detail-actions(Client, 낙관적 ❤👎🔖 + 본인 글 削除 + ⋯ placeholder) / post-detail-thread(Client wrapper, replyTo state 보유) / comment-list(Client, 1단계 대댓글 트리 + 본인 댓글 削除) / comment-form(Client, RHF + zodResolver(CommentFormSchema) + 하단 fixed + 返信 모드). 신규 라우트 1개: app/api/comments/[id]/route.ts DELETE (withAuth + soft delete). 댓글 즉시 반영은 router.refresh(). 댓글 추천 토글은 Phase 7+ 로 미룸 (read-only 카운트도 본 Task 에선 미노출, 단순화). FAB 와 댓글 폼 z-index 충돌은 미해결 (Task 020 통합 시 결정). 일본어 카피 W2 1:1 (戻る / 削除 / 返信 / 送信 / コメントを入力 / まだコメントがありません / 投稿を削除しました / 投稿が見つかりません 등). 4 서브태스크."
-    },
-    {
-      "id": "bb406658-eeda-42d1-af6d-c0a3979c5063",
-      "name": "Task 015-4: app/(app)/posts/[id]/page.tsx Server Component + npm run build + ROADMAP ✅",
-      "description": "Server Component 페이지 신규 + 통합 검증.\n\n파일: app/(app)/posts/[id]/page.tsx",
-      "notes": "FAB 와 댓글 폼 z-index 충돌은 본 Task 미해결 (Task 020 결정). 댓글 추천 토글은 Phase 7+. comment_count 캐시 컬럼 사용 (트리거 자동 갱신).",
-      "status": "pending",
-      "dependencies": [
-        {
-          "taskId": "aeb571a0-5949-4710-b23d-e740d50389da"
-        }
-      ],
-      "createdAt": "2026-05-04T08:08:44.157Z",
-      "updatedAt": "2026-05-04T08:08:44.157Z",
-      "relatedFiles": [
-        {
-          "path": "app/(app)/posts/[id]/page.tsx",
-          "type": "CREATE",
-          "description": "상세 Server Component"
-        },
-        {
-          "path": "docs/ROADMAP.md",
-          "type": "TO_MODIFY",
-          "description": "Task 015 ✅"
-        }
-      ],
-      "implementationGuide": "1) Write app/(app)/posts/[id]/page.tsx:\n   import { notFound } from 'next/navigation'\n   import Link from 'next/link'\n   import { ChevronLeft } from 'lucide-react'\n   import { createClient } from '@/lib/supabase/server'\n   import { fetchPostWithComments } from '@/lib/community/post-detail'\n   import { getCategoryEmoji } from '@/lib/community/categories'\n   import type { CategorySlug } from '@/types/community'\n   import { PostDetailActions } from '@/components/community/post-detail-actions'\n   import { PostDetailThread } from '@/components/community/post-detail-thread'\n\n   export default async function PostDetailPage({ params }: { params: Promise<{ id: string }> }) {\n     const { id } = await params\n     const supabase = await createClient()\n     const result = await fetchPostWithComments(supabase, id)\n     if (!result) notFound()\n     const { data: { user } } = await supabase.auth.getUser()\n     const currentUserId = user?.id ?? null\n     const { post, comments, myReaction, myBookmark } = result\n\n     return (\n       <div>\n         <header className='sticky top-0 z-30 bg-background/95 backdrop-blur border-b px-2 h-14 flex items-center'>\n           <Link href='/' aria-label='戻る' className='p-2 rounded-md hover:bg-muted'><ChevronLeft className='size-5' /></Link>\n         </header>\n         <article className='px-4 py-4 space-y-3 border-b'>\n           <div className='flex items-center gap-2'>\n             <span className='inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-secondary text-secondary-foreground text-xs'>\n               {post.category && getCategoryEmoji(post.category.slug as CategorySlug)} {post.category?.name ?? '—'}\n             </span>\n             <span className='text-xs text-muted-foreground'>\n               {post.author?.nickname ?? '匿名'} · {new Date(post.created_at).toLocaleString('ja-JP')}\n             </span>\n           </div>\n           <h1 className='text-xl font-bold'>{post.title}</h1>\n           <p className='whitespace-pre-wrap text-sm leading-relaxed'>{post.body}</p>\n         </article>\n         <PostDetailActions\n           postId={post.id} ownerUserId={post.user_id} currentUserId={currentUserId}\n           reactionUp={post.reaction_up} reactionDown={post.reaction_down} commentCount={post.comment_count}\n           initialMyReaction={myReaction} initialMyBookmark={myBookmark}\n         />\n         <section className='px-4 py-4'>\n           <h2 className='text-sm font-semibold text-muted-foreground mb-3'>コメント ({post.comment_count})</h2>\n           <PostDetailThread comments={comments} postId={post.id} currentUserId={currentUserId} />\n         </section>\n         <div className='h-32' aria-hidden />\n       </div>\n     )\n   }\n\n2) npm run build (timeout 5분) — /posts/[id] 신규 ƒ 라우트 + /api/comments/[id] 신규 ƒ 라우트 추가, 총 18~19 라우트 컴파일 통과 확인\n3) Edit docs/ROADMAP.md Task 015 ✅ + nested bullet 5~7줄",
-      "verificationCriteria": "/posts/[id] 라우트 정상 SSR, fetchPostWithComments null → 404, 본인 글 삭제·댓글 작성·返信·삭제 모두 동작, npm run build 회귀 0건, ROADMAP ✅.",
-      "analysisResult": "Task 015 — Phase 4 게시글 상세 + 댓글 (W2). app/(app)/posts/[id]/page.tsx Server Component 가 fetchPostWithComments 를 호출하여 post + 카테고리 + 작성자 + 1단계 대댓글 트리 + myReaction + myBookmark 를 SSR. 본인 판정은 Server Component 에서 supabase.auth.getUser() 로 currentUserId 추출 → Client 컴포넌트 props 전달. 컴포넌트 4개: post-detail-actions(Client, 낙관적 ❤👎🔖 + 본인 글 削除 + ⋯ placeholder) / post-detail-thread(Client wrapper, replyTo state 보유) / comment-list(Client, 1단계 대댓글 트리 + 본인 댓글 削除) / comment-form(Client, RHF + zodResolver(CommentFormSchema) + 하단 fixed + 返信 모드). 신규 라우트 1개: app/api/comments/[id]/route.ts DELETE (withAuth + soft delete). 댓글 즉시 반영은 router.refresh(). 댓글 추천 토글은 Phase 7+ 로 미룸 (read-only 카운트도 본 Task 에선 미노출, 단순화). FAB 와 댓글 폼 z-index 충돌은 미해결 (Task 020 통합 시 결정). 일본어 카피 W2 1:1 (戻る / 削除 / 返信 / 送信 / コメントを入力 / まだコメントがありません / 投稿を削除しました / 投稿が見つかりません 등). 4 서브태스크."
-    },
-    {
-      "id": "10d6dd7f-0390-4b55-88f3-68f4d8f11214",
-      "name": "Task 016-1: lib/stores/report-sheet-store.ts (Zustand, target 보유)",
-      "description": "Zustand store 신규. write-sheet-store 와 동일 패턴 + target 페이로드 (type/id/preview).\n\n시그니처:\n- isOpen: boolean\n- target: { type:'post'|'comment'; id:string; preview?:string } | null\n- open(target): void — isOpen=true, target=...\n- close(): void — isOpen=false, target=null",
-      "notes": "기존 lib/stores/write-sheet-store.ts 와 100% 동일 패턴 + target 추가.",
-      "status": "pending",
-      "dependencies": [],
-      "createdAt": "2026-05-04T12:06:22.783Z",
-      "updatedAt": "2026-05-04T12:06:22.783Z",
-      "relatedFiles": [
-        {
-          "path": "lib/stores/report-sheet-store.ts",
-          "type": "CREATE",
-          "description": "Zustand store"
-        },
-        {
-          "path": "lib/stores/write-sheet-store.ts",
-          "type": "REFERENCE",
-          "description": "동일 패턴 출처"
-        }
-      ],
-      "implementationGuide": "Write lib/stores/report-sheet-store.ts:\nimport { create } from 'zustand'\nexport type ReportTarget = { type: 'post' | 'comment'; id: string; preview?: string }\ninterface State { isOpen: boolean; target: ReportTarget | null; open: (t: ReportTarget) => void; close: () => void }\nexport const useReportSheet = create<State>((set) => ({\n  isOpen: false,\n  target: null,\n  open: (target) => set({ isOpen: true, target }),\n  close: () => set({ isOpen: false, target: null }),\n}))\n\ntsc --noEmit 검증",
-      "verificationCriteria": "useReportSheet export, isOpen/target/open/close 시그니처 일치, tsc 0건.",
-      "analysisResult": "Task 016 — F008 신고 기능 (W6 와이어프레임). lib/stores/report-sheet-store.ts(Zustand, target 보유) + components/community/report-sheet.tsx(50vh + RHF + zodResolver(ReportFormSchema) + 사유 라디오 4건 + 보충 0/500 + UNIQUE 409 처리) + 3곳 ⋯ placeholder 통합(post-card / post-detail-actions / comment-list — 댓글은 본인이면 削除, 타인이면 通報) + (app)/layout.tsx 에 마운트. /api/reports POST 라우트 + reports 테이블 + UNIQUE 제약 + RLS 정책 모두 Task 011 에서 완료. 일본어 카피 W6 1:1. write-bottom-sheet 와 동일 패턴 (Sheet/RHF/sonner). 4 서브태스크."
-    },
-    {
-      "id": "386b54f2-f9fc-4923-b681-45b609bf4bcc",
-      "name": "Task 016-2: components/community/report-sheet.tsx (50vh + RHF + ReportFormSchema)",
-      "description": "W6 와이어프레임 1:1 구현. 'use client'. shadcn Sheet(side='bottom') 50vh + 헤더(X/通報/送信) + 안내(target.type 분기) + RadioGroup 사유 4건 + Textarea 보충 0/500 + 重複 안내 + RHF + zodResolver(ReportFormSchema) + envelope 처리 (200/409/422/401/기타).\n\n파일: components/community/report-sheet.tsx",
-      "notes": "target null 시 SheetContent 안의 target?.type 분기에서 fallback 처리. form.formState.isValid 가 reason 미선택 시 false → 제출 disabled. write-bottom-sheet 와 톤 일관.",
-      "status": "pending",
-      "dependencies": [
-        {
-          "taskId": "10d6dd7f-0390-4b55-88f3-68f4d8f11214"
-        }
-      ],
-      "createdAt": "2026-05-04T12:06:22.783Z",
-      "updatedAt": "2026-05-04T12:06:22.783Z",
-      "relatedFiles": [
-        {
-          "path": "components/community/report-sheet.tsx",
-          "type": "CREATE",
-          "description": "通報 Bottom Sheet"
-        },
-        {
-          "path": "components/community/write-bottom-sheet.tsx",
-          "type": "REFERENCE",
-          "description": "Sheet+RHF+sonner 패턴 출처"
-        },
-        {
-          "path": "types/community.ts",
-          "type": "DEPENDENCY",
-          "description": "ReportFormSchema/ReportFormData/REPORT_REASON_VALUES"
-        },
-        {
-          "path": "lib/stores/report-sheet-store.ts",
-          "type": "DEPENDENCY",
-          "description": "useReportSheet"
-        },
-        {
-          "path": "app/api/reports/route.ts",
-          "type": "DEPENDENCY",
-          "description": "POST 응답 envelope"
-        },
-        {
-          "path": "docs/wireframes/report-sheet.md",
-          "type": "REFERENCE",
-          "description": "W6 시안 (만약 부재면 메모리 시안)"
-        }
-      ],
-      "implementationGuide": "1) 'use client' + imports: Sheet/SheetContent/SheetHeader/SheetTitle/SheetDescription/SheetClose, Button, Textarea, RadioGroup/RadioGroupItem, Label, X/Loader2/AlertCircle, useForm/Controller, zodResolver, ReportFormSchema/ReportFormData (types/community), useReportSheet (lib/stores), useRouter, toast (sonner), useEffect/useRef\n2) const REASONS = [{value:'abuse',label:'暴言・誹謗中傷'},{value:'defamation',label:'名誉毀損'},{value:'spam',label:'スパム'},{value:'illegal',label:'違法・不適切なコンテンツ'}] as const\n3) const { isOpen, target, close } = useReportSheet()\n4) form = useForm<ReportFormData>({ resolver: zodResolver(ReportFormSchema), mode:'onChange', defaultValues: { targetType: 'post', targetId: '', reason: undefined as any, description: '' } })\n5) useEffect on target?.id/type — target 가 있을 때 form.reset({ targetType: target.type, targetId: target.id, reason: undefined, description: '' })\n6) onSubmit:\n   res = fetch('/api/reports', POST + JSON)\n   json.ok → toast.success('通報を受け付けました。運営が確認します。') + close() + form.reset\n   res.status===401 → router.replace('/login')\n   res.status===409 || json.error?.code==='CONFLICT' → toast.warning('既に通報済みです') + close()\n   422 + fieldErrors → form.setError 인라인\n   기타 → toast.error('通報に失敗しました', { description: json.error?.message })\n7) JSX:\n   <Sheet open={isOpen} onOpenChange={(o)=>!o&&close()}>\n     <SheetContent side='bottom' showCloseButton={false} className='h-[50vh] p-0 flex flex-col rounded-t-2xl'>\n       <SheetHeader> [SheetClose ghost X] [SheetTitle 通報 + SheetDescription sr-only] [Button submit form='report-form' destructive disabled=!isValid||isSubmitting] </SheetHeader>\n       <form id='report-form' onSubmit={form.handleSubmit(onSubmit)} className='flex-1 overflow-y-auto p-4 space-y-4'>\n         <Alert/안내 div: この{target?.type==='post'?'投稿':'コメント'}を運営に通報します。 内容は管理者のみが確認できます。\n         (선택) target?.preview 표시\n         <Controller name='reason' RadioGroup REASONS map → Label + RadioGroupItem >\n         <Textarea register('description') maxLength=500 placeholder='補足説明 (任意)\\n具体的な状況をご記入ください...' rows=4 + 카운터>\n         <p className='text-xs text-muted-foreground'>⚠️ 同じ投稿への重複通報はできません</p>\n       </form>\n     </SheetContent>\n   </Sheet>\n8) tsc --noEmit",
-      "verificationCriteria": "50vh Sheet + 사유 4 라디오 + 보충 0/500 + 重複 안내 + 通報 라벨 + 既に通報済み 토스트, target.type 에 따라 投稿/コメント 분기, tsc 0건.",
-      "analysisResult": "Task 016 — F008 신고 기능 (W6 와이어프레임). lib/stores/report-sheet-store.ts(Zustand, target 보유) + components/community/report-sheet.tsx(50vh + RHF + zodResolver(ReportFormSchema) + 사유 라디오 4건 + 보충 0/500 + UNIQUE 409 처리) + 3곳 ⋯ placeholder 통합(post-card / post-detail-actions / comment-list — 댓글은 본인이면 削除, 타인이면 通報) + (app)/layout.tsx 에 마운트. /api/reports POST 라우트 + reports 테이블 + UNIQUE 제약 + RLS 정책 모두 Task 011 에서 완료. 일본어 카피 W6 1:1. write-bottom-sheet 와 동일 패턴 (Sheet/RHF/sonner). 4 서브태스크."
-    },
-    {
-      "id": "ef6b1ac1-c484-4f66-9268-bf7d64c5309f",
-      "name": "Task 016-3: ⋯ 메뉴 통합 (post-card + post-detail-actions + comment-list)",
-      "description": "3곳의 ⋯ placeholder 를 useReportSheet().open() 호출로 교체. 댓글은 본인/타인 분기 (본인 削除 / 타인 通報).",
-      "notes": "본인 글 신고 차단은 MVP 에서 미구현 — post-card/post-detail-actions 는 본인 글이라도 통보 메뉴 노출 (자기 신고 가능). 후속 보강 가능. 댓글은 본인/타인 분기로 명확.",
-      "status": "pending",
-      "dependencies": [
-        {
-          "taskId": "386b54f2-f9fc-4923-b681-45b609bf4bcc"
-        }
-      ],
-      "createdAt": "2026-05-04T12:06:22.783Z",
-      "updatedAt": "2026-05-04T12:06:22.783Z",
-      "relatedFiles": [
-        {
-          "path": "components/community/post-card.tsx",
-          "type": "TO_MODIFY",
-          "description": "⋯ menu 진입점",
-          "lineStart": 135,
-          "lineEnd": 180
-        },
-        {
-          "path": "components/community/post-detail-actions.tsx",
-          "type": "TO_MODIFY",
-          "description": "⋯ menu 진입점",
-          "lineStart": 210,
-          "lineEnd": 345
-        },
-        {
-          "path": "components/community/comment-list.tsx",
-          "type": "TO_MODIFY",
-          "description": "본인/타인 분기",
-          "lineStart": 115,
-          "lineEnd": 160
-        },
-        {
-          "path": "lib/stores/report-sheet-store.ts",
-          "type": "DEPENDENCY",
-          "description": "useReportSheet.open"
-        }
-      ],
-      "implementationGuide": "1) post-card.tsx (line ~138):\n   import { useReportSheet } from '@/lib/stores/report-sheet-store'\n   const openReport = useReportSheet(s=>s.open)\n   handleMenu(e):\n     e.stopPropagation()\n     openReport({ type:'post', id: post.id, preview: post.title })\n   기존 toast('準備中') 라인 제거\n\n2) post-detail-actions.tsx (line ~213):\n   동일 import + openReport\n   handleMenu(e):\n     e.stopPropagation()\n     openReport({ type:'post', id: postId, preview: undefined })\n   (post 의 title 은 props 미보유, undefined 로 두거나 props 추가)\n\n3) comment-list.tsx CommentItem (line ~135 부근):\n   currentUserId === c.user_id 가드 제거 — 항상 ⋯ 노출\n   DropdownMenuContent 안:\n     {isOwner ? (\n       <DropdownMenuItem onClick={handleDelete}>削除</DropdownMenuItem>\n     ) : (\n       <DropdownMenuItem onClick={() => openReport({ type:'comment', id: c.id, preview: c.body.slice(0,30) })}>通報</DropdownMenuItem>\n     )}\n   const isOwner = currentUserId === c.user_id\n   import { useReportSheet } from '@/lib/stores/report-sheet-store'\n\n4) tsc --noEmit",
-      "verificationCriteria": "3 곳 placeholder 모두 openReport() 호출로 교체, comment-list 가 타인 댓글에도 ⋯ 노출 + 通報 항목, tsc 0건.",
-      "analysisResult": "Task 016 — F008 신고 기능 (W6 와이어프레임). lib/stores/report-sheet-store.ts(Zustand, target 보유) + components/community/report-sheet.tsx(50vh + RHF + zodResolver(ReportFormSchema) + 사유 라디오 4건 + 보충 0/500 + UNIQUE 409 처리) + 3곳 ⋯ placeholder 통합(post-card / post-detail-actions / comment-list — 댓글은 본인이면 削除, 타인이면 通報) + (app)/layout.tsx 에 마운트. /api/reports POST 라우트 + reports 테이블 + UNIQUE 제약 + RLS 정책 모두 Task 011 에서 완료. 일본어 카피 W6 1:1. write-bottom-sheet 와 동일 패턴 (Sheet/RHF/sonner). 4 서브태스크."
-    },
-    {
-      "id": "7e8e1ca3-bdef-4041-afb2-fb7dd560cd78",
-      "name": "Task 016-4: (app)/layout.tsx 마운트 + npm run build + ROADMAP ✅",
-      "description": "ReportBottomSheet 를 (app) 라우트 layout 에 마운트하여 모든 페이지에서 호출 가능하게 + 통합 검증 + ROADMAP.",
-      "notes": "본 Task 의 build 가 실패하면 가장 흔한 사고: ReportFormSchema 의 reason undefined 초기값 / RadioGroup Controller 타입 / target null 가드.",
-      "status": "pending",
-      "dependencies": [
-        {
-          "taskId": "ef6b1ac1-c484-4f66-9268-bf7d64c5309f"
-        }
-      ],
-      "createdAt": "2026-05-04T12:06:22.783Z",
-      "updatedAt": "2026-05-04T12:06:22.783Z",
-      "relatedFiles": [
-        {
-          "path": "app/(app)/layout.tsx",
-          "type": "TO_MODIFY",
-          "description": "ReportBottomSheet 마운트"
-        },
-        {
-          "path": "docs/ROADMAP.md",
-          "type": "TO_MODIFY",
-          "description": "Task 016 ✅"
-        }
-      ],
-      "implementationGuide": "1) Edit app/(app)/layout.tsx:\n   import { ReportBottomSheet } from '@/components/community/report-sheet'\n   <WriteBottomSheet />\n   <ReportBottomSheet />  ← 추가\n\n2) Bash npm run build (timeout 5분) — 19 라우트 컴파일 통과 확인 (라우트 수 변동 없음)\n\n3) (선택) mcp__supabase__execute_sql 로 reports 테이블 직전 row 확인\n\n4) Edit docs/ROADMAP.md Task 016 ✅ + nested bullet 5~7줄:\n   - lib/stores/report-sheet-store.ts (Zustand + target 페이로드)\n   - components/community/report-sheet.tsx (50vh Sheet + RHF + ReportFormSchema + 사유 4 라디오 + 보충 0/500)\n   - 3 곳 ⋯ placeholder 통합 (post-card / post-detail-actions / comment-list — 본인 削除 vs 타인 通報 분기)\n   - 응답 envelope 처리: 200 toast.success / 409 既に通報済み / 401 redirect / 422 setError / 기타 toast.error\n   - 일본어 카피 W6 1:1 + 重複 안내\n   - npm run build 회귀 0건. Task 017 진입 — 탐색·인기 페이지",
-      "verificationCriteria": "layout 에 ReportBottomSheet 추가, npm run build 회귀 0건, ROADMAP Task 016 ✅ + nested bullet 5~7줄.",
-      "analysisResult": "Task 016 — F008 신고 기능 (W6 와이어프레임). lib/stores/report-sheet-store.ts(Zustand, target 보유) + components/community/report-sheet.tsx(50vh + RHF + zodResolver(ReportFormSchema) + 사유 라디오 4건 + 보충 0/500 + UNIQUE 409 처리) + 3곳 ⋯ placeholder 통합(post-card / post-detail-actions / comment-list — 댓글은 본인이면 削除, 타인이면 通報) + (app)/layout.tsx 에 마운트. /api/reports POST 라우트 + reports 테이블 + UNIQUE 제약 + RLS 정책 모두 Task 011 에서 완료. 일본어 카피 W6 1:1. write-bottom-sheet 와 동일 패턴 (Sheet/RHF/sonner). 4 서브태스크."
-    },
-    {
-      "id": "05b6289e-11e5-4bad-bcd6-9fe3a42b1884",
-      "name": "Task 017-1: components/community/explore-search-bar.tsx (검색바)",
-      "description": "sticky 검색 입력바 — 'use client'. 자동 포커스(mount), 디바운스 300ms, IME composition 가드, URL ?q replace, X 클리어 버튼. shadcn Input + lucide Search/X.\n\n파일: components/community/explore-search-bar.tsx",
-      "notes": "디바운스 300ms — 빠른 타이핑에 fetch 폭주 방지. URL replace 채택 — 디바운스마다 history 추가 방지. composition 중에는 setTimeout 보류 (한자/일본어 조합 안정성).",
-      "status": "pending",
-      "dependencies": [],
-      "createdAt": "2026-05-04T12:17:05.011Z",
-      "updatedAt": "2026-05-04T12:17:05.011Z",
-      "relatedFiles": [
-        {
-          "path": "components/community/explore-search-bar.tsx",
-          "type": "CREATE",
-          "description": "검색 입력바"
-        },
-        {
-          "path": "components/community/category-icon-row.tsx",
-          "type": "REFERENCE",
-          "description": "useRouter+useSearchParams 패턴 출처"
-        },
-        {
-          "path": "components/ui/input.tsx",
-          "type": "DEPENDENCY",
-          "description": "shadcn Input"
-        }
-      ],
-      "implementationGuide": "1) 'use client' + imports: useEffect/useRef/useState, useRouter/useSearchParams/usePathname, Search/X (lucide), Input (shadcn)\n2) 컴포넌트:\n   - const sp = useSearchParams(); const initialQ = sp.get('q') ?? ''\n   - state local (controlled), inputRef, debounceRef (NodeJS.Timeout), composingRef\n   - mount useEffect → inputRef.focus()\n   - useEffect on sp 변경: urlQ 와 local 다르면 setLocal\n   - pushUrl(value): URLSearchParams 에 q set/delete + router.replace(`${pathname}?${qs}`)\n   - scheduleDebounced(value): clearTimeout(prev); composing 면 return; setTimeout(()=>pushUrl(value),300)\n   - onChange(e): setLocal + scheduleDebounced\n   - onCompositionStart: composingRef=true\n   - onCompositionEnd: composingRef=false; scheduleDebounced(value)\n   - onClear: setLocal('') + clearTimeout + pushUrl('') + focus\n3) JSX:\n   <div sticky top-0 z-30 bg-background/95 backdrop-blur border-b px-4 py-3>\n     <div className='relative'>\n       <Search absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground />\n       <Input ref + value + onChange + onCompositionStart + onCompositionEnd + placeholder='キーワードを検索...' aria-label='検索' role='searchbox' className='pl-10 pr-10 h-11' />\n       {local && <button X onClear absolute right-2 ...>}\n     </div>\n   </div>\n4) tsc --noEmit",
-      "verificationCriteria": "sticky 검색바 + 자동 포커스 + 디바운스 300ms + IME 가드 + X 클리어 + URL ?q replace 모두 동작, tsc 0건.",
-      "analysisResult": "Task 017 — F007 검색 + 인기 페이지 (W4 와이어프레임). 3 산출물: components/community/explore-search-bar.tsx (sticky+자동포커스+디바운스 300ms+IME composition 가드+URL ?q replace+X 클리어) / components/community/post-feed.tsx 빈 상태 분기 1줄 보강 (search 모드면 該当する投稿が見つかりません) / app/(app)/explore/page.tsx 교체 (Server Component, searchParams Promise, q 있으면 sort=latest+search+limit=20 / q 없으면 sort=popular+limit=10, ExploreSearchBar+CategoryIconRow+PostFeed 조합). PostCard/PostFeed/CategoryIconRow 100% 재사용. fetchPosts 의 search 옵션 그대로. 일본어 카피 W4 1:1."
-    },
-    {
-      "id": "f4493de9-57ec-4596-a93b-9cf8ae353848",
-      "name": "Task 017-2: PostFeed 빈 상태 분기 보강 (search 모드)",
-      "description": "components/community/post-feed.tsx 의 빈 상태 메시지를 search prop 유무에 따라 분기. truthy 면 '該当する投稿が見つかりません — キーワードを変えて再検索', falsy 면 기존 'まだ投稿がありません ...'. 1줄 변경.",
-      "notes": "props 시그니처 (search?: string) 가 이미 존재하므로 추가 변경 X. 단순 분기 1줄.",
-      "status": "pending",
-      "dependencies": [
-        {
-          "taskId": "05b6289e-11e5-4bad-bcd6-9fe3a42b1884"
-        }
-      ],
-      "createdAt": "2026-05-04T12:17:05.011Z",
-      "updatedAt": "2026-05-04T12:17:05.011Z",
-      "relatedFiles": [
-        {
-          "path": "components/community/post-feed.tsx",
-          "type": "TO_MODIFY",
-          "description": "빈 상태 분기",
-          "lineStart": 85,
-          "lineEnd": 100
-        }
-      ],
-      "implementationGuide": "Edit components/community/post-feed.tsx 의 `if (items.length === 0)` 블록:\nreturn (\n  <div className='py-12 text-center text-sm text-muted-foreground'>\n    {search\n      ? '該当する投稿が見つかりません — キーワードを変えて再検索'\n      : 'まだ投稿がありません — 右下のボタンから最初の投稿を作成しましょう'}\n  </div>\n)\n\ntsc --noEmit 검증",
-      "verificationCriteria": "검색 모드에서 빈 결과 시 '該当する投稿が見つかりません', 평소 빈 결과 시 기존 메시지. tsc 0건.",
-      "analysisResult": "Task 017 — F007 검색 + 인기 페이지 (W4 와이어프레임). 3 산출물: components/community/explore-search-bar.tsx (sticky+자동포커스+디바운스 300ms+IME composition 가드+URL ?q replace+X 클리어) / components/community/post-feed.tsx 빈 상태 분기 1줄 보강 (search 모드면 該当する投稿が見つかりません) / app/(app)/explore/page.tsx 교체 (Server Component, searchParams Promise, q 있으면 sort=latest+search+limit=20 / q 없으면 sort=popular+limit=10, ExploreSearchBar+CategoryIconRow+PostFeed 조합). PostCard/PostFeed/CategoryIconRow 100% 재사용. fetchPosts 의 search 옵션 그대로. 일본어 카피 W4 1:1."
-    },
-    {
-      "id": "689cdafb-63df-47fa-b8da-78f7e059957b",
-      "name": "Task 017-3: app/(app)/explore/page.tsx 교체 + npm run build + ROADMAP ✅",
-      "description": "placeholder 페이지를 Server Component 본격 구현으로 교체. searchParams Promise + q 분기 (검색/인기) + ExploreSearchBar + CategoryIconRow + PostFeed.",
-      "notes": "page.tsx 가 ○ static → ƒ Dynamic 으로 변경 (searchParams + supabase 호출). 정상 동작.",
-      "status": "pending",
-      "dependencies": [
-        {
-          "taskId": "f4493de9-57ec-4596-a93b-9cf8ae353848"
-        }
-      ],
-      "createdAt": "2026-05-04T12:17:05.011Z",
-      "updatedAt": "2026-05-04T12:17:05.011Z",
-      "relatedFiles": [
-        {
-          "path": "app/(app)/explore/page.tsx",
-          "type": "TO_MODIFY",
-          "description": "placeholder → Server Component 본격 구현"
-        },
-        {
-          "path": "docs/ROADMAP.md",
-          "type": "TO_MODIFY",
-          "description": "Task 017 ✅"
-        },
-        {
-          "path": "components/community/category-icon-row.tsx",
-          "type": "DEPENDENCY",
-          "description": "재사용"
-        },
-        {
-          "path": "components/community/post-feed.tsx",
-          "type": "DEPENDENCY",
-          "description": "재사용"
-        },
-        {
-          "path": "lib/community/posts.ts",
-          "type": "DEPENDENCY",
-          "description": "fetchPosts(search)"
-        }
-      ],
-      "implementationGuide": "1) Edit app/(app)/explore/page.tsx 전체 교체:\n   - import Suspense, createClient, fetchPosts, CATEGORY_SLUG_VALUES, CategorySlug, ExploreSearchBar, CategoryIconRow, PostFeed\n   - searchParams Promise<{ q?: string; category?: string }>\n   - const sp = await searchParams\n   - const q = sp.q?.trim() || undefined\n   - const categorySlug = sp.category 가 CATEGORY_SLUG_VALUES 에 포함되면 CategorySlug 캐스트, 아니면 undefined\n   - const sort: 'latest'|'popular' = q ? 'latest' : 'popular'\n   - const limit = q ? 20 : 10\n   - const list = await fetchPosts(supabase, { sort, search: q, categorySlug, limit })\n   - JSX:\n     <div>\n       <header sticky top-0 z-30 bg-background/95 backdrop-blur border-b px-4 h-14 flex items-center>\n         <h1 className='text-lg font-bold'>探索</h1>\n       </header>\n       <Suspense fallback={빈 div}><ExploreSearchBar /></Suspense>\n       <Suspense fallback={빈 div}><CategoryIconRow /></Suspense>\n       <section className='px-4 pt-3 pb-1'>\n         {q ? <h2>'\"{q}\"の検索結果'</h2> : <h2>🔥 今週の人気投稿</h2>}\n       </section>\n       <section className='px-4 pb-4'>\n         <PostFeed key={`${q ?? ''}-${categorySlug ?? 'all'}-${sort}`} initial={list} sort={sort} categorySlug={categorySlug} search={q} />\n       </section>\n     </div>\n\n2) Bash npm run build (timeout 5분) — 19 라우트 컴파일 (/explore 가 ○ static → ƒ Dynamic 변경 예상). 회귀 0건 확인\n\n3) Edit docs/ROADMAP.md Task 017 ✅ + nested bullet 5~7줄:\n   - components/community/explore-search-bar.tsx — sticky + 자동 포커스 + 디바운스 300ms + IME composition 가드 + URL ?q replace + X 클리어\n   - PostFeed 빈 상태 카피 분기 (search 모드 → '該当する投稿が見つかりません — キーワードを変えて再検索')\n   - app/(app)/explore/page.tsx Server Component — searchParams Promise + q 분기 (검색=latest+limit20 / 인기=popular+limit10) + ExploreSearchBar + CategoryIconRow 재사용 + PostFeed key reset\n   - 카테고리 칩 필터 (CategoryIconRow ?category 동기화) + PostCard 인라인 ❤/🔖 그대로\n   - 일본어 카피 W4 1:1 (探索 / キーワードを検索... / 🔥今週の人気投稿 / \"...\"の検索結果 / 該当する投稿が見つかりません)\n   - npm run build 회귀 0건. 다음 — Task 018 마이페이지",
-      "verificationCriteria": "/explore 진입 시 sticky 검색바 + 카테고리 행 + 인기 TOP10 (q 빈) / 검색 결과 (q 있음) 모두 정상 렌더, npm run build 회귀 0건, ROADMAP Task 017 ✅.",
-      "analysisResult": "Task 017 — F007 검색 + 인기 페이지 (W4 와이어프레임). 3 산출물: components/community/explore-search-bar.tsx (sticky+자동포커스+디바운스 300ms+IME composition 가드+URL ?q replace+X 클리어) / components/community/post-feed.tsx 빈 상태 분기 1줄 보강 (search 모드면 該当する投稿が見つかりません) / app/(app)/explore/page.tsx 교체 (Server Component, searchParams Promise, q 있으면 sort=latest+search+limit=20 / q 없으면 sort=popular+limit=10, ExploreSearchBar+CategoryIconRow+PostFeed 조합). PostCard/PostFeed/CategoryIconRow 100% 재사용. fetchPosts 의 search 옵션 그대로. 일본어 카피 W4 1:1."
-    },
-    {
-      "id": "be737d50-91c6-4b7d-95af-6528d182bd8c",
-      "name": "Task 018-1: lib/community/my.ts (fetchMyPosts/Comments/Bookmarks)",
-      "description": "마이페이지 Server-side 데이터 액세스 3 함수. 모두 supabase 클라이언트 + userId 받음. 50건 hard limit. 익명 마스킹 불필요(본인 페이지). RLS 통과 (profiles_select_own / posts_select_self / comments_select_visible / bookmarks_select_self).\n\n파일: lib/community/my.ts",
-      "notes": "FK 별칭 select 패턴 — Task 011 의 fetchPosts/post-detail 와 일관. supabase ssr 클라이언트가 RLS 자동 적용. user_id 매개변수는 명시 비교용 (RLS 추가 보장).",
-      "status": "pending",
-      "dependencies": [],
-      "createdAt": "2026-05-04T13:16:51.110Z",
-      "updatedAt": "2026-05-04T13:16:51.110Z",
-      "relatedFiles": [
-        {
-          "path": "lib/community/my.ts",
-          "type": "CREATE",
-          "description": "마이 데이터 액세스 3 함수"
-        },
-        {
-          "path": "lib/community/posts.ts",
-          "type": "REFERENCE",
-          "description": "PostListItem 타입 + FK select 패턴"
-        }
-      ],
-      "implementationGuide": "1) Write lib/community/my.ts:\n   - export interface MyComment { id, body, created_at, post_id, post_title }\n   - export interface MyBookmark { id, created_at, post: PostListItem }\n   - export async function fetchMyPosts(supabase, userId): Promise<PostListItem[]>:\n     supabase.from('posts').select('*, category:categories(slug,name,type), author:profiles(nickname)').eq('user_id',userId).eq('is_deleted',false).order('created_at',{ascending:false}).limit(50)\n   - export async function fetchMyComments(supabase, userId): Promise<MyComment[]>:\n     .from('comments').select('id, body, created_at, post_id, post:posts(title)').eq('user_id',userId).eq('is_deleted',false).order('created_at',{ascending:false}).limit(50)\n     → row.post.title 을 post_title 로 평탄화\n   - export async function fetchMyBookmarks(supabase, userId): Promise<MyBookmark[]>:\n     .from('bookmarks').select('id, created_at, post:posts(*, category:categories(slug,name,type), author:profiles(nickname))').eq('user_id',userId).order('created_at',{ascending:false}).limit(50)\n2) tsc --noEmit",
-      "verificationCriteria": "3 함수 모두 export, PostListItem/MyComment/MyBookmark 타입 정합, tsc 0건.",
-      "analysisResult": "Task 018 — F009·F011 마이페이지 (W5). 1 lib 모듈(my.ts: fetchMyPosts/Comments/Bookmarks) + 5 컴포넌트(my-tabs sticky URL ?tab + my-post-card 削除 + my-comment-card 削除+元投稿 링크 + my-bookmark-card 解除 + logout-button) + page.tsx Server Component 교체 (프로필 헤더 + 3탭 + 카드 리스트 + 빈 상태 분기 + 하단 ログアウト). 50건 hard limit, 페이징 P1. /api/posts·/api/comments·/api/bookmarks 라우트 + soft_delete_comment RPC 모두 재사용. 일본어 카피 W5 1:1. 3 서브태스크."
-    },
-    {
-      "id": "4e3e2557-0050-489b-a230-1e4b26a74a9e",
-      "name": "Task 018-2: my-tabs + my-post-card + my-comment-card + my-bookmark-card + logout-button",
-      "description": "마이페이지 컴포넌트 5개. Client Components.\n\n파일:\n- components/community/my-tabs.tsx — sticky 3탭 segment + URL ?tab 동기화\n- components/community/my-post-card.tsx — [削除] 버튼 + DELETE /api/posts/[id]\n- components/community/my-comment-card.tsx — 본문 + 元投稿 링크 + [削除] + DELETE /api/comments/[id]\n- components/community/my-bookmark-card.tsx — [🔖 解除] + POST /api/bookmarks (토글)\n- components/community/logout-button.tsx — supabase.auth.signOut + router.replace('/login')",
-      "notes": "my-bookmark-card 의 toggleBookmark 응답이 { bookmarked: false } 라 별도 분기 불필요. 즉시 router.refresh 로 목록에서 사라짐.",
-      "status": "pending",
-      "dependencies": [
-        {
-          "taskId": "be737d50-91c6-4b7d-95af-6528d182bd8c"
-        }
-      ],
-      "createdAt": "2026-05-04T13:16:51.110Z",
-      "updatedAt": "2026-05-04T13:16:51.110Z",
-      "relatedFiles": [
-        {
-          "path": "components/community/my-tabs.tsx",
-          "type": "CREATE",
-          "description": "3탭 segment"
-        },
-        {
-          "path": "components/community/my-post-card.tsx",
-          "type": "CREATE",
-          "description": "내 투고 카드"
-        },
-        {
-          "path": "components/community/my-comment-card.tsx",
-          "type": "CREATE",
-          "description": "내 댓글 카드"
-        },
-        {
-          "path": "components/community/my-bookmark-card.tsx",
-          "type": "CREATE",
-          "description": "북마크 카드"
-        },
-        {
-          "path": "components/community/logout-button.tsx",
-          "type": "CREATE",
-          "description": "로그아웃 버튼"
-        },
-        {
-          "path": "components/community/sort-toggle.tsx",
-          "type": "REFERENCE",
-          "description": "segment control + URL 동기화 패턴"
-        }
-      ],
-      "implementationGuide": "1) my-tabs.tsx ('use client'):\n   const TABS = [{value:'posts',label:'投稿'},{value:'comments',label:'コメント'},{value:'bookmarks',label:'ブックマーク'}] as const\n   useSearchParams + useRouter + usePathname\n   const tab = sp.get('tab') ?? 'posts' (3개 중 하나로 검증)\n   onSelect(v): URLSearchParams set tab + router.replace\n   sticky top-14 z-20 bg-background/95 backdrop-blur border-b + segment control 3 button (sort-toggle 패턴)\n\n2) my-post-card.tsx ('use client'):\n   props { post: PostListItem }\n   카테고리 배지 + 시간 + 제목 line-clamp-1 + ❤ 추천수 + 💬 댓글수 + 우측 [削除] Button destructive\n   handleDelete: confirm '投稿を削除しますか?' + fetch DELETE `/api/posts/${post.id}` + ok → toast.success('投稿を削除しました') + router.refresh / 401→/login / 기타→toast.error\n   카드 자체는 router.push(`/posts/${id}`) (役割 button + tabIndex)\n\n3) my-comment-card.tsx ('use client'):\n   props { comment: MyComment }\n   본문 line-clamp-2 + 元の投稿: <Link href={`/posts/${comment.post_id}`}>{comment.post_title}</Link> + 시간 + [削除]\n   handleDelete: confirm + fetch DELETE `/api/comments/${id}` + ok → toast + router.refresh\n\n4) my-bookmark-card.tsx ('use client'):\n   props { bookmark: MyBookmark }\n   카테고리 배지 + 제목 line-clamp-1 + ❤ 추천수 + 💬 댓글수 + 우측 [🔖 解除]\n   handleUnbookmark: fetch POST `/api/bookmarks` body { postId } → ok 시 toast.success('ブックマークを解除しました') + router.refresh\n   카드 클릭 시 router.push(`/posts/${bookmark.post.id}`)\n\n5) logout-button.tsx ('use client'):\n   import { createClient } from '@/lib/supabase/client'\n   onClick: const supabase = createClient(); await supabase.auth.signOut(); router.replace('/login')\n   Button variant='destructive' className='w-full'\n\n6) tsc --noEmit",
-      "verificationCriteria": "5 컴포넌트 모두 export 및 Client Component 정확, 削除/解除/ログアウト 모두 fetch + router.refresh/replace 동작, tsc 0건.",
-      "analysisResult": "Task 018 — F009·F011 마이페이지 (W5). 1 lib 모듈(my.ts: fetchMyPosts/Comments/Bookmarks) + 5 컴포넌트(my-tabs sticky URL ?tab + my-post-card 削除 + my-comment-card 削除+元投稿 링크 + my-bookmark-card 解除 + logout-button) + page.tsx Server Component 교체 (프로필 헤더 + 3탭 + 카드 리스트 + 빈 상태 분기 + 하단 ログアウト). 50건 hard limit, 페이징 P1. /api/posts·/api/comments·/api/bookmarks 라우트 + soft_delete_comment RPC 모두 재사용. 일본어 카피 W5 1:1. 3 서브태스크."
-    },
-    {
-      "id": "547f910d-7fcf-43a1-b7c0-0e3aaf32a5d4",
-      "name": "Task 018-3: app/(app)/my/page.tsx 교체 + npm run build + ROADMAP ✅",
-      "description": "placeholder /my 를 Server Component 본격 구현으로 교체. 프로필 헤더 + 3탭 + 카드 리스트 + 빈 상태 분기 + 하단 로그아웃.",
-      "notes": "page.tsx 가 ƒ Dynamic 으로 전환됨. /my/profile 은 그대로 재활용 (한국어 카피 그대로 — 후속 일본어 변환).",
-      "status": "pending",
-      "dependencies": [
-        {
-          "taskId": "4e3e2557-0050-489b-a230-1e4b26a74a9e"
-        }
-      ],
-      "createdAt": "2026-05-04T13:16:51.110Z",
-      "updatedAt": "2026-05-04T13:16:51.110Z",
-      "relatedFiles": [
         {
           "path": "app/(app)/my/page.tsx",
           "type": "TO_MODIFY",
-          "description": "placeholder → Server Component"
+          "description": "하단 진입점 row 추가"
         },
         {
-          "path": "docs/ROADMAP.md",
-          "type": "TO_MODIFY",
-          "description": "Task 018 ✅"
-        },
-        {
-          "path": "lib/community/my.ts",
+          "path": "components/ui/checkbox.tsx",
           "type": "DEPENDENCY",
-          "description": "3 fetch 함수"
-        },
-        {
-          "path": "components/community/my-tabs.tsx",
-          "type": "DEPENDENCY",
-          "description": "3탭"
+          "description": "shadcn Checkbox"
         }
       ],
-      "implementationGuide": "1) Edit app/(app)/my/page.tsx 전체 교체:\n   import Suspense, Link, Settings, createClient, fetchMyPosts/Comments/Bookmarks, MyTabs, MyPostCard, MyCommentCard, MyBookmarkCard, LogoutButton\n   searchParams Promise<{ tab?: string }>\n   const sp = await searchParams\n   const tab: 'posts'|'comments'|'bookmarks' = ['posts','comments','bookmarks'].includes(sp.tab??'') ? sp.tab as any : 'posts'\n   supabase = await createClient()\n   const { data: { user } } = await supabase.auth.getUser()\n   if (!user) redirect('/login') (혹은 proxy 가 처리하므로 미사용 분기)\n   const { data: profile } = await supabase.from('profiles').select('nickname,campus,department').eq('id', user.id).maybeSingle()\n   탭별 fetch:\n     const items = tab==='posts' ? await fetchMyPosts(supabase,user.id) :\n                   tab==='comments' ? await fetchMyComments(supabase,user.id) :\n                   await fetchMyBookmarks(supabase,user.id)\n\n   JSX:\n   <div>\n     <header sticky top-0 z-30 + マイページ + ml-auto Link href='/my/profile' aria-label='設定'><Settings /></Link>\n   </header>\n     <section profile header — px-4 py-4 border-b flex items-center gap-3>\n       <div size-12 rounded-full bg-muted flex items-center justify-center>👤</div>\n       <div flex-1>\n         <p font-semibold>{profile?.nickname ?? '匿名'}</p>\n         <p text-xs text-muted-foreground>{profile?.campus ?? '—'} / {profile?.department ?? '—'}</p>\n       </div>\n       <Button asChild variant='outline' size='sm'><Link href='/my/profile'>プロフィール編集</Link></Button>\n     </section>\n     <Suspense fallback={빈 div}><MyTabs /></Suspense>\n     <section px-4 py-4 space-y-3>\n       {items.length === 0 ? (\n         <div className='py-12 text-center text-sm text-muted-foreground'>\n           {tab==='posts' ? 'まだ投稿がありません' : tab==='comments' ? 'まだコメントがありません' : 'まだブックマークがありません'}\n         </div>\n       ) : tab==='posts' ? items.map(p => <MyPostCard key={p.id} post={p} />) :\n           tab==='comments' ? items.map(c => <MyCommentCard key={c.id} comment={c} />) :\n           items.map(b => <MyBookmarkCard key={b.id} bookmark={b} />)}\n     </section>\n     <section px-4 py-4 border-t>\n       <LogoutButton />\n     </section>\n   </div>\n\n2) npm run build (timeout 5분) — 18 라우트 컴파일 통과. /my 가 ○ static → ƒ Dynamic 으로 변경 예상\n\n3) Edit docs/ROADMAP.md Task 018 ✅ + nested bullet 5~7줄:\n   - lib/community/my.ts — fetchMyPosts/Comments/Bookmarks (50건 hard limit)\n   - components/community/{my-tabs(sticky 3탭 ?tab), my-post-card(削除), my-comment-card(削除 + 元投稿 링크), my-bookmark-card(🔖 解除), logout-button(signOut)}\n   - app/(app)/my/page.tsx Server Component — searchParams ?tab 분기 + 프로필 헤더 + 3탭 + 카드 리스트 + 빈 상태 분기 + 하단 ログアウト\n   - 削除/解除/ログアウト → fetch + router.refresh/replace 즉시 반영\n   - 일본어 카피 W5 1:1 (投稿/コメント/ブックマーク, 削除/解除/プロフィール編集/ログアウト, まだ〜がありません)\n   - npm run build 회귀 0건. Phase 4 완료 (Task 012~018). 다음 — Phase 5 어드민 큐",
-      "verificationCriteria": "/my SSR 정상, 3탭 전환 + 削除/解除/ログアウト 동작, npm run build 회귀 0건, ROADMAP ✅.",
-      "analysisResult": "Task 018 — F009·F011 마이페이지 (W5). 1 lib 모듈(my.ts: fetchMyPosts/Comments/Bookmarks) + 5 컴포넌트(my-tabs sticky URL ?tab + my-post-card 削除 + my-comment-card 削除+元投稿 링크 + my-bookmark-card 解除 + logout-button) + page.tsx Server Component 교체 (프로필 헤더 + 3탭 + 카드 리스트 + 빈 상태 분기 + 하단 ログアウト). 50건 hard limit, 페이징 P1. /api/posts·/api/comments·/api/bookmarks 라우트 + soft_delete_comment RPC 모두 재사용. 일본어 카피 W5 1:1. 3 서브태스크."
+      "implementationGuide": "1) types/auth.ts SetupFormSchema 확장:\\n   z.object({...기존 필드, agreedToTerms: z.literal(true, { errorMap: () => ({ message: '利用規約とコミュニティガイドラインへの同意が必要です' }) })}).refine(...)\\n   defaultValues 에 agreedToTerms: false 추가.\\n2) app/(public)/signup/setup/page.tsx 폼에 Controller + Checkbox 필드 추가:\\n   import { Checkbox } from '@/components/ui/checkbox'\\n   import Link from 'next/link'\\n   <motion.div variants={authField} className='flex items-start gap-3 mt-2'>\\n     <Controller control={control} name='agreedToTerms' render={({ field }) => (\\n       <Checkbox id='agree' checked={field.value ?? false} onCheckedChange={field.onChange} className='mt-0.5' />\\n     )} />\\n     <Label htmlFor='agree' className='text-sm leading-relaxed'>\\n       <Link href='/terms' target='_blank' rel='noopener' className='underline'>利用規約</Link> と{' '}\\n       <Link href='/guidelines' target='_blank' rel='noopener' className='underline'>コミュニティガイドライン</Link> に同意します\\n     </Label>\\n   </motion.div>\\n   {errors.agreedToTerms && <p className='text-sm text-destructive mt-1'>{errors.agreedToTerms.message}</p>}\\n3) onSubmit 핸들러에서 supabase.auth.updateUser 의 data 에 agreed_*_at 추가:\\n   const now = new Date().toISOString()\\n   await supabase.auth.updateUser({ data: { ...기존, agreed_terms_at: now, agreed_guidelines_at: now } })\\n   → 트리거가 profiles 동기화 (청크 1).\\n4) app/(app)/my/page.tsx 하단 ログアウト 버튼 위에 nav row:\\n   <nav className='flex flex-wrap justify-center gap-x-4 gap-y-2 text-xs text-muted-foreground py-4 border-t mt-4'>\\n     <Link href='/guidelines' className='hover:text-foreground'>コミュニティガイドライン</Link>\\n     <Link href='/terms' className='hover:text-foreground'>利用規約</Link>\\n     <Link href='/privacy' className='hover:text-foreground'>プライバシーポリシー</Link>\\n   </nav>\\n5) 검증 — 시간 절약 목적 SQL 직접 + Playwright 핵심 흐름만:\\n   a. 새 user(e2e_t_001@keio.jp) admin createUser → /signup/setup 진입 (Playwright)\\n   b. 미체크 + submit → 「同意が必要です」 에러 표시\\n   c. 체크 후 submit → /(홈) 진입\\n   d. SQL: SELECT agreed_terms_at, agreed_guidelines_at FROM profiles WHERE id=<user> → 둘 다 NOT NULL\\n   e. /my 진입 → 하단 link 3건 표시 / 각 클릭 → 정상 navigation\\n   f. /guidelines 의 'target=_blank' link 새 탭 열림 확인\\n   g. cleanup: DELETE FROM auth.users WHERE email='e2e_t_001@keio.jp'\\n6) npm run lint && npm run build 통과 (본 Task 신규 0 issue).\\n7) mcp__supabase__get_advisors security/performance 신규 ERROR 0건.",
+      "verificationCriteria": "Setup 미체크 + submit → 에러 표시 + 가입 차단. 체크 + submit → DB profiles.agreed_*_at NOT NULL. 마이페이지 link 3건 정상 navigation. 새 탭 열림 (target='_blank'). npm run lint/build 통과. advisors 신규 0건.",
+      "analysisResult": "Task 022 — 가이드라인 + 법적 문서 + F013 동의 도입. 출시 직전 법적·운영 정합성 + 회원가입 동의 흐름 구축. 7청크: DB 마이그(profiles agreed_*_at + 트리거 확장) → shadcn checkbox + LegalPageShell → proxy PUBLIC_PATHS → guidelines/terms/privacy 3페이지(병렬) → setup 체크박스 + 마이페이지 진입점 + 검증. 모든 카피 일본어. 출시 후 약관·가이드라인 업데이트 시 LegalPageShell 재사용. 기존 가입자 재동의는 본 Task 외(P1)."
     }
   ]
 }
