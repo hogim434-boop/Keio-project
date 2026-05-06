@@ -49,6 +49,8 @@ export default function LoginPage() {
       return
     }
 
+    // 로그인 직후 쿠키가 서버에 반영되도록 RSC 재실행을 강제 (race condition 방지)
+    router.refresh()
     router.replace('/')
   }
 
