@@ -33,14 +33,14 @@ export async function GET(
 }
 
 export async function DELETE(
-  _req: Request,
+  req: Request,
   ctx: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
   const { id } = await ctx.params
   const parsed = ParamsSchema.safeParse({ id })
   if (!parsed.success) return err('VALIDATION', 'IDが正しくありません', 422)
 
-  return withAuth(async (supabase) => {
+  return withAuth(req, async (supabase) => {
     // soft delete 후 is_deleted=true 가 된 row 는 select 정책으로 가려지므로
     // .select() 대신 count 로 영향 행 수 확인 — RLS 가 비본인을 차단하면 count=0
     const { error, count } = await supabase

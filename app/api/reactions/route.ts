@@ -31,7 +31,7 @@ export async function POST(req: Request): Promise<NextResponse> {
     return err('VALIDATION', '入力値が不正です', 422, { issues: parsed.error.flatten() })
   }
 
-  return withAuth(async (supabase) => {
+  return withAuth(req, async (supabase) => {
     return toggleReaction(supabase, parsed.data)
   })
 }

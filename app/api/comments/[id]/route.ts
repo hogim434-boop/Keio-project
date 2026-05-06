@@ -13,14 +13,14 @@ import { withAuth, err } from '@/lib/community/api-helpers'
 const ParamsSchema = z.object({ id: z.string().uuid() })
 
 export async function DELETE(
-  _req: Request,
+  req: Request,
   ctx: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
   const { id } = await ctx.params
   const parsed = ParamsSchema.safeParse({ id })
   if (!parsed.success) return err('VALIDATION', 'IDが正しくありません', 422)
 
-  return withAuth(async (supabase, user) => {
+  return withAuth(req, async (supabase, user) => {
     // PostgREST 경유 UPDATE 시 RLS 평가 컨텍스트의 auth.uid() 가 NULL 로
     // 평가되어 self 정책이 결정적으로 false → "new row violates RLS" 발생.
     // SECURITY DEFINER RPC 안에서 호출자 검증 + UPDATE 를 캡슐화하여 우회.

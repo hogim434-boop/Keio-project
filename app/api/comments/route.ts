@@ -22,7 +22,7 @@ export async function POST(req: Request): Promise<NextResponse> {
     return err('VALIDATION', '入力値が不正です', 422, { issues: parsed.error.flatten() })
   }
 
-  return withAuth(async (supabase, user) => {
+  return withAuth(req, async (supabase, user) => {
     const { data, error } = await supabase
       .from('comments')
       .insert({

@@ -15,6 +15,7 @@ import type { Database } from '@/types/database'
 export type ApiHandler<T> = (
   supabase: SupabaseClient<Database>,
   user: User,
+  req: Request,
 ) => Promise<T>
 
 export function ok<T>(data: T, status = 200): NextResponse {
@@ -51,8 +52,12 @@ export function pgErrorToResponse(e: unknown): NextResponse {
   if (isPostgrestError(e)) {
     const code = e.code
     const msg = e.message ?? 'database error'
-    // 진단용 풀로깅 — dev 환경에서 details/hint/code 까지 envelope 에 포함
-    const extra = { dbCode: code, details: e.details, hint: e.hint }
+    // 개발 환경에서만 DB 내부 정보(code/details/hint)를 응답에 포함.
+    // 프로덕션에서는 노출하지 않아 DB 구조 정보가 외부로 유출되지 않도록 함.
+    const extra =
+      process.env.NODE_ENV !== 'production'
+        ? { dbCode: code, details: e.details, hint: e.hint }
+        : undefined
     if (code === '23505') return err('CONFLICT', msg, 409, extra)
     if (code === '23514') return err('VALIDATION', msg, 422, extra)
     if (code === '23503') return err('FK_VIOLATION', msg, 400, extra)
@@ -64,7 +69,7 @@ export function pgErrorToResponse(e: unknown): NextResponse {
   return err('INTERNAL', msg, 500)
 }
 
-export async function withAuth<T>(handler: ApiHandler<T>): Promise<NextResponse> {
+export async function withAuth<T>(req: Request, handler: ApiHandler<T>): Promise<NextResponse> {
   const supabase = await createClient()
   const {
     data: { user },
@@ -74,7 +79,7 @@ export async function withAuth<T>(handler: ApiHandler<T>): Promise<NextResponse>
     console.info('[withAuth]', { userId: user.id, email: user.email })
   }
   try {
-    const data = await handler(supabase, user)
+    const data = await handler(supabase, user, req)
     return ok(data)
   } catch (e) {
     return pgErrorToResponse(e)
