@@ -4,7 +4,7 @@
  * 레이아웃 구성 (W1 와이어프레임 기준):
  *  1층: sticky 헤더 (掲示板)
  *  2층: 핫 피드 캐러셀 (HotFeedCarousel — 24h TOP 3)
- *  3층: 갤러리 아이콘 행 (CategoryIconRow — 全て + 9 카테고리)
+ *  3층: 갤러리 아이콘 행 (CategoryIconRow — 全て + 5 카테고리)
  *  4층: sticky 정렬 토글 (SortToggle — 最新 / 人気)
  *  5층: 카드 피드 placeholder (Task 014 에서 PostCard + 무한 스크롤로 교체)
  *  6층: BottomTabBar + WriteFab + WriteBottomSheet (layout.tsx 처리)
@@ -23,6 +23,7 @@ import { HotFeedCarousel } from '@/components/community/hot-feed-carousel'
 import { CategoryIconRow } from '@/components/community/category-icon-row'
 import { SortToggle } from '@/components/community/sort-toggle'
 import { PostFeed } from '@/components/community/post-feed'
+import { NotificationBellContainer } from '@/components/community/notification-bell-container'
 
 export default async function HomePage({
   searchParams,
@@ -55,9 +56,13 @@ export default async function HomePage({
 
   return (
     <div>
-      {/* 1층: sticky 헤더 */}
+      {/* 1층: sticky 헤더 — 좌: 타이틀, 우: 알림 종 버튼 */}
       <header className="sticky top-0 z-30 bg-background/95 backdrop-blur border-b px-4 h-14 flex items-center">
         <h1 className="text-lg font-bold">掲示板</h1>
+        {/* 알림 벨 — 우측 정렬. Client Component이므로 Server Component인 이 페이지에서 바로 사용 가능 */}
+        <div className="ml-auto">
+          <NotificationBellContainer />
+        </div>
       </header>
 
       {/* 2층: 핫 피드 캐러셀 */}

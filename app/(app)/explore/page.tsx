@@ -21,6 +21,7 @@ import type { CategorySlug } from '@/types/community'
 import { ExploreSearchBar } from '@/components/community/explore-search-bar'
 import { CategoryIconRow } from '@/components/community/category-icon-row'
 import { PostFeed } from '@/components/community/post-feed'
+import { NotificationBellContainer } from '@/components/community/notification-bell-container'
 
 export default async function ExplorePage({
   searchParams,
@@ -47,9 +48,12 @@ export default async function ExplorePage({
 
   return (
     <div>
-      {/* 探索 고정 헤더 */}
+      {/* 探索 고정 헤더 — 우측에 알림 종 */}
       <header className="sticky top-0 z-30 bg-background/95 backdrop-blur border-b px-4 h-14 flex items-center">
         <h1 className="text-lg font-bold">探索</h1>
+        <div className="ml-auto">
+          <NotificationBellContainer />
+        </div>
       </header>
 
       {/* 검색 입력바 — useSearchParams 사용으로 Suspense 필수 */}

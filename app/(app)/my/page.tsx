@@ -18,6 +18,7 @@ import { MyPostCard } from '@/components/community/my-post-card'
 import { MyCommentCard } from '@/components/community/my-comment-card'
 import { MyBookmarkCard } from '@/components/community/my-bookmark-card'
 import { LogoutButton } from '@/components/community/logout-button'
+import { NotificationBellContainer } from '@/components/community/notification-bell-container'
 import { getCampusLabel, getDepartmentLabel } from '@/lib/locale/labels'
 import { CAMPUS_VALUES, DEPARTMENT_VALUES, type Campus, type Department } from '@/types/domain'
 
@@ -61,17 +62,20 @@ export default async function MyPage({
 
   return (
     <div>
-      {/* 상단 헤더 — glass-panel 다크 보라 글래스 효과 */}
+      {/* 상단 헤더 — glass-panel 다크 보라 글래스 효과. 우측에 알림 종 + 설정 */}
       <header className="sticky top-0 z-30 glass-panel px-4 h-14 flex items-center">
         {/* 보라 그라데이션 타이틀 */}
         <h1 className="text-gradient-violet text-lg font-bold">マイページ</h1>
-        <Link
-          href="/my/profile"
-          aria-label="設定"
-          className="ml-auto p-2 rounded-md hover:bg-muted"
-        >
-          <Settings className="size-5" />
-        </Link>
+        <div className="ml-auto flex items-center gap-1">
+          <NotificationBellContainer />
+          <Link
+            href="/my/profile"
+            aria-label="設定"
+            className="inline-flex items-center justify-center p-2 rounded-md hover:bg-muted"
+          >
+            <Settings className="size-5" />
+          </Link>
+        </div>
       </header>
 
       {/* 프로필 섹션 — 보라 라디알 그라데이션 글로우 배경 */}
