@@ -16,7 +16,7 @@
 import { Suspense } from 'react'
 import { createClient } from '@/lib/supabase/server'
 import { fetchHotPosts } from '@/lib/community/hot-feed'
-import { fetchPosts } from '@/lib/community/posts'
+import { fetchPosts, fetchMyReactionsAndBookmarks } from '@/lib/community/posts'
 import { CATEGORY_SLUG_VALUES } from '@/types/community'
 import type { CategorySlug } from '@/types/community'
 import { HotFeedCarousel } from '@/components/community/hot-feed-carousel'
@@ -54,6 +54,17 @@ export default async function HomePage({
     fetchPosts(supabase, { sort, categorySlug, limit: 20 }),
   ])
 
+  // 현재 사용자의 반응·북마크 일괄 조회 (비로그인이면 빈 결과)
+  // hot 캐러셀과 카드 리스트의 게시글 ID를 합쳐 한 번에 조회 (DB 라운드트립 절약)
+  const allIds = [
+    ...hot.map((p) => p.id),
+    ...list.items.map((p) => p.id),
+  ]
+  const { myReactions, myBookmarks } = await fetchMyReactionsAndBookmarks(
+    supabase,
+    allIds,
+  )
+
   return (
     <div>
       {/* 1층: sticky 헤더 — 좌: 타이틀, 우: 알림 종 버튼 */}
@@ -70,7 +81,7 @@ export default async function HomePage({
         <h2 className="text-xs font-semibold text-muted-foreground px-4 mb-2">
           🔥 おすすめ
         </h2>
-        <HotFeedCarousel posts={hot} />
+        <HotFeedCarousel posts={hot} myReactions={myReactions} />
       </section>
 
       {/* 3층: 갤러리 아이콘 행 — useSearchParams() 사용 → Suspense 필요 */}
@@ -112,6 +123,8 @@ export default async function HomePage({
         <PostFeed
           key={`${sort}-${categorySlug ?? 'all'}`}
           initial={list}
+          initialMyReactions={myReactions}
+          initialMyBookmarks={myBookmarks}
           sort={sort}
           categorySlug={categorySlug}
           currentUserId={user?.id ?? null}

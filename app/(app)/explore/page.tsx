@@ -15,7 +15,7 @@
 
 import { Suspense } from 'react'
 import { createClient } from '@/lib/supabase/server'
-import { fetchPosts } from '@/lib/community/posts'
+import { fetchPosts, fetchMyReactionsAndBookmarks } from '@/lib/community/posts'
 import { CATEGORY_SLUG_VALUES } from '@/types/community'
 import type { CategorySlug } from '@/types/community'
 import { ExploreSearchBar } from '@/components/community/explore-search-bar'
@@ -45,6 +45,12 @@ export default async function ExplorePage({
   const sort: 'latest' | 'popular' = q ? 'latest' : 'popular'
   const limit = q ? 20 : 10
   const list = await fetchPosts(supabase, { sort, search: q, categorySlug, limit })
+
+  // 현재 사용자의 반응·북마크 일괄 조회 (비로그인이면 빈 결과)
+  const { myReactions, myBookmarks } = await fetchMyReactionsAndBookmarks(
+    supabase,
+    list.items.map((p) => p.id),
+  )
 
   return (
     <div>
@@ -95,6 +101,8 @@ export default async function ExplorePage({
         <PostFeed
           key={`${q ?? ''}-${categorySlug ?? 'all'}-${sort}`}
           initial={list}
+          initialMyReactions={myReactions}
+          initialMyBookmarks={myBookmarks}
           sort={sort}
           categorySlug={categorySlug}
           search={q}

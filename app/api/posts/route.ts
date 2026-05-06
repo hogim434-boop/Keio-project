@@ -6,7 +6,7 @@
 
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { fetchPosts } from '@/lib/community/posts'
+import { fetchPosts, fetchMyReactionsAndBookmarks } from '@/lib/community/posts'
 import { err, ok, pgErrorToResponse, withAuth } from '@/lib/community/api-helpers'
 import {
   CategorySlugSchema,
@@ -34,7 +34,11 @@ export async function GET(req: Request): Promise<NextResponse> {
   try {
     const supabase = await createClient()
     const result = await fetchPosts(supabase, { sort, categorySlug, cursor, limit, search })
-    return ok(result)
+    const { myReactions, myBookmarks } = await fetchMyReactionsAndBookmarks(
+      supabase,
+      result.items.map((p) => p.id),
+    )
+    return ok({ ...result, myReactions, myBookmarks })
   } catch (e) {
     return pgErrorToResponse(e)
   }

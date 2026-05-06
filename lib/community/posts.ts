@@ -7,7 +7,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database, Post, Category } from '@/types/database'
-import type { CategorySlug } from '@/types/community'
+import type { CategorySlug, ReactionKind } from '@/types/community'
 
 export interface PostListItem extends Post {
   category: Pick<Category, 'slug' | 'name' | 'type'> | null
@@ -124,4 +124,48 @@ export async function fetchPosts(
   }
 
   return { items: masked, nextCursor }
+}
+
+/**
+ * 현재 로그인 사용자의 게시글별 반응(up/down) 및 북마크 여부를 batch 조회
+ *
+ * 게시판 목록 화면에서 카드별로 ❤️/🔖 활성 상태를 표시하기 위해 사용.
+ * 비로그인 사용자나 빈 postIds 의 경우 빈 결과 반환.
+ *
+ * RLS:
+ *   - reactions: SELECT 전체 허용 → user_id 필터로 본인 데이터만 추출
+ *   - bookmarks: SELECT 본인만 허용 → 자동으로 본인 행만 반환
+ */
+export async function fetchMyReactionsAndBookmarks(
+  supabase: SupabaseClient<Database>,
+  postIds: string[],
+): Promise<{ myReactions: Record<string, ReactionKind>; myBookmarks: string[] }> {
+  if (postIds.length === 0) return { myReactions: {}, myBookmarks: [] }
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { myReactions: {}, myBookmarks: [] }
+
+  const [rxRes, bmRes] = await Promise.all([
+    supabase
+      .from('reactions')
+      .select('target_id, reaction')
+      .eq('user_id', user.id)
+      .eq('target_type', 'post')
+      .in('target_id', postIds),
+    supabase
+      .from('bookmarks')
+      .select('post_id')
+      .eq('user_id', user.id)
+      .in('post_id', postIds),
+  ])
+
+  const myReactions: Record<string, ReactionKind> = {}
+  for (const r of rxRes.data ?? []) {
+    myReactions[r.target_id as string] = r.reaction as ReactionKind
+  }
+  const myBookmarks = (bmRes.data ?? []).map((b) => b.post_id as string)
+
+  return { myReactions, myBookmarks }
 }

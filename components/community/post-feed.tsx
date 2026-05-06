@@ -17,9 +17,14 @@ import { Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { PostCard } from './post-card'
 import type { PostListItem, FetchPostsResult } from '@/lib/community/posts'
+import type { ReactionKind } from '@/types/community'
 
 export interface PostFeedProps {
   initial: FetchPostsResult
+  /** SSR 에서 전달된 사용자별 게시글 반응(up/down) 맵 — postId → kind */
+  initialMyReactions?: Record<string, ReactionKind>
+  /** SSR 에서 전달된 사용자별 북마크 게시글 ID 목록 */
+  initialMyBookmarks?: string[]
   sort: 'latest' | 'popular'
   categorySlug?: string
   search?: string
@@ -27,7 +32,15 @@ export interface PostFeedProps {
   currentUserId?: string | null
 }
 
-export function PostFeed({ initial, sort, categorySlug, search, currentUserId }: PostFeedProps) {
+export function PostFeed({
+  initial,
+  initialMyReactions = {},
+  initialMyBookmarks = [],
+  sort,
+  categorySlug,
+  search,
+  currentUserId,
+}: PostFeedProps) {
   const router = useRouter()
   const [items, setItems] = useState<PostListItem[]>(initial.items)
   const [cursor, setCursor] = useState<string | null>(initial.nextCursor)
@@ -35,6 +48,10 @@ export function PostFeed({ initial, sort, categorySlug, search, currentUserId }:
   const [isLoading, setIsLoading] = useState(false)
   const sentinelRef = useRef<HTMLDivElement>(null)
   const abortRef = useRef<AbortController | null>(null)
+
+  // 사용자별 반응·북마크 — 무한 스크롤로 새 페이지 도달 시 머지
+  const [myReactions, setMyReactions] = useState<Record<string, ReactionKind>>(initialMyReactions)
+  const [myBookmarks, setMyBookmarks] = useState<Set<string>>(() => new Set(initialMyBookmarks))
 
   async function fetchMore() {
     if (!cursor || isLoading || !hasMore) return
@@ -62,6 +79,18 @@ export function PostFeed({ initial, sort, categorySlug, search, currentUserId }:
       setItems((prev) => [...prev, ...json.data.items])
       setCursor(json.data.nextCursor)
       setHasMore(json.data.nextCursor !== null)
+
+      // 새 페이지의 사용자 반응·북마크를 기존 상태에 머지
+      if (json.data.myReactions) {
+        setMyReactions((prev) => ({ ...prev, ...json.data.myReactions }))
+      }
+      if (Array.isArray(json.data.myBookmarks)) {
+        setMyBookmarks((prev) => {
+          const next = new Set(prev)
+          for (const id of json.data.myBookmarks as string[]) next.add(id)
+          return next
+        })
+      }
     } catch (e) {
       if (e instanceof Error && e.name === 'AbortError') return
       toast.error('投稿の読み込みに失敗しました')
@@ -103,7 +132,13 @@ export function PostFeed({ initial, sort, categorySlug, search, currentUserId }:
   return (
     <div className="space-y-3">
       {items.map((p) => (
-        <PostCard key={p.id} post={p} currentUserId={currentUserId} />
+        <PostCard
+          key={p.id}
+          post={p}
+          currentUserId={currentUserId}
+          initialMyReaction={myReactions[p.id] ?? null}
+          initialMyBookmark={myBookmarks.has(p.id)}
+        />
       ))}
       {hasMore && (
         <div ref={sentinelRef} className="py-6 flex justify-center">
