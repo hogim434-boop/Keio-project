@@ -167,3 +167,67 @@ export const subCopyReveal: Variants = {
     },
   },
 }
+
+// ============================================================
+// Cinema Stamp 인트로 시퀀스 전용 variants
+// 랜딩 page.tsx 의 useAnimationControls와 함께 사용
+// ============================================================
+
+/**
+ * 워드마크 스택 진입 — scale 0.96 + rotateX -25° + blur(16px) → 완성 상태.
+ * perspective:1000 부모 아래에서 3D 플립+줌인 느낌.
+ * duration: 0.6s expo-out — 무게감 있는 제목 등장.
+ */
+export const wordmarkStampEnter: Variants = {
+  hidden: {
+    opacity: 0,
+    scale: 0.96,
+    rotateX: -25,
+    filter: 'blur(16px)',
+  },
+  visible: {
+    opacity: 1,
+    scale: 1,
+    rotateX: 0,
+    filter: 'blur(0px)',
+    transition: {
+      duration: 0.6,
+      ease: [0.22, 1, 0.36, 1] as [number, number, number, number],
+    },
+  },
+}
+
+/**
+ * 검은 인트로 오버레이 페이드 아웃 — opacity 1 → 0.
+ * T=1.4s 시점에 트리거, 0.5s 동안 부드럽게 배경을 드러냄.
+ */
+export const overlayFadeOut: Variants = {
+  visible: { opacity: 1 },
+  hidden: {
+    opacity: 0,
+    transition: {
+      duration: 0.5,
+      ease: [0.22, 1, 0.36, 1] as [number, number, number, number],
+    },
+  },
+}
+
+/**
+ * horizon-line 가로선 reveal — width 0 → '100vw'.
+ * T=0.2s 시점에 트리거, origin-left 방향으로 왼쪽에서 오른쪽으로 그어짐.
+ * useAnimationControls 와 함께 사용 (animate() 함수로 직접 호출).
+ */
+export const horizonReveal = {
+  duration: 0.45,
+  ease: [0.22, 1, 0.36, 1] as [number, number, number, number],
+}
+
+/**
+ * horizon splits — 양 절반선이 각 방향 끝으로 미끄러져 사라짐.
+ * T=0.7s 시점에 horizonLeftControls / horizonRightControls 각각에 적용.
+ * x: 0 → ±50vw, opacity: 1 → 0.
+ */
+export const horizonSplitTransition = {
+  duration: 0.5,
+  ease: [0.22, 1, 0.36, 1] as [number, number, number, number],
+}
