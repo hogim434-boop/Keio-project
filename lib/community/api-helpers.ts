@@ -63,6 +63,8 @@ export function pgErrorToResponse(e: unknown): NextResponse {
     if (code === '23503') return err('FK_VIOLATION', msg, 400, extra)
     if (code === '42501') return err('PERMISSION_DENIED', msg, 403, extra)
     if (code === '42P17') return err('RLS_VIOLATION', msg, 403, extra)
+    if (code === 'P0002') return err('NOT_FOUND', msg, 404, extra)
+    if (code === '22023') return err('VALIDATION', msg, 422, extra)
     return err('DB_ERROR', msg, 500, extra)
   }
   const msg = e instanceof Error ? e.message : 'internal error'
