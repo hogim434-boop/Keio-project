@@ -155,159 +155,6 @@ export type Database = {
           },
         ]
       }
-      posts: {
-        Row: {
-          body: string
-          category_id: string
-          comment_count: number
-          created_at: string
-          id: string
-          is_anonymous: boolean
-          is_deleted: boolean
-          reaction_down: number
-          reaction_up: number
-          title: string
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          body: string
-          category_id: string
-          comment_count?: number
-          created_at?: string
-          id?: string
-          is_anonymous?: boolean
-          is_deleted?: boolean
-          reaction_down?: number
-          reaction_up?: number
-          title: string
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          body?: string
-          category_id?: string
-          comment_count?: number
-          created_at?: string
-          id?: string
-          is_anonymous?: boolean
-          is_deleted?: boolean
-          reaction_down?: number
-          reaction_up?: number
-          title?: string
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "posts_category_id_fkey"
-            columns: ["category_id"]
-            isOneToOne: false
-            referencedRelation: "categories"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "posts_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "posts_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles_public"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      profiles: {
-        Row: {
-          campus: string | null
-          created_at: string
-          department: string | null
-          email: string
-          grade: string | null
-          id: string
-          nickname: string | null
-          role: string
-          updated_at: string
-        }
-        Insert: {
-          campus?: string | null
-          created_at?: string
-          department?: string | null
-          email: string
-          grade?: string | null
-          id: string
-          nickname?: string | null
-          role?: string
-          updated_at?: string
-        }
-        Update: {
-          campus?: string | null
-          created_at?: string
-          department?: string | null
-          email?: string
-          grade?: string | null
-          id?: string
-          nickname?: string | null
-          role?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "profiles_id_fkey"
-            columns: ["id"]
-            isOneToOne: true
-            referencedRelation: "user_list"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      reactions: {
-        Row: {
-          created_at: string
-          id: string
-          reaction: string
-          target_id: string
-          target_type: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          reaction: string
-          target_id: string
-          target_type: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          reaction?: string
-          target_id?: string
-          target_type?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "reactions_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "reactions_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles_public"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       notifications: {
         Row: {
           actor_id: string
@@ -381,6 +228,165 @@ export type Database = {
           {
             foreignKeyName: "notifications_recipient_id_fkey"
             columns: ["recipient_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_public"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      posts: {
+        Row: {
+          body: string
+          category_id: string
+          comment_count: number
+          created_at: string
+          id: string
+          is_anonymous: boolean
+          is_deleted: boolean
+          reaction_down: number
+          reaction_up: number
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          body: string
+          category_id: string
+          comment_count?: number
+          created_at?: string
+          id?: string
+          is_anonymous?: boolean
+          is_deleted?: boolean
+          reaction_down?: number
+          reaction_up?: number
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          body?: string
+          category_id?: string
+          comment_count?: number
+          created_at?: string
+          id?: string
+          is_anonymous?: boolean
+          is_deleted?: boolean
+          reaction_down?: number
+          reaction_up?: number
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "posts_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "posts_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "posts_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_public"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          agreed_guidelines_at: string | null
+          agreed_terms_at: string | null
+          campus: string | null
+          created_at: string
+          department: string | null
+          email: string
+          grade: string | null
+          id: string
+          nickname: string | null
+          role: string
+          updated_at: string
+        }
+        Insert: {
+          agreed_guidelines_at?: string | null
+          agreed_terms_at?: string | null
+          campus?: string | null
+          created_at?: string
+          department?: string | null
+          email: string
+          grade?: string | null
+          id: string
+          nickname?: string | null
+          role?: string
+          updated_at?: string
+        }
+        Update: {
+          agreed_guidelines_at?: string | null
+          agreed_terms_at?: string | null
+          campus?: string | null
+          created_at?: string
+          department?: string | null
+          email?: string
+          grade?: string | null
+          id?: string
+          nickname?: string | null
+          role?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "profiles_id_fkey"
+            columns: ["id"]
+            isOneToOne: true
+            referencedRelation: "user_list"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      reactions: {
+        Row: {
+          created_at: string
+          id: string
+          reaction: string
+          target_id: string
+          target_type: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          reaction: string
+          target_id: string
+          target_type: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          reaction?: string
+          target_id?: string
+          target_type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reactions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reactions_user_id_fkey"
+            columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles_public"
             referencedColumns: ["id"]
@@ -481,6 +487,10 @@ export type Database = {
       }
     }
     Functions: {
+      admin_resolve_report: {
+        Args: { p_action: string; p_report_id: string }
+        Returns: Json
+      }
       is_admin: { Args: never; Returns: boolean }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
