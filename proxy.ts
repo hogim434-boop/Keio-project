@@ -38,8 +38,15 @@ export async function proxy(request: NextRequest) {
   const isSignupPath = pathname === '/signup'
   const isLandingPath = pathname === '/landing'
 
+  // 법적 문서 — setup 진행 중인 사용자도 약관 link 새 탭 진입 허용
+  const isLegalPath =
+    pathname === '/guidelines' || pathname.startsWith('/guidelines/') ||
+    pathname === '/terms' || pathname.startsWith('/terms/') ||
+    pathname === '/privacy' || pathname.startsWith('/privacy/')
+
   // 공개 경로 화이트리스트 — /auth/* 는 위에서 이미 early return 처리됨
-  const PUBLIC_PATHS = ['/landing', '/login', '/signup']
+  // 법적 문서(/guidelines, /terms, /privacy)는 미인증 사용자도 접근 가능 (F013 가입 동의 link)
+  const PUBLIC_PATHS = ['/landing', '/login', '/signup', '/guidelines', '/terms', '/privacy']
   const isPublicPath = PUBLIC_PATHS.some((p) => pathname.startsWith(p))
 
   if (user) {
@@ -49,8 +56,9 @@ export async function proxy(request: NextRequest) {
     const needsSetup = provider === 'google' && passwordSet !== true
 
     if (needsSetup) {
-      // /signup/setup 외 모든 경로에서 setup으로 강제 이동
-      if (!isSetupPath) {
+      // /signup/setup 외 모든 경로에서 setup으로 강제 이동.
+      // 단 법적 문서 (F013 동의 link 새 탭) 는 setup 진행 중에도 진입 허용.
+      if (!isSetupPath && !isLegalPath) {
         return NextResponse.redirect(new URL('/signup/setup', request.url))
       }
       return supabaseResponse
