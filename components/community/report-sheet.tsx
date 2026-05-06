@@ -47,14 +47,7 @@ import { Label } from '@/components/ui/label'
 import { ReportFormSchema, type ReportFormData } from '@/types/community'
 import { useReportSheet } from '@/lib/stores/report-sheet-store'
 import { springTap } from '@/lib/motion-variants'
-
-/** 신고 사유 선택지 — W6 와이어프레임 1:1 */
-const REASONS = [
-  { value: 'abuse',      label: '暴言・誹謗中傷' },
-  { value: 'defamation', label: '名誉毀損' },
-  { value: 'spam',       label: 'スパム' },
-  { value: 'illegal',    label: '違法・不適切なコンテンツ' },
-] as const
+import { REPORT_REASONS as REASONS } from '@/lib/community/report-labels'
 
 /**
  * 신고 바텀 시트
