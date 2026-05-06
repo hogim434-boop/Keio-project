@@ -62,10 +62,9 @@ export default async function MyPage({
 
   return (
     <div>
-      {/* 상단 헤더 — glass-panel 다크 보라 글래스 효과. 우측에 알림 종 + 설정 */}
-      <header className="sticky top-0 z-30 glass-panel px-4 h-14 flex items-center">
-        {/* 보라 그라데이션 타이틀 */}
-        <h1 className="text-gradient-violet text-lg font-bold">マイページ</h1>
+      {/* 상단 헤더 — 다른 페이지와 동일한 sticky 패턴 (반투명 + backdrop-blur). 우측에 알림 종 + 설정 */}
+      <header className="sticky top-0 z-30 bg-background/95 backdrop-blur border-b px-4 h-14 flex items-center">
+        <h1 className="text-lg font-bold">マイページ</h1>
         <div className="ml-auto flex items-center gap-1">
           <NotificationBellContainer />
           <Link
@@ -78,11 +77,10 @@ export default async function MyPage({
         </div>
       </header>
 
-      {/* 프로필 섹션 — 보라 라디알 그라데이션 글로우 배경 */}
-      <section className="relative overflow-hidden px-4 py-4 border-b flex items-center gap-3 bg-gradient-violet-radial">
-        {/* Avatar — 보라 그라데이션 + 글로우 링 */}
+      {/* 프로필 섹션 */}
+      <section className="px-4 py-4 border-b flex items-center gap-3">
         <div
-          className="size-14 rounded-full bg-gradient-violet shadow-glow-violet ring-2 ring-primary/30 flex items-center justify-center text-2xl text-white"
+          className="size-14 rounded-full bg-muted flex items-center justify-center text-2xl"
           aria-hidden
         >
           👤
