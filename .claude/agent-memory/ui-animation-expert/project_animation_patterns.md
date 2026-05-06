@@ -217,6 +217,50 @@ type: project
 - `CommentItem`: `motion.div variants={fadeInUp}` + 본인 댓글 `ring-1 ring-primary/30`
 - 返信 버튼 hover: `hover:text-primary` (보라 색상)
 
+## Cinema Stamp 인트로 시퀀스 (2026-05-06)
+
+### 핵심 구현 패턴
+
+#### Variable Font weight 애니메이션 패턴 (중요)
+`fontVariationSettings`는 CSS 문자열 속성이라 `controls.start()` 또는 `animate()` 에 직접 넣으면 보간 안 됨.
+패턴: `useMotionValue(100)` + `wght.on('change', v => el.style.fontVariationSettings = ...)`
+`animate(wght, 700, { ... })` — `animate()`의 첫 번째 인자가 MotionValue 일 때는 직접 사용 가능
+
+#### AnimationControls vs animate() 타입 구분 (중요)
+- `useAnimationControls()` 반환값 → 반드시 `controls.start({ ... transition })` 방식
+- `animate(controls, { ... })` 형태는 TypeScript 오류 발생 (`LegacyAnimationControls` 타입 불일치)
+- `animate(motionValue, target, options)` — MotionValue에는 직접 사용 OK
+
+#### horizon-line scaleX 방식
+`width: 0→100vw` 는 controls.start 에서 불가 → `scaleX: 0→1` + `w-screen origin-left` 로 대체
+
+#### keyframes 배열 (글리치 펄스)
+`controls.start({ opacity: [0, 0.6, 0], x: [0, 2, 0], transition: { ... } })` — keyframes 배열 지원됨
+
+### sessionStorage + reduced 이중 가드 패턴
+```tsx
+function shouldSkipIntro(): boolean {
+  if (reduced) return true
+  try { return sessionStorage.getItem('keio_intro_seen') === '1' } catch { return false }
+}
+```
+스킵 시 `controls.set()` 으로 모든 레이어를 즉시 final state로 세팅.
+
+### isSkip 분기로 본 랜딩 delay 재계산
+```tsx
+const isSkip = reduced || (typeof window !== 'undefined' && sessionStorage.getItem('keio_intro_seen') === '1')
+const underlineDelay = isSkip ? 0.2 : 1.85
+const subcopyDelay   = isSkip ? 0.35 : 2.0
+const ctaDelay       = isSkip ? 0.5  : 2.3
+```
+
+### wait() 헬퍼 + async 시퀀스 패턴
+```tsx
+function wait(ms: number): Promise<void> { return new Promise(r => setTimeout(r, ms)) }
+// useEffect 내 async runIntro() 에서 await wait(ms) 로 타임라인 동기화
+// cancelled 플래그로 unmount 안전 처리
+```
+
 ## Phase 5 알림 시스템 마이크로 인터랙션 (2026-05-06)
 
 ### notification-bell.tsx
