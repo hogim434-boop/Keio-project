@@ -56,6 +56,21 @@ export async function proxy(request: NextRequest) {
       return supabaseResponse
     }
 
+    // /admin 경로 — profiles.role DB 진실 소스로 admin 권한 검증
+    const isAdminPath = pathname === '/admin' || pathname.startsWith('/admin/')
+    if (isAdminPath) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .maybeSingle()
+
+      // profile이 없거나 role이 'admin'이 아니면 홈으로 차단
+      if (profile?.role !== 'admin') {
+        return NextResponse.redirect(new URL('/', request.url))
+      }
+    }
+
     // 계정 설정이 완료된 사용자: 랜딩·로그인·회원가입·setup 페이지에서 내보냄
     if (isLandingPath || isLoginPath || isSignupPath || isSetupPath) {
       return NextResponse.redirect(new URL('/', request.url))
