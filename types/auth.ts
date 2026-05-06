@@ -73,6 +73,10 @@ export const SetupFormSchema = z
     campus: CampusSchema,
     grade: GradeSchema,
     department: DepartmentSchema,
+    /** F013: 利用規約 + コミュニティガイドライン 同意 — refine 으로 true 만 통과 */
+    agreedToTerms: z.boolean().refine((v) => v === true, {
+      message: '利用規約とコミュニティガイドラインへの同意が必要です',
+    }),
   })
   .refine((data) => data.password === data.confirmPassword, {
     message: 'パスワードが一致しません',

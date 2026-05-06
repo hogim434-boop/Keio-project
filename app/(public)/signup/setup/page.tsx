@@ -3,12 +3,14 @@
 import { motion, useReducedMotion } from 'framer-motion'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { CheckCircle2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Checkbox } from '@/components/ui/checkbox'
 import {
   Select,
   SelectContent,
@@ -55,6 +57,7 @@ export default function SetupPage() {
       campus: undefined,
       grade: undefined,
       department: undefined,
+      agreedToTerms: false,
     },
     mode: 'onSubmit',
   })
@@ -92,6 +95,9 @@ export default function SetupPage() {
   async function onSubmit(values: SetupFormData) {
     const supabase = createClient()
 
+    // F013: 동의 timestamp — 트리거가 profiles.agreed_*_at 동기화
+    const agreedAt = new Date().toISOString()
+
     const { error } = await supabase.auth.updateUser({
       password: values.password,
       data: {
@@ -100,6 +106,8 @@ export default function SetupPage() {
         campus: values.campus,
         grade: values.grade,
         department: values.department,
+        agreed_terms_at: agreedAt,
+        agreed_guidelines_at: agreedAt,
       },
     })
 
@@ -308,6 +316,61 @@ export default function SetupPage() {
             {errors.department?.message && (
               <p role="alert" className="px-2 text-xs text-destructive">
                 {errors.department.message}
+              </p>
+            )}
+          </motion.div>
+
+          {/* F013: 利用規約 + コミュニティガイドライン 同意 (가입 차단 가드)
+              마크업 재구조: 라벨(체크박스 토글)과 link(새 탭 진입)를 분리.
+              이전 구조는 Label 안에 Link가 들어가 라벨 클릭 시 체크박스 토글이
+              Link 의 target="_blank" navigation 을 가로채는 문제가 있었음. */}
+          <motion.div variants={shouldReduce ? {} : authField} className="space-y-2 pt-2">
+            {/* 1행: 체크박스 + 동의 라벨 (label htmlFor 로 체크박스 토글) */}
+            <div className="flex items-start gap-3">
+              <Controller
+                name="agreedToTerms"
+                control={control}
+                render={({ field }) => (
+                  <Checkbox
+                    id="agree"
+                    checked={field.value === true}
+                    onCheckedChange={(v) => field.onChange(v === true)}
+                    aria-invalid={!!errors.agreedToTerms}
+                    className="mt-0.5"
+                  />
+                )}
+              />
+              <Label
+                htmlFor="agree"
+                className="text-sm leading-relaxed font-normal cursor-pointer select-none"
+              >
+                利用規約 と コミュニティガイドライン に同意します
+              </Label>
+            </div>
+
+            {/* 2행: 별도 link row — 라벨 클릭과 무관, 새 탭으로 진입 */}
+            <div className="flex flex-wrap gap-x-4 gap-y-1 pl-7 text-xs">
+              <Link
+                href="/terms"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-muted-foreground underline underline-offset-2 hover:text-foreground transition-colors"
+              >
+                利用規約を読む
+              </Link>
+              <Link
+                href="/guidelines"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-muted-foreground underline underline-offset-2 hover:text-foreground transition-colors"
+              >
+                コミュニティガイドラインを読む
+              </Link>
+            </div>
+
+            {errors.agreedToTerms?.message && (
+              <p role="alert" className="px-2 text-xs text-destructive">
+                {errors.agreedToTerms.message}
               </p>
             )}
           </motion.div>
