@@ -1,20 +1,3 @@
-/**
- * Supabase Database 타입 정의
- *
- * `mcp__supabase__generate_typescript_types` (Supabase MCP) 출력 본문 +
- * 프로젝트 단축 alias 보강. dev 프로젝트의 7테이블 + user_list view +
- * 함수 시그니처 (is_admin / show_limit / show_trgm) 정합.
- *
- * 사용 예:
- * ```ts
- * import type { Database, Post, PostInsert } from '@/types/database'
- * type Profile = Database['public']['Tables']['profiles']['Row']
- * ```
- *
- * 재생성 방법: `mcp__supabase__generate_typescript_types` 호출 후 본문 교체.
- * 단축 alias 블록(파일 하단)은 보존할 것.
- */
-
 export type Json =
   | string
   | number
@@ -63,6 +46,13 @@ export type Database = {
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bookmarks_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_public"
             referencedColumns: ["id"]
           },
         ]
@@ -156,6 +146,13 @@ export type Database = {
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "comments_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_public"
+            referencedColumns: ["id"]
+          },
         ]
       }
       posts: {
@@ -214,6 +211,13 @@ export type Database = {
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "posts_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_public"
             referencedColumns: ["id"]
           },
         ]
@@ -295,6 +299,92 @@ export type Database = {
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "reactions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_public"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notifications: {
+        Row: {
+          actor_id: string
+          comment_id: string | null
+          created_at: string
+          id: string
+          is_read: boolean
+          post_id: string | null
+          reaction_kind: string | null
+          recipient_id: string
+          type: string
+        }
+        Insert: {
+          actor_id: string
+          comment_id?: string | null
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          post_id?: string | null
+          reaction_kind?: string | null
+          recipient_id: string
+          type: string
+        }
+        Update: {
+          actor_id?: string
+          comment_id?: string | null
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          post_id?: string | null
+          reaction_kind?: string | null
+          recipient_id?: string
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_comment_id_fkey"
+            columns: ["comment_id"]
+            isOneToOne: false
+            referencedRelation: "comments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "posts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_recipient_id_fkey"
+            columns: ["recipient_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_recipient_id_fkey"
+            columns: ["recipient_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_public"
+            referencedColumns: ["id"]
+          },
         ]
       }
       reports: {
@@ -339,10 +429,43 @@ export type Database = {
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "reports_reporter_id_fkey"
+            columns: ["reporter_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_public"
+            referencedColumns: ["id"]
+          },
         ]
       }
     }
     Views: {
+      profiles_public: {
+        Row: {
+          id: string | null
+          nickname: string | null
+          role: string | null
+        }
+        Insert: {
+          id?: string | null
+          nickname?: string | null
+          role?: string | null
+        }
+        Update: {
+          id?: string | null
+          nickname?: string | null
+          role?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "profiles_id_fkey"
+            columns: ["id"]
+            isOneToOne: true
+            referencedRelation: "user_list"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_list: {
         Row: {
           campus: string | null
@@ -373,6 +496,12 @@ export type Database = {
           post_id: string
           updated_at: string
           user_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "comments"
+          isOneToOne: true
+          isSetofReturn: false
         }
       }
     }
@@ -541,3 +670,9 @@ export type ReportUpdate   = TablesUpdate<'reports'>
 export type Bookmark       = Tables<'bookmarks'>
 export type BookmarkInsert = TablesInsert<'bookmarks'>
 export type BookmarkUpdate = TablesUpdate<'bookmarks'>
+
+export type Notification       = Tables<'notifications'>
+export type NotificationInsert = TablesInsert<'notifications'>
+export type NotificationUpdate = TablesUpdate<'notifications'>
+
+export type ProfilePublic      = Tables<'profiles_public'>
