@@ -19,27 +19,29 @@ import { z } from 'zod'
 // ============================================================
 
 /**
- * 9개 초기 카테고리 슬러그 — topic 6 + campus 3.
- * 향후 야가미/시나노마치/시바공립 추가 시 본 배열 + categories 시드 마이그레이션 동시 갱신.
+ * 5개 카테고리 슬러그 — 모두 topic 단일 축.
+ * 2026-05-06 재편: 9개 → 5개. 캠퍼스(三田/日吉/SFC) 카테고리 제거.
+ * 추가/변경 시 `lib/community/categories.ts` + 시드 마이그레이션 동시 갱신.
  */
 export const CATEGORY_SLUG_VALUES = [
-  'free',
-  'love',
   'study',
   'job',
-  'daily',
-  'question',
-  'mita',
-  'hiyoshi',
-  'sfc',
+  'school-life',
+  'club',
+  'free',
 ] as const
 
 export type CategorySlug = (typeof CATEGORY_SLUG_VALUES)[number]
 
 export const CategorySlugSchema = z.enum(CATEGORY_SLUG_VALUES)
 
-/** 카테고리 분류축 — DB CHECK in (topic, campus) 와 일치 */
-export const CATEGORY_TYPE_VALUES = ['topic', 'campus'] as const
+/**
+ * 카테고리 분류축 — 현재는 topic만 사용.
+ * DB CHECK 제약은 ('topic','campus') 유지 (미래 캠퍼스 분류 재도입 시 ALTER 불필요).
+ * TypeScript에서 의도적으로 'campus'를 제외: 현재 캠퍼스 카테고리가 없으므로
+ * 코드 레벨에서 campus를 입력할 수 없도록 타입으로 제한함.
+ */
+export const CATEGORY_TYPE_VALUES = ['topic'] as const
 
 export type CategoryType = (typeof CATEGORY_TYPE_VALUES)[number]
 
