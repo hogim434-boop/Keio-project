@@ -155,6 +155,22 @@ export default async function MyPage({
           ))}
       </section>
 
+      {/* 법적 문서 진입점 — 가이드라인 / 약관 / 개인정보 (Task 022 F013) */}
+      <nav
+        aria-label="法的文書"
+        className="flex flex-wrap justify-center gap-x-4 gap-y-2 text-xs text-muted-foreground py-4 border-t border-border/50"
+      >
+        <Link href="/guidelines" className="hover:text-foreground transition-colors">
+          コミュニティガイドライン
+        </Link>
+        <Link href="/terms" className="hover:text-foreground transition-colors">
+          利用規約
+        </Link>
+        <Link href="/privacy" className="hover:text-foreground transition-colors">
+          プライバシーポリシー
+        </Link>
+      </nav>
+
       {/* 하단 로그아웃 버튼 — 보더 통일 */}
       <section className="px-4 py-4 border-t border-border/50">
         <LogoutButton />
