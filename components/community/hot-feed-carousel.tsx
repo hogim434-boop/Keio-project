@@ -3,40 +3,57 @@
 /**
  * 핫 피드 캐러셀 컴포넌트 (F014)
  *
- * 최근 24시간 reaction_up TOP 3 게시글을 가로 드래그 캐러셀로 표시.
- * Framer Motion drag="x" + useMotionValue 로 현재 x 위치 추적.
- * 드래그 중 Link 클릭 차단 (10px 이상 이동 시).
+ * 최근 7일 reaction_up TOP 3 게시글을 가로 CSS scroll-snap 캐러셀로 표시.
+ * overflow-x-auto + snap-x snap-mandatory 로 네이티브 스크롤 snap 적용.
+ * IntersectionObserver 로 현재 가장 많이 보이는 카드를 activeIdx 로 추적.
  * 하단 점 인디케이터로 현재 슬라이드 위치 표시.
  */
 
 import Link from 'next/link'
-import { useRef, useState } from 'react'
-import { motion, useMotionValue } from 'framer-motion'
+import { useRef, useState, useEffect } from 'react'
 import { Heart } from 'lucide-react'
 import type { PostListItem } from '@/lib/community/posts'
 import { getCategoryEmoji } from '@/lib/community/categories'
-import type { CategorySlug } from '@/types/community'
+import type { CategorySlug, ReactionKind } from '@/types/community'
 import { Card } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
 
-/** 슬라이드 너비 (w-72 = 288px) */
-const SLIDE_W = 288
-/** 슬라이드 간격 (gap-4 = 16px) */
-const SLIDE_GAP = 16
-
 interface HotFeedCarouselProps {
   posts: PostListItem[]
+  /** 현재 로그인 사용자의 게시글별 반응 맵 (postId → 'up' | 'down') — 좋아요한 카드의 ❤️를 채우기 위해 사용 */
+  myReactions?: Record<string, ReactionKind>
 }
 
-export function HotFeedCarousel({ posts }: HotFeedCarouselProps) {
+export function HotFeedCarousel({ posts, myReactions = {} }: HotFeedCarouselProps) {
   // 현재 활성 슬라이드 인덱스
   const [activeIdx, setActiveIdx] = useState(0)
 
-  // Framer Motion x 위치 추적 (렌더 사이클 외부에서 업데이트)
-  const x = useMotionValue(0)
+  // 스크롤 컨테이너 ref
+  const scrollerRef = useRef<HTMLDivElement>(null)
 
-  // 드래그 이동 거리 추적 (링크 클릭 차단용)
-  const dragOffsetRef = useRef(0)
+  // 각 카드(Link) 요소 ref 배열
+  const cardRefs = useRef<(HTMLAnchorElement | null)[]>([])
+
+  // IntersectionObserver 로 스크롤 위치에 따른 활성 인덱스 계산
+  useEffect(() => {
+    if (!scrollerRef.current) return
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        // intersectionRatio 가 가장 높은(가장 많이 보이는) 항목을 활성으로 지정
+        const visible = entries
+          .filter((e) => e.isIntersecting)
+          .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0]
+        if (!visible) return
+        const idx = cardRefs.current.indexOf(visible.target as HTMLAnchorElement)
+        if (idx >= 0) setActiveIdx(idx)
+      },
+      { root: scrollerRef.current, threshold: [0.5, 0.75, 1] },
+    )
+
+    cardRefs.current.forEach((el) => el && observer.observe(el))
+    return () => observer.disconnect()
+  }, [posts.length])
 
   // 빈 배열 처리 — 아직 인기 게시글 없음 메시지 표시
   if (posts.length === 0) {
@@ -47,49 +64,33 @@ export function HotFeedCarousel({ posts }: HotFeedCarouselProps) {
     )
   }
 
-  // 드래그 제약: 첫 슬라이드(right=0) ~ 마지막 슬라이드
-  const leftConstraint = posts.length === 1 ? 0 : -((posts.length - 1) * (SLIDE_W + SLIDE_GAP))
-
   return (
     <div aria-label="人気の投稿">
-      {/* 드래그 가능한 슬라이드 컨테이너 */}
-      <div className="overflow-hidden">
-        <motion.div
-          drag="x"
-          dragConstraints={{ left: leftConstraint, right: 0 }}
-          dragElastic={0.15}
-          dragSnapToOrigin={false}
-          dragMomentum={false}
-          style={{ x }}
-          className="flex gap-4 px-4 cursor-grab active:cursor-grabbing"
-          onDrag={(_, info) => {
-            // 드래그 중 이동 거리 기록 (링크 클릭 차단용)
-            dragOffsetRef.current = info.offset.x
-          }}
-          onDragEnd={(_, info) => {
-            // 현재 x 위치 기반으로 활성 인덱스 계산
-            const currentX = x.get()
-            const rawIdx = Math.round(-currentX / (SLIDE_W + SLIDE_GAP))
-            const clampedIdx = Math.max(0, Math.min(posts.length - 1, rawIdx))
-            setActiveIdx(clampedIdx)
-
-            // 드래그 오프셋 리셋
-            dragOffsetRef.current = info.offset.x
-          }}
-        >
-          {posts.map((p) => (
+      {/* 네이티브 scroll-snap 컨테이너 */}
+      {/* overflow-y-visible: Card 의 ring(테두리)이 상하에서 잘리지 않도록 함 */}
+      <div
+        ref={scrollerRef}
+        className={cn(
+          'flex gap-4 overflow-x-auto overflow-y-visible',
+          'px-4 py-2 snap-x snap-mandatory scrollbar-none',
+          'scroll-px-4 scroll-smooth',
+          '[-webkit-overflow-scrolling:touch] [overscroll-behavior-x:contain]',
+        )}
+      >
+        {posts.map((p, i) => {
+          // 현재 사용자가 이 게시글에 'up' 반응을 남겼는지
+          const liked = myReactions[p.id] === 'up'
+          return (
             <Link
               key={p.id}
               href={`/posts/${p.id}`}
-              onClick={(e) => {
-                // 드래그 이동 거리 10px 초과 시 링크 클릭 차단
-                if (Math.abs(dragOffsetRef.current) > 10) {
-                  e.preventDefault()
-                }
+              ref={(el) => {
+                // 카드 ref 배열에 순서대로 저장
+                cardRefs.current[i] = el
               }}
-              className="shrink-0"
+              className="shrink-0 snap-start"
             >
-              <Card className="w-72 shrink-0 p-4 h-32 flex flex-col justify-between gap-2 select-none">
+              <Card className="w-72 p-4 h-32 flex flex-col justify-between gap-2 select-none">
                 {/* 상단: 카테고리 배지 */}
                 <div>
                   <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-secondary text-secondary-foreground text-xs">
@@ -105,15 +106,20 @@ export function HotFeedCarousel({ posts }: HotFeedCarouselProps) {
                   {p.title}
                 </h3>
 
-                {/* 하단: 추천 수 */}
-                <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                  <Heart className="size-3.5" />
+                {/* 하단: 추천 수 — 본인이 좋아요한 글은 빨간색 채움 */}
+                <div
+                  className={cn(
+                    'flex items-center gap-1 text-xs',
+                    liked ? 'text-red-500' : 'text-muted-foreground',
+                  )}
+                >
+                  <Heart className={cn('size-3.5', liked && 'fill-red-500')} />
                   <span>{p.reaction_up}</span>
                 </div>
               </Card>
             </Link>
-          ))}
-        </motion.div>
+          )
+        })}
       </div>
 
       {/* 점 인디케이터 */}
