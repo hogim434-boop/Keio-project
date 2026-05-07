@@ -1,0 +1,3 @@
+- [Jukulog 프로젝트 마케팅 컨텍스트](project_jukulog_overview.md) — 케이오 한정 익명 SNS, 1인 운영, PENMARK 보완재 포지셔닝, 슬로건 「塾生だけが、本音で話せる場所。」 확정
+- [일본 시장 데이터 검증용 출처](reference_jp_data_sources.md) — IG MAU·대학생 SNS 통계·三田祭 공식 IG·ひま部 사망 사례 1차 출처 모음
+- [일본 시장 카피 가드레일](feedback_jp_localization.md) — 직역체 금지, 신뢰→가치→차별→비용 순서, 인플루언서 단가 표준, 「中の人」 톤
