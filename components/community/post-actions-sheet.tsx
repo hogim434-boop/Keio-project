@@ -29,7 +29,9 @@ import {
 
 import { usePostActionsSheet } from '@/lib/stores/post-actions-sheet-store'
 import { useReportSheet } from '@/lib/stores/report-sheet-store'
+import { useWriteSheet } from '@/lib/stores/write-sheet-store'
 import { springTap } from '@/lib/motion-variants'
+import type { CategorySlug } from '@/types/community'
 
 /**
  * 게시글 액션 바텀 시트
@@ -44,6 +46,59 @@ export function PostActionsSheet() {
 
   // 삭제 진행 중 로컬 상태
   const [isDeleting, setIsDeleting] = useState(false)
+  // 편집 데이터 로딩 중 로컬 상태
+  const [isLoadingEdit, setIsLoadingEdit] = useState(false)
+  // WriteBottomSheet 편집 모드로 열기
+  const openForEdit = useWriteSheet((s) => s.openForEdit)
+
+  /**
+   * 編集する 핸들러
+   * GET /api/posts/:id 로 최신 데이터 조회 → WriteBottomSheet 편집 모드 열기
+   * 액션 시트 자체는 fetch 후 닫음 (실패 시에도 닫음 — 토스트로 알림)
+   */
+  async function handleEdit() {
+    if (!target) return
+    if (isLoadingEdit) return
+    setIsLoadingEdit(true)
+    try {
+      const res = await fetch(`/api/posts/${target.id}`, { method: 'GET' })
+      if (res.status === 401) {
+        close()
+        router.replace('/login')
+        return
+      }
+      const json = (await res.json()) as {
+        ok: boolean
+        data?: {
+          post: {
+            id: string
+            title: string
+            body: string
+            is_anonymous: boolean
+            category: { slug: string } | null
+          }
+        }
+        error?: { message?: string }
+      }
+      if (!json.ok || !json.data) {
+        toast.error('投稿の取得に失敗しました', { description: json.error?.message })
+        return
+      }
+      const p = json.data.post
+      close()
+      openForEdit({
+        id: p.id,
+        title: p.title,
+        body: p.body,
+        categorySlug: (p.category?.slug ?? 'free') as CategorySlug,
+        isAnonymous: p.is_anonymous,
+      })
+    } catch {
+      toast.error('投稿の取得に失敗しました')
+    } finally {
+      setIsLoadingEdit(false)
+    }
+  }
 
   /**
    * 게시글 삭제 핸들러
@@ -126,6 +181,25 @@ export function PostActionsSheet() {
 
         {/* 버튼 목록 — safe-area-inset-bottom 로 홈 인디케이터 여백 확보 */}
         <div className="px-4 pt-3 pb-[calc(env(safe-area-inset-bottom)+20px)] space-y-3">
+
+          {/* 編集する — 본인 게시글일 때만 노출 */}
+          {target?.isOwner && (
+            <motion.button
+              type="button"
+              onClick={handleEdit}
+              disabled={isLoadingEdit}
+              whileTap={shouldReduce ? {} : { scale: 0.98 }}
+              transition={springTap}
+              aria-label="この投稿を編集"
+              className="min-h-[60px] w-full rounded-2xl text-base font-semibold tracking-wide bg-muted hover:bg-muted/80 text-foreground transition-colors disabled:opacity-50 flex items-center justify-center"
+            >
+              {isLoadingEdit ? (
+                <Loader2 className="size-5 animate-spin" />
+              ) : (
+                '編集する'
+              )}
+            </motion.button>
+          )}
 
           {/* 削除する — 본인 게시글일 때만 노출 */}
           {target?.isOwner && (

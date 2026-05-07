@@ -50,7 +50,11 @@ const DRAFT_DEBOUNCE_MS = 1000
 export function WriteBottomSheet() {
   const isOpen = useWriteSheet((s) => s.isOpen)
   const close = useWriteSheet((s) => s.close)
+  const editTarget = useWriteSheet((s) => s.editTarget)
   const router = useRouter()
+
+  // 편집 모드 여부 — editTarget 이 있으면 편집, 없으면 신규 작성
+  const isEditMode = editTarget !== null
 
   // 드래프트 복원 여부 — 시트가 열릴 때 한 번만 체크
   const [draftChecked, setDraftChecked] = useState(false)
@@ -88,10 +92,23 @@ export function WriteBottomSheet() {
   const bodyValue = watch('body')
 
   // ────────────────────────────────────────────────
-  // 드래프트 복원 — 시트 열릴 때 한 번만 체크
+  // 편집 모드 — 시트 열릴 때 editTarget 값으로 폼 prefill
   // ────────────────────────────────────────────────
   useEffect(() => {
-    if (!isOpen || draftChecked) return
+    if (!isOpen || !editTarget) return
+    reset({
+      title: editTarget.title,
+      body: editTarget.body,
+      categorySlug: editTarget.categorySlug,
+      isAnonymous: editTarget.isAnonymous,
+    })
+  }, [isOpen, editTarget, reset])
+
+  // ────────────────────────────────────────────────
+  // 드래프트 복원 — 시트 열릴 때 한 번만 체크 (신규 작성 모드만)
+  // ────────────────────────────────────────────────
+  useEffect(() => {
+    if (!isOpen || draftChecked || isEditMode) return
     setDraftChecked(true)
 
     const raw = localStorage.getItem(DRAFT_KEY)
@@ -122,7 +139,7 @@ export function WriteBottomSheet() {
         },
       },
     })
-  }, [isOpen, draftChecked, reset])
+  }, [isOpen, draftChecked, isEditMode, reset])
 
   // 시트 닫힐 때 draftChecked 리셋 (다음에 다시 열면 재체크)
   useEffect(() => {
@@ -132,14 +149,14 @@ export function WriteBottomSheet() {
   }, [isOpen])
 
   // ────────────────────────────────────────────────
-  // 자동 저장 — dirty 상태에서만 debounce 1s
+  // 자동 저장 — dirty 상태에서만 debounce 1s (신규 작성 모드만)
   // ────────────────────────────────────────────────
   const saveDraft = useCallback(
     (values: PostFormData) => {
-      if (!isDirty) return
+      if (!isDirty || isEditMode) return
       localStorage.setItem(DRAFT_KEY, JSON.stringify(values))
     },
-    [isDirty]
+    [isDirty, isEditMode]
   )
 
   useEffect(() => {
@@ -183,13 +200,13 @@ export function WriteBottomSheet() {
   }, [])
 
   // ────────────────────────────────────────────────
-  // Sheet onOpenChange — 닫을 때 dirty 처리
+  // Sheet onOpenChange — 닫을 때 dirty 처리 (신규 작성 모드만 드래프트 저장)
   // ────────────────────────────────────────────────
   const handleOpenChange = useCallback(
     (open: boolean) => {
       if (!open) {
-        // 닫힐 때 dirty 상태이면 자동 저장 + 토스트
-        if (isDirty) {
+        // 신규 작성 모드 + dirty 일 때만 드래프트 저장
+        if (isDirty && !isEditMode) {
           const currentValues = form.getValues()
           localStorage.setItem(DRAFT_KEY, JSON.stringify(currentValues))
           toast.success('下書きを保存しました')
@@ -197,16 +214,19 @@ export function WriteBottomSheet() {
         close()
       }
     },
-    [isDirty, form, close]
+    [isDirty, isEditMode, form, close]
   )
 
   // ────────────────────────────────────────────────
-  // 폼 제출
+  // 폼 제출 — 신규 작성: POST, 편집: PATCH
   // ────────────────────────────────────────────────
   const onSubmit = async (data: PostFormData) => {
     try {
-      const res = await fetch('/api/posts', {
-        method: 'POST',
+      const url = isEditMode ? `/api/posts/${editTarget!.id}` : '/api/posts'
+      const method = isEditMode ? 'PATCH' : 'POST'
+
+      const res = await fetch(url, {
+        method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
       })
@@ -232,17 +252,25 @@ export function WriteBottomSheet() {
           return
         }
         // 기타 서버 에러
-        toast.error('投稿に失敗しました', {
+        toast.error(isEditMode ? '更新に失敗しました' : '投稿に失敗しました', {
           description: json.error?.message ?? 'もう一度お試しください',
         })
         return
       }
 
       // 성공 처리
-      localStorage.removeItem(DRAFT_KEY)
-      close()
-      reset()
-      router.push(`/posts/${json.data!.id}`)
+      if (isEditMode) {
+        toast.success('投稿を更新しました')
+        close()
+        reset()
+        // 현재 페이지를 새로고침 → 마이페이지/상세 페이지 어디서든 최신 내용 반영
+        router.refresh()
+      } else {
+        localStorage.removeItem(DRAFT_KEY)
+        close()
+        reset()
+        router.push(`/posts/${json.data!.id}`)
+      }
     } catch {
       // 네트워크 에러
       toast.error('ネットワークエラーが発生しました', {
@@ -283,16 +311,18 @@ export function WriteBottomSheet() {
             </Button>
           </SheetClose>
 
-          {/* 타이틀 */}
+          {/* 타이틀 — 모드에 따라 분기 */}
           <SheetTitle className="flex-1 text-center text-base font-semibold">
-            投稿する
+            {isEditMode ? '投稿を編集' : '投稿する'}
           </SheetTitle>
           {/* 접근성용 설명 — 시각적으로 숨기지만 aria 에 노출 */}
           <SheetDescription className="sr-only">
-            カテゴリーを選び、タイトルと本文を入力して投稿してください。
+            {isEditMode
+              ? 'カテゴリー・タイトル・本文を編集して保存してください。'
+              : 'カテゴリーを選び、タイトルと本文を入力して投稿してください。'}
           </SheetDescription>
 
-          {/* 제출 버튼 */}
+          {/* 제출 버튼 — 편집 모드는 「保存」, 신규 작성은 「送信」 */}
           <Button
             type="submit"
             form="write-post-form"
@@ -303,7 +333,7 @@ export function WriteBottomSheet() {
             {isSubmitting ? (
               <Loader2 size={16} className="animate-spin" />
             ) : (
-              '送信'
+              isEditMode ? '保存' : '送信'
             )}
           </Button>
         </SheetHeader>
