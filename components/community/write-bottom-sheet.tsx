@@ -92,16 +92,30 @@ export function WriteBottomSheet() {
   const bodyValue = watch('body')
 
   // ────────────────────────────────────────────────
-  // 편집 모드 — 시트 열릴 때 editTarget 값으로 폼 prefill
+  // 편집 모드 / 신규 작성 모드 — 시트 열릴 때 폼 상태 결정
+  // editTarget 있음 → 편집 데이터로 prefill
+  // editTarget 없음 → 빈 폼으로 reset (직전 편집 잔존 데이터 제거)
   // ────────────────────────────────────────────────
   useEffect(() => {
-    if (!isOpen || !editTarget) return
-    reset({
-      title: editTarget.title,
-      body: editTarget.body,
-      categorySlug: editTarget.categorySlug,
-      isAnonymous: editTarget.isAnonymous,
-    })
+    if (!isOpen) return
+    if (editTarget) {
+      // 편집 모드: 기존 데이터로 prefill
+      reset({
+        title: editTarget.title,
+        body: editTarget.body,
+        categorySlug: editTarget.categorySlug,
+        isAnonymous: editTarget.isAnonymous,
+      })
+    } else {
+      // 신규 작성 모드: 폼을 defaultValues 로 초기화
+      // — 직전 편집 시트의 잔존 데이터를 깨끗이 비움
+      reset({
+        title: '',
+        body: '',
+        categorySlug: undefined as unknown as PostFormData['categorySlug'],
+        isAnonymous: true,
+      })
+    }
   }, [isOpen, editTarget, reset])
 
   // ────────────────────────────────────────────────
