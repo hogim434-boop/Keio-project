@@ -21,6 +21,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { formatJstDateTime } from '@/lib/locale/date'
 import { cn } from '@/lib/utils'
 
 export interface CommentListProps {
@@ -52,13 +53,8 @@ function CommentItem({ c, canReply, currentUserId, onReply }: CommentItemProps) 
   // 작성자 표시명
   const displayName = c.is_anonymous ? '匿名' : (c.author?.nickname ?? '匿名')
 
-  // 작성 시간 (ja-JP 로케일)
-  const createdAt = new Date(c.created_at).toLocaleString('ja-JP', {
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
+  // 작성 시간 (JST 고정 — 해외 접속자도 일본 기준)
+  const createdAt = formatJstDateTime(c.created_at)
 
   // 본인 댓글 여부
   const isOwner = currentUserId !== null && currentUserId === c.user_id

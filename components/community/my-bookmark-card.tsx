@@ -15,6 +15,7 @@ import { Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import type { MyBookmark } from '@/lib/community/my'
+import { formatJstDate } from '@/lib/locale/date'
 
 export interface MyBookmarkCardProps {
   bookmark: MyBookmark
@@ -80,7 +81,7 @@ export function MyBookmarkCard({ bookmark }: MyBookmarkCardProps) {
           {post.category?.name ?? '—'}
         </span>
         <span className="text-xs text-muted-foreground">
-          {new Date(post.created_at).toLocaleDateString('ja-JP')}
+          {formatJstDate(post.created_at)}
         </span>
         {/* 🔖 解除 버튼 */}
         <Button

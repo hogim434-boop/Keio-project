@@ -14,6 +14,7 @@ import { Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import type { MyComment } from '@/lib/community/my'
+import { formatJstDate } from '@/lib/locale/date'
 
 export interface MyCommentCardProps {
   comment: MyComment
@@ -70,7 +71,7 @@ export function MyCommentCard({ comment }: MyCommentCardProps) {
           元の投稿: {comment.post_title ?? '元の投稿'}
         </Link>
         <span className="text-xs text-muted-foreground ml-auto shrink-0">
-          {new Date(comment.created_at).toLocaleDateString('ja-JP')}
+          {formatJstDate(comment.created_at)}
         </span>
         {/* 削除 버튼 */}
         <Button

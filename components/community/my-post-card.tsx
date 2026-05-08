@@ -15,6 +15,7 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import type { PostListItem } from '@/lib/community/posts'
 import { useWriteSheet } from '@/lib/stores/write-sheet-store'
+import { formatJstDate } from '@/lib/locale/date'
 import type { CategorySlug } from '@/types/community'
 
 export interface MyPostCardProps {
@@ -89,7 +90,7 @@ export function MyPostCard({ post }: MyPostCardProps) {
           {post.category?.name ?? '—'}
         </span>
         <span className="text-xs text-muted-foreground">
-          {new Date(post.created_at).toLocaleDateString('ja-JP')}
+          {formatJstDate(post.created_at)}
         </span>
         {/* 編集 / 削除 버튼 — 우측 정렬 */}
         <div className="ml-auto flex items-center gap-1">

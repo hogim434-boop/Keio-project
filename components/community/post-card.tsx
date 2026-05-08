@@ -22,6 +22,7 @@ import type { PostListItem } from '@/lib/community/posts'
 import type { ReactionKind, CategorySlug } from '@/types/community'
 import { getCategoryEmoji } from '@/lib/community/categories'
 import { usePostActionsSheet } from '@/lib/stores/post-actions-sheet-store'
+import { formatJstDate } from '@/lib/locale/date'
 import { cn } from '@/lib/utils'
 
 /** PostCard 컴포넌트 props */
@@ -174,7 +175,7 @@ export function PostCard({
         </span>
         <span className="text-xs text-muted-foreground truncate">
           {post.author?.nickname ?? '匿名'} ·{' '}
-          {new Date(post.created_at).toLocaleDateString('ja-JP')}
+          {formatJstDate(post.created_at)}
         </span>
         <button
           type="button"

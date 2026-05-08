@@ -19,6 +19,7 @@ import { ChevronLeft } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import { fetchPostWithComments } from '@/lib/community/post-detail'
 import { getCategoryEmoji } from '@/lib/community/categories'
+import { formatJstDateTime } from '@/lib/locale/date'
 import type { CategorySlug } from '@/types/community'
 import { PostDetailActions } from '@/components/community/post-detail-actions'
 import { PostDetailThread } from '@/components/community/post-detail-thread'
@@ -69,12 +70,7 @@ export default async function PostDetailPage({
           </span>
           <span className="text-xs text-muted-foreground">
             {post.author?.nickname ?? '匿名'} ·{' '}
-            {new Date(post.created_at).toLocaleString('ja-JP', {
-              month: 'short',
-              day: 'numeric',
-              hour: '2-digit',
-              minute: '2-digit',
-            })}
+            {formatJstDateTime(post.created_at)}
           </span>
         </div>
 

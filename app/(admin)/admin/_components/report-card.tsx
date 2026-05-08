@@ -11,6 +11,7 @@
 
 import { ReportActions } from './report-actions'
 import { REPORT_REASON_LABEL } from '@/lib/community/report-labels'
+import { formatJstDateTime } from '@/lib/locale/date'
 import type { ReportReason } from '@/types/community'
 
 interface ReportCardProps {
@@ -57,12 +58,7 @@ export function ReportCard({ report, preview, count }: ReportCardProps) {
 
         {/* 접수 시각 — 우측 정렬 */}
         <span className="ml-auto text-muted-foreground">
-          {new Date(report.created_at).toLocaleString('ja-JP', {
-            month: 'short',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
-          })}
+          {formatJstDateTime(report.created_at)}
         </span>
       </div>
 
