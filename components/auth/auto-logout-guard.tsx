@@ -12,7 +12,7 @@
 
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { useAutoLogout } from '@/hooks/use-auto-logout'
+import { useAutoLogout, AUTO_LOGOUT_STORAGE_KEY } from '@/hooks/use-auto-logout'
 import { createClient } from '@/lib/supabase/client'
 
 /** 자동 로그아웃 감시 컴포넌트 — UI 없음 */
@@ -30,6 +30,8 @@ export function AutoLogoutGuard() {
       const supabase = createClient()
       await supabase.auth.signOut()
     } finally {
+      // 다음 로그인 시 옛 timestamp로 즉시 만료 판정되는 것을 방지
+      try { localStorage.removeItem(AUTO_LOGOUT_STORAGE_KEY) } catch {}
       // signOut 성공·실패 모두 토스트 + 리다이렉트
       toast.warning('セッションが期限切れです。再度ログインしてください。')
       router.replace('/login')

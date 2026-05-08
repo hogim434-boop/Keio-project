@@ -6,7 +6,8 @@
  * - 마지막 활동 시각을 localStorage에 기록해 멀티 탭 동기화
  * - 60초 간격으로 만료 여부 검사, 만료 시 onIdle() 콜백 호출
  * - 사파리 프라이빗 모드(localStorage 차단) 대비 try/catch 처리
- * - 마운트 시 즉시 만료 검사 (백그라운드 30분 후 새로고침 케이스 대응)
+ * - 마운트 시점은 "활동의 시작점"으로 간주해 활동 시각을 현재로 갱신
+ *   (이전 세션이 남긴 옛 timestamp로 새 로그인 직후 즉시 만료되는 것을 방지)
  * - 컴포넌트 언마운트 시 모든 리스너 + interval 해제
  */
 
@@ -21,8 +22,9 @@ const CHECK_INTERVAL_MS = 60 * 1000
 /** 활동 기록 throttle 간격: 1초 (잦은 localStorage 쓰기 방지) */
 const ACTIVITY_THROTTLE_MS = 1000
 
-/** localStorage 저장 키 */
-const STORAGE_KEY = 'jukulog:last-activity'
+/** localStorage 저장 키 (auto-logout-guard에서 cleanup용으로 import) */
+export const AUTO_LOGOUT_STORAGE_KEY = 'jukulog:last-activity'
+const STORAGE_KEY = AUTO_LOGOUT_STORAGE_KEY
 
 /**
  * 현재 시각을 localStorage에 기록한다.
@@ -97,9 +99,12 @@ export function useAutoLogout(onIdle: () => void): void {
       }
     }
 
-    // ── 마운트 직후 즉시 검사 ────────────────────────────────
-    // 백그라운드에서 30분 이상 경과 후 새로고침하는 케이스 대응
-    checkAndFire()
+    // ── 마운트 시점에 활동 시각을 무조건 현재로 갱신 ──────
+    // 페이지 진입(=새 로그인 직후 또는 (app) 레이아웃 재마운트) 자체가 "활동"이다.
+    // 이전 세션이 localStorage에 남긴 옛 timestamp로 인해 새 로그인 직후 즉시
+    // 만료 판정되어 강제 로그아웃되는 버그를 방지한다.
+    recordActivity()
+    lastWriteRef.current = Date.now()
 
     // ── 활동 이벤트 핸들러 (throttle 적용) ─────────────────
     function handleActivity(): void {
@@ -108,13 +113,6 @@ export function useAutoLogout(onIdle: () => void): void {
       if (now - lastWriteRef.current < ACTIVITY_THROTTLE_MS) return
       lastWriteRef.current = now
       recordActivity()
-    }
-
-    // 첫 활동 기록 (마운트 시점에 한 번 — 기록이 없으면 30분 카운트 기준점 생성)
-    const existingActivity = readLastActivity()
-    if (existingActivity === null) {
-      recordActivity()
-      lastWriteRef.current = Date.now()
     }
 
     // ── storage 이벤트 핸들러 (다른 탭의 활동 동기화) ──────
