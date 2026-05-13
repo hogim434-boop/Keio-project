@@ -61,3 +61,62 @@ type: project
 10. **Metadata description이 한국어**: `app/layout.tsx` 24라인에 description이 "게이오 재학생을 위한 익명 강의 리뷰 플랫폼" — 일본어 서비스인데 한국어.
 11. **admin 배지가 한국어**: `app/(admin)/layout.tsx` 13라인 "관리자" 텍스트 — 일본어 서비스 불일치.
 12. **domain.ts의 한국어 enum 값**: CAMPUS_VALUES('미타', '히요시'), REQUIREMENT_TYPE_VALUES('필수','선택'), ENROLLMENT_SIZE_VALUES('소','중') 등이 한국어. DB와 불일치 위험.
+
+## 2026-05-09 7차 리뷰 (마이페이지·신고·알림·어드민 영역 C)
+
+### 잘 구현된 부분:
+1. proxy.ts + AdminLayout 이중 어드민 게이트 — defense-in-depth 올바른 패턴
+2. 신고 UNIQUE 23505 → 409 매핑이 api-helpers.ts와 정확히 연동
+3. useNotifications 낙관적 업데이트 + 함수형 업데이터 롤백 패턴
+
+### 발견된 이슈:
+1. **my-client.tsx 데드 코드**: 현재 page.tsx에서 사용되지 않음. 한국어 텍스트("프로필 설정") 포함.
+2. **_components/logout-button.tsx stub**: alert('Task 006에서 구현') — 삭제됐어야 할 개발용 stub.
+3. **profile/page.tsx: user_metadata 의존**: 폼 초기값을 user_metadata에서 로드 — profiles DB와 불일치 가능성 (4차 리뷰 반복 이슈).
+4. **report-sheet.tsx onSubmit: try-catch 없음**: 전체 fetch가 try-catch 없음 — 네트워크 에러 시 unhandled rejection.
+5. **admin/page.tsx: count 집계가 현재 페이지 50건 기준**: 51번째 동일 대상 신고는 count에 미포함.
+6. **admin/page.tsx: postsRes.error / commentsRes.error 미처리**: DB 에러 시 빈 preview 표시.
+7. **useNotifications: refresh()와 refreshUnreadCount() 경쟁 조건**: 패널 열기 + window focus 동시 발생 시 unreadCount 일시적 불일치 가능.
+8. **my-comment-card.tsx: 삭제된 게시글로 이동하는 링크**: post_title null일 때도 링크 활성화.
+9. **fetchMyBookmarks: is_deleted 필터 없음**: bookmarks 쿼리에 posts의 is_deleted 필터 미적용 (fetchMyPosts는 적용됨).
+
+## 2026-05-09 6차 리뷰 (게시판 핵심 영역 B — posts/comments/reactions/bookmarks)
+
+### 현재 상태 (이번 영역에서 잘 구현된 부분):
+- Next.js 16 params Promise / searchParams Promise 올바르게 처리됨
+- withAuth + pgErrorToResponse + ok/err 일관 사용
+- ILIKE 검색어 % _ escape + cursor base64url 인코딩
+- IntersectionObserver AbortController race 방지
+- 낙관적 업데이트 6케이스 카운터 보정 (post-detail-actions)
+- CommentForm 4차 리뷰 지적 try-catch 수정 확인
+
+### 새로 발견된 이슈 (영역 B):
+1. **post-card.tsx: 롤백 시 post.reaction_up/down 원본값 사용**: 롤백 시 setReactionUp(post.reaction_up)이 클로저 캡처 초기값으로 복원 — 이 컴포넌트 수명 중 다른 반응이 있었다면 잘못된 값으로 롤백됨.
+2. **post-feed.tsx: fetchMore useEffect 내 클로저 stale**: [hasMore, cursor] 의존성이지만 fetchMore 내에서 cursor/isLoading/hasMore를 직접 읽음 — cursor 상태가 오래된 값을 참조할 수 있음.
+3. **lib/community/posts.ts: cursor 내용 검증 없음**: decodeCursor 후 created_at/id 필드를 바로 SQL 파라미터로 삽입. PostgREST .or() 의 파라미터는 PostgREST 필터 문자열에 직접 보간되므로 cursor 조작 시 쿼리 변형 가능성.
+4. **toggleReaction/toggleBookmark: withAuth 이후 내부 getUser() 재호출**: 4차 리뷰 지적 사항 여전히 미수정.
+5. **hot-feed.ts: HOT_WINDOW_DAYS=7인데 주석은 24h TOP3**: 코드(7일)와 JSDoc 주석(24h)이 불일치.
+6. **post-detail.ts: buildCommentTree — parent_id 있지만 byId에 없는 경우 루트로 승격**: 삭제된 댓글의 자식이 루트로 올라오는 UX 혼란 가능성.
+7. **write-bottom-sheet.tsx: Textarea ref 병합 방식 중복 register 호출**: register('body')를 두 번 호출(line 463, 468)하여 이벤트 핸들러가 두 번 등록될 수 있음.
+8. **comment-form.tsx: onSubmit에 try-catch 추가됨**: 4차 리뷰 지적 사항 수정 확인.
+9. **post-actions-sheet.tsx handleMenu: preview props가 없을 때 undefined 전달**: PostDetailActions에서 openActions({ id, isOwner }) 호출 시 preview 미전달 — 시트 타이틀 표시 없음(기능상 무해하나 UX 미완).
+10. **explore/page.tsx: 인기 모드 limit=10 무한 스크롤**: nextCursor가 있으면 무한 스크롤로 추가 로드 가능. 인기 모드 의도가 TOP10이라면 PostFeed에 maxPage 제한 필요.
+
+## 2026-05-09 5차 리뷰 (인증·인프라·공통 영역 A)
+
+### 현재 상태 (개선된 사항):
+- lang="ja" 수정됨 (app/layout.tsx)
+- admin 라우트 보호 proxy.ts에 추가됨 (DB role 검증)
+- password_set 우회 이슈: proxy.ts에서 user_metadata 기반 needsSetup 가드 여전히 사용 중 → 4차 리뷰 Blocker 미수정
+
+### 새로 발견된 이슈:
+1. **proxy.ts: admin 검사 매 요청마다 DB 쿼리**: /admin/* 접근 시 매 요청마다 profiles 테이블 SELECT → Proxy는 모든 요청에 실행되므로 성능 부담. JWT claims 기반 낙관적 체크 후 페이지 내에서 재검증 패턴이 적합.
+2. **setup/page.tsx: onSubmit 성공 후 signOut 후 router.replace('/login')**: signOut이 비동기인데 await 후 라우팅은 올바름. 단, signOut 실패 시에도 /login으로 리다이렉트되어 세션이 살아있는 상태로 login 페이지로 가는 엣지 케이스 존재.
+3. **signup/page.tsx: useEffect에서 window.location.search 사용**: searchParams hook 미사용. Next.js App Router에서는 useSearchParams()가 권장 패턴.
+4. **metadata description 여전히 한국어**: app/layout.tsx 26라인 "게이오 재학생을 위한 익명 강의 리뷰 플랫폼" → 일본어 서비스 불일치 (4차 리뷰 지적 사항 미수정).
+5. **privacy/page.tsx: 개인정보보호법 제11조 연락처 미기재**: "（連絡先: 運営者により後日公表）" — 서비스 공개 전 반드시 기재 필요.
+6. **KEIO_EMAIL_DOMAINS: endsWith 패턴 우회 가능성**: 'xxx@notkeio.jp'도 '@keio.jp'로 끝나면 통과. .split('@')[1] === 도메인 비교 방식이 더 안전.
+7. **lib/locale/date.ts: Intl 인스턴스 재사용 없음**: toLocaleDateString 호출마다 내부적으로 Intl 인스턴스 재생성. Intl.DateTimeFormat 캐싱이 성능에 유리.
+8. **hero-section.tsx: 일본어 서비스인데 한국어 텍스트**: "게이오대학교 전용 플랫폼", "익명 강의 리뷰 플랫폼" — 일본어로 교체 필요.
+9. **auth/callback/route.ts: state 파라미터 미검증**: OAuth CSRF 방어를 위한 state 파라미터를 서버에서 직접 검증하지 않음 (Supabase PKCE가 처리하나, 명시적 검증 없음).
+10. **types/domain.ts: CAMPUS_VALUES 한국어 키 (미타, 히요시 등)**: DB CHECK 제약과 UI 라벨이 한국어로 혼재 — labels.ts에서 한→일 매핑을 하지만 DB 저장값 자체가 한국어라 외부 API 노출 시 혼란.
