@@ -283,3 +283,49 @@
   background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.5 0'/></filter><rect width='100%' height='100%' filter='url(%23n)' opacity='0.7'/></svg>");
   background-size: 120px 120px;
 }
+
+/* ============================================================
+   Day 3 Finishing Touches — 섹션 헤더 & 프로필 아바타 등장 애니메이션
+
+   #8 section-fade-in: 탐색 페이지 섹션 헤더의 작은 fade-up 등장.
+      Server Component 에서도 JS 없이 순수 CSS 로 동작.
+      y=8px — 미세한 이동이라 콘텐츠 흐름을 방해하지 않음.
+      duration 0.4s, expo-out easing 으로 자연스럽게 안착.
+
+   #9 animate-avatar-pop: 프로필 아바타 spring pop 등장.
+      cubic-bezier(0.34, 1.56, 0.64, 1) — back-out (오버슈트) 곡선.
+      scale 0.88→1.0 으로 "살짝 튀어오르며 착지"하는 따뜻한 느낌.
+      일본 시장 특화: 차갑지 않고 약간 생동감 있는 인터랙션.
+   ============================================================ */
+
+/* 섹션 헤더 작은 fade-up (y: 8px → 0) */
+@keyframes section-fade-up-sm {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* 탐색 페이지 섹션 헤더에 적용 — Server Component 에서도 className 으로 바로 사용 가능 */
+.section-fade-in {
+  animation: section-fade-up-sm 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* 프로필 아바타 spring pop (scale: 0.88 → 1.0, back-out easing) */
+@keyframes avatar-pop {
+  from { opacity: 0; transform: scale(0.88); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+/* 마이페이지 프로필 아바타에 적용 */
+.animate-avatar-pop {
+  animation: avatar-pop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+/* prefers-reduced-motion 가드 — 모션 민감 사용자를 위한 필수 접근성 처리 */
+@media (prefers-reduced-motion: reduce) {
+  .section-fade-in {
+    animation: none;
+  }
+  .animate-avatar-pop {
+    animation: none;
+  }
+}

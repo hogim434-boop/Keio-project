@@ -84,7 +84,12 @@ export default async function ExplorePage({
       </Suspense>
 
       {/* 섹션 헤더 — 검색 모드 / 인기 모드 분기 */}
-      <section className="px-4 pt-3 pb-1">
+      {/*
+       * section-fade-in: globals.css 의 section-fade-up-sm 키프레임을 사용.
+       * Server Component 이므로 JS/Framer Motion 없이 순수 CSS 애니메이션.
+       * opacity 0→1 + translateY 8→0, 0.4s expo-out.
+       */}
+      <section className="px-4 pt-3 pb-1 section-fade-in">
         {q ? (
           <h2 className="text-xs font-semibold text-muted-foreground">
             「{q}」の検索結果

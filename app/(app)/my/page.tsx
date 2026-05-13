@@ -80,8 +80,14 @@ export default async function MyPage({
 
       {/* 프로필 섹션 */}
       <section className="px-4 py-4 border-b flex items-center gap-3">
+        {/*
+         * animate-avatar-pop: globals.css 의 avatar-pop 키프레임을 사용.
+         * scale 0.88→1.0, cubic-bezier(0.34, 1.56, 0.64, 1) — back-out 오버슈트 곡선.
+         * "살짝 튀어오르며 착지"하는 따뜻한 등장감. duration 0.5s.
+         * Server Component 이므로 JS 없이 순수 CSS 로 동작.
+         */}
         <div
-          className="size-14 rounded-full bg-muted flex items-center justify-center text-2xl"
+          className="size-14 rounded-full bg-muted flex items-center justify-center text-2xl animate-avatar-pop"
           aria-hidden
         >
           👤
