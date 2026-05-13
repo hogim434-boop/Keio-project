@@ -24,6 +24,20 @@ export const KEIO_EMAIL_DOMAINS = [
   '@sfc.keio.ac.jp',
 ] as const
 
+/**
+ * 이메일이 게이오 대학 도메인에 속하는지 정확히 판정한다.
+ *
+ * `endsWith('@keio.jp')` 만 쓰면 `evil.keio.jp` 같은 서브도메인 위장 가능성이
+ * 있으므로, `@` 로 분리 후 도메인 부분을 화이트리스트와 정확 일치 비교한다.
+ * 이메일은 대소문자 무관하므로 toLowerCase 로 정규화.
+ */
+export function isKeioEmail(email: string): boolean {
+  const at = email.lastIndexOf('@')
+  if (at === -1 || at === email.length - 1) return false
+  const domain = email.slice(at + 1).toLowerCase()
+  return KEIO_EMAIL_DOMAINS.some((d) => d.slice(1).toLowerCase() === domain)
+}
+
 // ============================================================
 // 기본 검증 스키마
 // ============================================================
@@ -33,10 +47,9 @@ export const KeioEmailSchema = z
   .string()
   .min(1, 'メールアドレスを入力してください')
   .email('メールアドレスの形式が正しくありません')
-  .refine(
-    (email) => KEIO_EMAIL_DOMAINS.some((domain) => email.endsWith(domain)),
-    { message: 'keio.jp ドメインのメールアドレスのみご利用いただけます' }
-  )
+  .refine(isKeioEmail, {
+    message: 'keio.jp ドメインのメールアドレスのみご利用いただけます',
+  })
 
 /** 비밀번호: 8자 이상 + 영문 1자 + 숫자 1자 */
 export const PasswordSchema = z

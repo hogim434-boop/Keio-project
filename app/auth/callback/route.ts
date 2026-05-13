@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { KEIO_EMAIL_DOMAINS } from '@/types/auth'
+import { isKeioEmail } from '@/types/auth'
 
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url)
@@ -19,9 +19,8 @@ export async function GET(request: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser()
   const email = user?.email ?? ''
-  const isKeio = KEIO_EMAIL_DOMAINS.some((domain) => email.endsWith(domain))
 
-  if (!isKeio) {
+  if (!isKeioEmail(email)) {
     await supabase.auth.signOut()
     return NextResponse.redirect(new URL('/signup?error=domain', origin))
   }
