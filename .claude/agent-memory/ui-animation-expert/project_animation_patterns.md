@@ -45,11 +45,11 @@ type: project
 | `fabEntrance` | FAB 버튼 진입 | scale:0→1+y:8, delay:0.3, back-out ease |
 | `emptyState` | 빈 상태 UI | scale:0.95→1+opacity, back-out ease |
 
-### Phase 1B 신규 9개 (Threads/X SNS 스타일)
+### Phase 1B 신규 (Threads/X SNS 스타일) — 실제 motion-variants.ts 기준
 | variant 이름 | 타입 | 용도 |
 |---|---|---|
-| `springTap` | transition 객체 | 버튼 whileTap transition — stiffness:500, damping:30 |
-| `cardLift` | Variants | 포스트 카드 hover lift — y:-2, scale:1.005, rest/hover 상태 |
+| `springTap` | transition 객체 | 버튼 whileTap transition — stiffness:500, damping:30, mass:0.6 |
+| ~~`cardLift`~~ | ~~Variants~~ | **실제 파일에 없음** — post-card.tsx에서 whileHover 인라인 처리 |
 | `heroFadeUp` | Variants | 랜딩 hero 대형 등장 — blur(8px)→0 + y:32→0, duration:0.7 |
 | `staggerFast` | Variants | 빠른 stagger 컨테이너 — staggerChildren:0.04 (0.06보다 빠름) |
 | `fadeInUp` | Variants | 범용 등장 — y:16→0, duration:0.4, expo-out |
@@ -195,9 +195,17 @@ type: project
 ## Phase 3B 컴포넌트 모션 강화 (2026-05-04)
 
 ### post-card.tsx
-- `<article>` → `<motion.article variants={cardLift} initial="rest" whileHover="hover">` (shouldReduce 시 undefined) — Phase 3B
+- `<article>` → `<motion.article>` 교체 — **Phase 3B 기록은 부정확**. 실제 motion-variants.ts에 `cardLift` Variants 없음.
+  - Pro Phase 1 Day 2 #5 에서 `whileHover`/`whileTap` 인라인으로 직접 구현:
+    ```tsx
+    whileHover={reduce ? undefined : { y: -2, scale: 1.005, boxShadow: '0 4px 16px 0 rgba(0,0,0,0.10)' }}
+    whileTap={reduce ? undefined : { scale: 0.985, y: 0 }}
+    transition={{ type:'spring', stiffness:400, damping:28, mass: springTap.mass }}
+    ```
+  - `springTap`의 `mass:0.6` 값을 `(springTap as { mass: number }).mass` 로 재사용
+  - ViewTransition wrapper + 좋아요 4단계 choreography 완전 보존
 - 추천 버튼: `whileTap + transition={springTap}` + `motion.span key={String(myReaction==='up')} animate={scale:[1,1.45,1]}`로 heartPop 구현
-- 활성 색상: 추천 `text-primary bg-primary/10`, 북마크 `text-amber-400 bg-amber-400/10`
+- 활성 색상: 추천 `text-red-500 bg-red-50`, 북마크 `text-amber-500 bg-amber-50`
 - **FLIP layout animation (Pro Phase 1 Day 1)**: `layout={reduce ? undefined : 'position'}` + `transition={{ type:'spring', stiffness:350, damping:30 }}` 추가
   - `layout="position"` 선택 이유: "size" 대신 위치만 추적 → 카드 내부 텍스트 클램프 왜곡 없음
   - `reduce===true` 시 layout=undefined으로 FLIP 계산 완전 스킵 (접근성)
@@ -374,6 +382,23 @@ TypeScript 타입 해제 (React 19.2.4에 없고 canary에만 있음):
 - 미지원 브라우저 (Firefox, 구 Safari): graceful degradation — 일반 라우팅, 에러 없음
 - Next.js 16 runtime: `compiled/react` (canary 19.3.0) 를 사용 → ViewTransition 실제 동작
 - TypeScript: 설치된 `react@19.2.4` 에는 타입 없음 → `react/canary` 레퍼런스 필요
+
+## MyTabContent stagger entrance (Pro Phase 1 Day 2, 2026-05-13)
+
+### `components/community/my-tab-content.tsx` (신규)
+- **핵심 원리**: `key={tab}` → 탭 변경 시 Client Component unmount → remount → stagger 재실행
+  - 컨테이너에 `key={tab}` 대신 컴포넌트 자체가 `tab` prop을 key로 받아 부모(page.tsx)가 `<MyTabContent tab={...}>` 로 렌더 → 탭이 바뀌면 `{tab === 'posts' && <MyTabContent tab="posts" ...>}` 조건 분기로 자연스럽게 remount
+- `tabContainer`: `staggerChildren: 0.05` (50ms, PostFeed feedContainer 와 동일)
+- `listItem`: `lib/motion-variants.ts` 에서 import — opacity+y:12, 0.4s expo-out
+- Empty State: `initial={{ opacity:0, y:8 }}` → `animate={{ opacity:1, y:0 }}`, `key="empty-{tab}"` 별도 처리
+- 이모지 idle loop: `animate={{ y:[0,-4,0] }}` duration:2.5s repeat:Infinity easeInOut
+- `useReducedMotion() ?? false`: true 시 variants/initial/animate 모두 undefined
+
+### page.tsx 통합 패턴
+- Server Component → Client Component 에 JSX 전달: `children` prop 으로 카드 배열 전달
+  - `{posts.map(p => <MyPostCard key={p.id} post={p} />)}` 를 children으로 전달 — 직렬화 없이 JSX tree로 전달됨 (React 정상 패턴)
+- `<section className="px-4 py-4">` 에서 `space-y-3` 제거 (MyTabContent 내부가 `space-y-3` 담당)
+- 탭별 조건 분기: `{tab === 'posts' && <MyTabContent ...>}` — 조건이 false면 null → 이전 탭 MyTabContent unmount
 
 ## body 제약사항
 
