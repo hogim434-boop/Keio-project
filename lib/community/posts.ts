@@ -5,6 +5,7 @@
  * 익명 게시글은 server-side 에서 author=null 로 마스킹. RLS + .eq(is_deleted,false) 이중 보장.
  */
 
+import { z } from 'zod'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database, Post, Category } from '@/types/database'
 import type { CategorySlug, ReactionKind } from '@/types/community'
@@ -27,11 +28,19 @@ export interface FetchPostsResult {
   nextCursor: string | null
 }
 
-interface CursorState {
-  created_at: string
-  id: string
-  reaction_up?: number
-}
+/**
+ * cursor payload 스키마 — PostgREST `.or()` 필터에 직접 보간되므로
+ * 형식 검증 없이 사용하면 인젝션 위험이 있다. 디코딩 직후 zod 로 강제 검증.
+ *   - published_at: ISO 8601 datetime (예약 발행 도입 후 정렬·필터 키)
+ *   - id: UUID
+ *   - reaction_up: 0 이상 정수 (popular 정렬에서만 사용)
+ */
+const CursorStateSchema = z.object({
+  published_at: z.string().datetime({ offset: true }),
+  id: z.string().uuid(),
+  reaction_up: z.number().int().min(0).optional(),
+})
+type CursorState = z.infer<typeof CursorStateSchema>
 
 function encodeCursor(state: CursorState): string {
   return Buffer.from(JSON.stringify(state)).toString('base64url')
@@ -40,7 +49,9 @@ function encodeCursor(state: CursorState): string {
 function decodeCursor(s: string | null | undefined): CursorState | null {
   if (!s) return null
   try {
-    return JSON.parse(Buffer.from(s, 'base64url').toString('utf-8')) as CursorState
+    const raw = JSON.parse(Buffer.from(s, 'base64url').toString('utf-8'))
+    const parsed = CursorStateSchema.safeParse(raw)
+    return parsed.success ? parsed.data : null
   } catch {
     return null
   }
@@ -63,10 +74,15 @@ export async function fetchPosts(
     categoryId = cat.id
   }
 
+  // RLS posts_select_visible 이 published_at <= now() 를 강제하지만,
+  // 명시적으로도 필터하여 인덱스 사용 + 가독성 확보
+  const nowIso = new Date().toISOString()
+
   let q = supabase
     .from('posts')
     .select('*, category:categories(slug,name,type), author:profiles(nickname)')
     .eq('is_deleted', false)
+    .lte('published_at', nowIso)
     .limit(limit + 1)
 
   if (categoryId) q = q.eq('category_id', categoryId)
@@ -79,24 +95,24 @@ export async function fetchPosts(
   const cur = decodeCursor(opts.cursor)
 
   if (opts.sort === 'latest') {
-    q = q.order('created_at', { ascending: false }).order('id', { ascending: false })
-    // (created_at, id) 복합 커서: 동일 ms 작성된 게시글 중복/누락 방지
+    q = q.order('published_at', { ascending: false }).order('id', { ascending: false })
+    // (published_at, id) 복합 커서: 동일 ms 발행 게시글 중복/누락 방지
     if (cur) {
       q = q.or(
-        `created_at.lt.${cur.created_at},and(created_at.eq.${cur.created_at},id.lt.${cur.id})`,
+        `published_at.lt.${cur.published_at},and(published_at.eq.${cur.published_at},id.lt.${cur.id})`,
       )
     }
   } else {
     q = q
       .order('reaction_up', { ascending: false })
-      .order('created_at', { ascending: false })
+      .order('published_at', { ascending: false })
       .order('id', { ascending: false })
-    // (reaction_up, created_at, id) 3-key 복합 커서
+    // (reaction_up, published_at, id) 3-key 복합 커서
     if (cur && typeof cur.reaction_up === 'number') {
       q = q.or(
         `reaction_up.lt.${cur.reaction_up},` +
-          `and(reaction_up.eq.${cur.reaction_up},created_at.lt.${cur.created_at}),` +
-          `and(reaction_up.eq.${cur.reaction_up},created_at.eq.${cur.created_at},id.lt.${cur.id})`,
+          `and(reaction_up.eq.${cur.reaction_up},published_at.lt.${cur.published_at}),` +
+          `and(reaction_up.eq.${cur.reaction_up},published_at.eq.${cur.published_at},id.lt.${cur.id})`,
       )
     }
   }
@@ -117,7 +133,7 @@ export async function fetchPosts(
   if (hasMore) {
     const last = items[items.length - 1]
     nextCursor = encodeCursor({
-      created_at: last.created_at,
+      published_at: last.published_at,
       id: last.id,
       reaction_up: opts.sort === 'popular' ? last.reaction_up : undefined,
     })

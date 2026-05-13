@@ -243,6 +243,7 @@ export type Database = {
           id: string
           is_anonymous: boolean
           is_deleted: boolean
+          published_at: string
           reaction_down: number
           reaction_up: number
           title: string
@@ -257,6 +258,7 @@ export type Database = {
           id?: string
           is_anonymous?: boolean
           is_deleted?: boolean
+          published_at?: string
           reaction_down?: number
           reaction_up?: number
           title: string
@@ -271,6 +273,7 @@ export type Database = {
           id?: string
           is_anonymous?: boolean
           is_deleted?: boolean
+          published_at?: string
           reaction_down?: number
           reaction_up?: number
           title?: string
