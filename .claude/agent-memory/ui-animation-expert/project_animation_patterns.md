@@ -400,6 +400,28 @@ TypeScript 타입 해제 (React 19.2.4에 없고 canary에만 있음):
 - `<section className="px-4 py-4">` 에서 `space-y-3` 제거 (MyTabContent 내부가 `space-y-3` 담당)
 - 탭별 조건 분기: `{tab === 'posts' && <MyTabContent ...>}` — 조건이 false면 null → 이전 탭 MyTabContent unmount
 
+## Day 3 Finishing Touches CSS 유틸 클래스 (2026-05-13)
+
+globals.css 파일 맨 끝에 추가된 keyframe + 유틸 클래스:
+
+| 클래스명 | keyframe | easing | duration | 용도 |
+|---|---|---|---|---|
+| `.section-fade-in` | `section-fade-up-sm` | `cubic-bezier(0.22, 1, 0.36, 1)` | 0.4s | 탐색 페이지 섹션 헤더 등장 — Server Component용 순수 CSS |
+| `.animate-avatar-pop` | `avatar-pop` | `cubic-bezier(0.34, 1.56, 0.64, 1)` | 0.5s | 마이페이지 아바타 spring pop — back-out 오버슈트, 따뜻한 착지감 |
+
+- 두 클래스 모두 `@media (prefers-reduced-motion: reduce)` 가드 포함
+- Server Component 에서도 className 으로 바로 사용 가능 (JS 불필요)
+- `fill-mode: both` 대신 `animation-fill-mode: both` 를 css `both` 키워드로 적용
+
+### PostFeed 빈 상태 Empty State 패턴 (Day 3 #7)
+
+`components/community/post-feed.tsx` 빈 상태를 `motion.div` 로 교체:
+- 컨테이너: `motion.div initial={{ opacity:0, y:8 }} animate={{ opacity:1, y:0 }}` duration:0.4s expo-out
+- 이모지: `motion.span animate={{ y:[0,-4,0] }}` duration:2.5s, repeat:Infinity, easeInOut
+  - 검색 모드: 🔍 / 일반 모드: 🌸 조건 분기
+- `shouldReduceMotion=true` 시 initial/animate/transition 모두 undefined
+- **패턴 출처**: `my-tab-content.tsx` Empty State (Day 2 #6) 와 완전히 동일한 구조
+
 ## body 제약사항
 
 ```css
