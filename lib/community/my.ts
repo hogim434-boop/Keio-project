@@ -82,6 +82,9 @@ export async function fetchMyComments(
 /**
  * 내 북마크 50건 조회
  * post FK 별칭으로 게시글 전체 + category + author 포함 (PostListItem 타입 호환)
+ *
+ * `posts!inner` + `post.is_deleted=eq.false` 로 소프트 삭제된 게시물의 북마크는
+ * 결과에서 제외 — 마이페이지에서 삭제된 글로의 dead 링크 노출 방지.
  */
 export async function fetchMyBookmarks(
   supabase: SupabaseClient<Database>,
@@ -90,9 +93,10 @@ export async function fetchMyBookmarks(
   const { data, error } = await supabase
     .from('bookmarks')
     .select(
-      'id, created_at, post:posts(*, category:categories(slug,name,type), author:profiles(nickname))',
+      'id, created_at, post:posts!inner(*, category:categories(slug,name,type), author:profiles(nickname))',
     )
     .eq('user_id', userId)
+    .eq('post.is_deleted', false)
     .order('created_at', { ascending: false })
     .limit(50)
   if (error) throw error
