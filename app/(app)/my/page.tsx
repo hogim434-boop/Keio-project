@@ -17,6 +17,7 @@ import { MyTabs } from '@/components/community/my-tabs'
 import { MyPostCard } from '@/components/community/my-post-card'
 import { MyCommentCard } from '@/components/community/my-comment-card'
 import { MyBookmarkCard } from '@/components/community/my-bookmark-card'
+import { MyTabContent } from '@/components/community/my-tab-content'
 import { LogoutButton } from '@/components/community/logout-button'
 import { NotificationBellContainer } from '@/components/community/notification-bell-container'
 import { getCampusLabel, getDepartmentLabel } from '@/lib/locale/labels'
@@ -114,43 +115,54 @@ export default async function MyPage({
         <MyTabs />
       </Suspense>
 
-      {/* 탭 콘텐츠 — 선택된 탭에 따라 카드 리스트 렌더 */}
-      <section className="px-4 py-4 space-y-3">
+      {/* 탭 콘텐츠 — MyTabContent 로 위임 (stagger entrance + remount on tab change) */}
+      <section className="px-4 py-4">
         {/* 투고 탭 */}
-        {tab === 'posts' &&
-          (posts.length === 0 ? (
-            /* 빈 상태 — 보라 글로우 이모지 + 안내 텍스트 */
-            <div className="py-16 text-center space-y-3">
-              <p className="text-4xl" aria-hidden>🌸</p>
-              <p className="text-sm text-muted-foreground">まだ投稿がありません</p>
-            </div>
-          ) : (
-            posts.map((p) => <MyPostCard key={p.id} post={p} />)
-          ))}
+        {tab === 'posts' && (
+          /*
+           * key={tab} 은 MyTabContent 내부에서 처리.
+           * Server Component → Client Component 에 JSX 를 children 으로 전달하는
+           * 정상적인 React 패턴 (직렬화 없이 tree 로 전달됨).
+           */
+          <MyTabContent
+            tab="posts"
+            isEmpty={posts.length === 0}
+            emptyEmoji="🌸"
+            emptyLabel="まだ投稿がありません"
+          >
+            {posts.map((p) => (
+              <MyPostCard key={p.id} post={p} />
+            ))}
+          </MyTabContent>
+        )}
 
         {/* 댓글 탭 */}
-        {tab === 'comments' &&
-          (comments.length === 0 ? (
-            /* 빈 상태 — 댓글 없음 안내 */
-            <div className="py-16 text-center space-y-3">
-              <p className="text-4xl" aria-hidden>💬</p>
-              <p className="text-sm text-muted-foreground">まだコメントがありません</p>
-            </div>
-          ) : (
-            comments.map((c) => <MyCommentCard key={c.id} comment={c} />)
-          ))}
+        {tab === 'comments' && (
+          <MyTabContent
+            tab="comments"
+            isEmpty={comments.length === 0}
+            emptyEmoji="💬"
+            emptyLabel="まだコメントがありません"
+          >
+            {comments.map((c) => (
+              <MyCommentCard key={c.id} comment={c} />
+            ))}
+          </MyTabContent>
+        )}
 
         {/* 북마크 탭 */}
-        {tab === 'bookmarks' &&
-          (bookmarks.length === 0 ? (
-            /* 빈 상태 — 북마크 없음 안내 */
-            <div className="py-16 text-center space-y-3">
-              <p className="text-4xl" aria-hidden>🔖</p>
-              <p className="text-sm text-muted-foreground">まだブックマークがありません</p>
-            </div>
-          ) : (
-            bookmarks.map((b) => <MyBookmarkCard key={b.id} bookmark={b} />)
-          ))}
+        {tab === 'bookmarks' && (
+          <MyTabContent
+            tab="bookmarks"
+            isEmpty={bookmarks.length === 0}
+            emptyEmoji="🔖"
+            emptyLabel="まだブックマークがありません"
+          >
+            {bookmarks.map((b) => (
+              <MyBookmarkCard key={b.id} bookmark={b} />
+            ))}
+          </MyTabContent>
+        )}
       </section>
 
       {/* 법적 문서 진입점 — 가이드라인 / 약관 / 개인정보 (Task 022 F013) */}
