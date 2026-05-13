@@ -424,7 +424,7 @@ export default function LandingPage() {
             className="text-sm sm:text-base text-white/85 tracking-wide
                        drop-shadow-[0_1px_8px_rgba(0,0,0,0.5)]"
           >
-            学生だけの匿名キャンパスSNS
+            慶應生だけのコミュニティ　
           </motion.p>
         </div>
 
