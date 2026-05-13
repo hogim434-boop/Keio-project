@@ -125,6 +125,44 @@ type: project
 - 기존 scale 1.02 / 0.96 springTap 과 공존 (x/y transform 은 독립 축)
 - 가드: `reduced=true` 시 whileHover/whileTap undefined, mousemove ref 로 coarse 감지
 
+## 좋아요 4단계 choreography (Pro Phase 1 Day 1, 2026-05-13)
+
+### 공유 컴포넌트: `components/community/like-particles.tsx`
+- props: `trigger: boolean` — true 가 되는 순간 파티클 1회 발사 (애니메이션 끝나면 자동 소멸)
+- 4개 이모지 파티클 `❤️ ✨ ⭐ ❤️` 각기 다른 각도/거리로 방사
+- `useReducedMotion()` true 시 컴포넌트 자체 null 반환
+- 부모 요소에 `position: relative` 필수 (`motion.button`에 `relative` 추가)
+
+### 적용 패턴 (`post-card.tsx`, `post-detail-actions.tsx` 동일)
+```
+① 색 전환: CSS transition-colors duration-150 (myReaction === 'up' 조건부 className)
+② 하트 pop: motion.span key={'liked'|'unliked'} animate={{ scale:[1,1.45,1] }}
+   - ease: [0.34, 1.56, 0.64, 1] (back-out), duration: 0.35s
+   - key 전환 = remount = animate 재실행 (가장 간단한 패턴)
+③ 숫자 ticker: AnimatePresence mode="popLayout" + motion.span key={reactionUp}
+   - initial:{y:8,opacity:0} / animate:{y:0,opacity:1} / exit:{y:-8,opacity:0}
+   - duration:0.32, ease:[0.22,1,0.36,1]
+   - 부모 span: overflow-hidden min-w-[1ch] tabular-nums
+④ 파티클: before===null && next==='up' 조건에서만 setShowParticles(true)
+   setTimeout 650ms 후 false 리셋 (duration 600ms + 50ms 여유)
+```
+
+### 4단계가 모두 동시에 시작되는 이유
+- ①②④: `setMyReaction(next)` + `setShowParticles(true)` = 같은 render 싸이클
+- ③: `setReactionUp` 도 같은 싸이클 → React 배치 업데이트로 T+0ms 동시 발화
+
+## PostFeed stagger entrance 패턴 (Pro Phase 1 Day 1, 2026-05-13)
+
+### `components/community/post-feed.tsx`
+- 컨테이너: `motion.div variants={feedContainer}` — 파일 내 로컬 variants (listContainer override)
+- `feedContainer.staggerChildren = 0.05` (50ms) — listContainer(0.06=60ms)를 PostFeed에서 override
+  - 이유: 일본 시장 톤 — 한국(30-40ms)보다 한 박자 여유있게
+- 초기 마운트 카드: `motion.div variants={listItem}` — listItem은 `lib/motion-variants.ts`에서 import
+- 무한 스크롤 추가 카드: 일반 `<div>` — 즉시 표시, stagger 없음
+- 초기 카드 판별: `useState<number>(initial.items.length)` → `index < initialCount`
+  - **중요**: `useRef.current` 를 render 중 읽으면 `react-hooks/refs` ESLint 오류 → `useState` 사용
+- `useReducedMotion() ?? false`: true 시 feedContainer/listItem variants 모두 undefined
+
 ## 컴포넌트별 적용 패턴
 
 ### `app/(public)/layout.tsx`
@@ -157,9 +195,12 @@ type: project
 ## Phase 3B 컴포넌트 모션 강화 (2026-05-04)
 
 ### post-card.tsx
-- `<article>` → `<motion.article variants={cardLift} initial="rest" whileHover="hover">` (shouldReduce 시 undefined)
+- `<article>` → `<motion.article variants={cardLift} initial="rest" whileHover="hover">` (shouldReduce 시 undefined) — Phase 3B
 - 추천 버튼: `whileTap + transition={springTap}` + `motion.span key={String(myReaction==='up')} animate={scale:[1,1.45,1]}`로 heartPop 구현
 - 활성 색상: 추천 `text-primary bg-primary/10`, 북마크 `text-amber-400 bg-amber-400/10`
+- **FLIP layout animation (Pro Phase 1 Day 1)**: `layout={reduce ? undefined : 'position'}` + `transition={{ type:'spring', stiffness:350, damping:30 }}` 추가
+  - `layout="position"` 선택 이유: "size" 대신 위치만 추적 → 카드 내부 텍스트 클램프 왜곡 없음
+  - `reduce===true` 시 layout=undefined으로 FLIP 계산 완전 스킵 (접근성)
 
 ### post-detail-actions.tsx
 - 모든 motion.button에 `transition={springTap}` 추가
