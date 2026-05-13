@@ -329,3 +329,46 @@
     animation: none;
   }
 }
+
+/* ============================================================
+   Phase 2 #14 — sticky 헤더 scroll-driven shadow
+
+   스크롤이 0→60px 진행되는 동안 헤더 하단에 그림자가 자연스럽게 등장.
+   Instagram·Twitter·Apple 등 모던 SNS의 표준 인터랙션 — 페이지가
+   "물리적 깊이"를 갖는 인상.
+
+   CSS scroll-driven animation 사용 (JS 0줄):
+     - Chrome 115+ / Safari 17.4+ / Edge 115+ 에서 동작
+     - 미지원 브라우저 (구 Safari 등) 는 기존 border-b 가 자연 폴백
+
+   ============================================================ */
+
+/* 모던 브라우저에서만 scroll-driven 애니메이션 적용 (graceful degradation) */
+@supports (animation-timeline: scroll()) {
+  .sticky-header-shadow {
+    animation: header-shadow linear both;
+    animation-timeline: scroll(root);
+    /* 스크롤 0~80px 구간 동안 0→1 진행 */
+    animation-range: 0px 80px;
+  }
+}
+
+@keyframes header-shadow {
+  /* 시작: 그림자 없음 + border 보임 (헤더가 최상단 정지 상태) */
+  from {
+    box-shadow: 0 0 0 0 oklch(0 0 0 / 0);
+    border-bottom-color: var(--border);
+  }
+  /* 끝: 명확한 그림자 + border 거의 투명 (입체감 강조) */
+  to {
+    box-shadow: 0 4px 20px oklch(0 0 0 / 0.15);
+    border-bottom-color: transparent;
+  }
+}
+
+/* 모션 민감 사용자 가드 */
+@media (prefers-reduced-motion: reduce) {
+  .sticky-header-shadow {
+    animation: none;
+  }
+}

@@ -63,8 +63,9 @@ export default async function MyPage({
 
   return (
     <div>
-      {/* 상단 헤더 — 다른 페이지와 동일한 sticky 패턴 (반투명 + backdrop-blur). 우측에 알림 종 + 설정 */}
-      <header className="sticky top-0 z-30 bg-background/95 backdrop-blur border-b px-4 h-14 flex items-center">
+      {/* 상단 헤더 — 다른 페이지와 동일한 sticky 패턴 (반투명 + backdrop-blur). 우측에 알림 종 + 설정
+           sticky-header-shadow: 스크롤 진입 시 미세한 그림자 등장 (Phase 2 #14) */}
+      <header className="sticky-header-shadow sticky top-0 z-30 bg-background/95 backdrop-blur border-b px-4 h-14 flex items-center">
         <h1 className="text-lg font-bold">マイページ</h1>
         <div className="ml-auto flex items-center gap-1">
           <NotificationBellContainer />

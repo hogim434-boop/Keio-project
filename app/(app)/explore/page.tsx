@@ -54,8 +54,9 @@ export default async function ExplorePage({
 
   return (
     <div>
-      {/* 探索 고정 헤더 — 우측에 알림 종 */}
-      <header className="sticky top-0 z-30 bg-background/95 backdrop-blur border-b px-4 h-14 flex items-center">
+      {/* 探索 고정 헤더 — 우측에 알림 종
+           sticky-header-shadow: 스크롤 진입 시 미세한 그림자 등장 (Phase 2 #14) */}
+      <header className="sticky-header-shadow sticky top-0 z-30 bg-background/95 backdrop-blur border-b px-4 h-14 flex items-center">
         <h1 className="text-lg font-bold">探索</h1>
         <div className="ml-auto">
           <NotificationBellContainer />

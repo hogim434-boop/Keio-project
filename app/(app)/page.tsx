@@ -67,8 +67,9 @@ export default async function HomePage({
 
   return (
     <div>
-      {/* 1층: sticky 헤더 — 좌: 타이틀, 우: 알림 종 버튼 */}
-      <header className="sticky top-0 z-30 bg-background/95 backdrop-blur border-b px-4 h-14 flex items-center">
+      {/* 1층: sticky 헤더 — 좌: 타이틀, 우: 알림 종 버튼
+           sticky-header-shadow: 스크롤 진입 시 미세한 그림자 등장 (Phase 2 #14) */}
+      <header className="sticky-header-shadow sticky top-0 z-30 bg-background/95 backdrop-blur border-b px-4 h-14 flex items-center">
         <h1 className="text-lg font-bold">掲示板</h1>
         {/* 알림 벨 — 우측 정렬. Client Component이므로 Server Component인 이 페이지에서 바로 사용 가능 */}
         <div className="ml-auto">
