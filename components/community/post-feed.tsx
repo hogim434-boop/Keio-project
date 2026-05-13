@@ -155,14 +155,47 @@ export function PostFeed({
   // unmount 시 진행 중 fetch abort
   useEffect(() => () => abortRef.current?.abort(), [])
 
-  // 빈 상태 — 검색 모드와 일반 모드 카피 분기
+  // 빈 상태 — 검색 모드와 일반 모드 카피/이모지 분기
   if (items.length === 0) {
     return (
-      <div className="py-12 text-center text-sm text-muted-foreground">
-        {search
-          ? '該当する投稿が見つかりません — キーワードを変えて再検索'
-          : 'まだ投稿がありません — 右下のボタンから最初の投稿を作成しましょう'}
-      </div>
+      /*
+       * motion.div fade-up 등장:
+       *   - opacity 0→1, y 8→0, duration 0.4s, expo-out easing [0.22, 1, 0.36, 1]
+       *   - shouldReduceMotion=true: initial/animate 모두 undefined → 즉시 표시
+       *
+       * my-tab-content.tsx 의 Empty State 패턴과 동일한 구조 (Day 2 #6 패턴 재사용)
+       */
+      <motion.div
+        className="py-12 flex flex-col items-center gap-3 text-center text-sm text-muted-foreground"
+        initial={shouldReduceMotion ? undefined : { opacity: 0, y: 8 }}
+        animate={shouldReduceMotion ? undefined : { opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+      >
+        {/*
+         * 이모지 idle loop:
+         *   - 검색 모드: 🔍 (검색을 암시)
+         *   - 일반 모드: 🌸 (벚꽃 — 게이오 캠퍼스 봄 분위기)
+         *   - y: [0, -4, 0] 으로 2.5초 주기 부유 효과
+         *   - shouldReduceMotion=true: animate=undefined → 정지
+         */}
+        <motion.span
+          className="text-2xl select-none"
+          aria-hidden
+          animate={shouldReduceMotion ? undefined : { y: [0, -4, 0] }}
+          transition={
+            shouldReduceMotion
+              ? undefined
+              : { duration: 2.5, repeat: Infinity, ease: 'easeInOut' }
+          }
+        >
+          {search ? '🔍' : '🌸'}
+        </motion.span>
+        <span>
+          {search
+            ? '該当する投稿が見つかりません — キーワードを変えて再検索'
+            : 'まだ投稿がありません — 右下のボタンから最初の投稿を作成しましょう'}
+        </span>
+      </motion.div>
     )
   }
 
