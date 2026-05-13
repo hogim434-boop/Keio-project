@@ -7,6 +7,7 @@
  *   - 비admin → /
  */
 
+import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 
@@ -34,8 +35,21 @@ export default async function AdminLayout({
     <>
       {/* 어드민 헤더 - 상단 고정 */}
       <header className="sticky top-0 z-50 flex h-14 items-center justify-between border-b bg-background/95 backdrop-blur-sm px-4">
-        {/* 앱 이름 */}
-        <span className="text-base font-bold tracking-tight">KEIO SHARE</span>
+        {/* 좌측: 앱 이름 + 네비게이션 */}
+        <div className="flex items-center gap-4">
+          <span className="text-base font-bold tracking-tight">KEIO SHARE</span>
+          <nav className="flex items-center gap-3 text-sm text-muted-foreground">
+            <Link href="/admin" className="hover:text-foreground transition-colors">
+              通報
+            </Link>
+            <Link
+              href="/admin/posts"
+              className="hover:text-foreground transition-colors"
+            >
+              投稿
+            </Link>
+          </nav>
+        </div>
         {/* 어드민 배지 (일본어 — 일본 학생 대상 서비스) */}
         <span className="text-xs font-medium text-muted-foreground bg-muted border border-border px-2.5 py-1 rounded-full">
           管理者
