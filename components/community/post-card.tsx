@@ -21,6 +21,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ViewTransition } from 'react'
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
+import { springTap } from '@/lib/motion-variants'
 import { Heart, MessageCircle, Bookmark, MoreHorizontal } from 'lucide-react'
 import { toast } from 'sonner'
 import type { PostListItem } from '@/lib/community/posts'
@@ -172,7 +173,7 @@ export function PostCard({
   }
 
   return (
-    <article
+    <motion.article
       role="button"
       tabIndex={0}
       onClick={navigateToDetail}
@@ -184,6 +185,39 @@ export function PostCard({
         }
       }}
       className="border rounded-lg p-4 transition-colors hover:bg-muted/50 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      // ── cardLift 효과 ──────────────────────────────────────────────
+      // hover: y:-2px (살짝 떠오름) + scale:1.005 (미세 확대) + 그림자 강화
+      // tap:   scale:0.985 (살짝 눌리는 물리적 피드백)
+      // reduce-motion 시: 모든 motion 효과 비활성화 (접근성)
+      // boxShadow 는 transform/opacity 가 아니지만 카드 lift 의도상 함께 적용
+      // ──────────────────────────────────────────────────────────────
+      whileHover={
+        reduce
+          ? undefined
+          : {
+              y: -2,
+              scale: 1.005,
+              boxShadow: '0 4px 16px 0 rgba(0,0,0,0.10)',
+            }
+      }
+      whileTap={
+        reduce
+          ? undefined
+          : {
+              scale: 0.985,
+              y: 0,
+            }
+      }
+      // springTap (stiffness:500, damping:30, mass:0.6) 재사용
+      // 좋아요 버튼의 springTap 과 동일한 물리 계수로 전체 일관성 유지
+      // 단, PostCard 는 더 큰 요소이므로 stiffness:400, damping:28 로 소폭 완화
+      transition={{
+        type: 'spring',
+        stiffness: 400,
+        damping: 28,
+        // springTap 에서 mass 값 참조 (0.6)
+        mass: (springTap as { mass: number }).mass,
+      }}
     >
       {/* 카테고리 배지 + 작성자 정보 + ⋯ 메뉴 */}
       <div className="flex items-center gap-2 mb-2">
@@ -311,6 +345,6 @@ export function PostCard({
           <Bookmark className={cn('size-4', bookmarked && 'fill-current')} />
         </motion.button>
       </div>
-    </article>
+    </motion.article>
   )
 }
