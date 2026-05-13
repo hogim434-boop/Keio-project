@@ -130,7 +130,7 @@ export function WelcomeModal({
                   ようこそ、
                   <br className="sm:hidden" />
                   <span className="text-foreground">{nickname}</span>
-                  <span className="text-foreground/60">さん</span>。
+                  <span className="text-foreground">さん</span>。
                 </>
               ) : (
                 'ようこそ。'
