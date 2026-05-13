@@ -37,7 +37,7 @@ import { useWriteSheet } from '@/lib/stores/write-sheet-store'
 // false : 정상 동작 — props.shouldOpen 에 따라 1회만 표시 + DB 기록.
 // 되돌리려면 이 const 를 false 로 바꾸거나, 이 블록과 아래 분기 2곳을 삭제하세요.
 // ─────────────────────────────────────────────────────────────────────────────
-const TEMP_ALWAYS_OPEN = true
+const TEMP_ALWAYS_OPEN = false
 
 // 스태거 애니메이션 공통 클래스 — 초기 opacity 0, animation 으로 페이드인
 // data-welcome-stagger 는 prefers-reduced-motion 가드와 매칭됨 (globals.css)
