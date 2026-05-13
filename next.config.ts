@@ -1,6 +1,11 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  experimental: {
+    // View Transitions API 활성화 — React <ViewTransition> 컴포넌트 사용 가능
+    // Next.js 16 + React canary 기능. 미지원 브라우저는 일반 라우팅으로 graceful degradation
+    viewTransition: true,
+  },
   images: {
     remotePatterns: [
       // Unsplash — 랜딩 페이지 배경 사진 (캠퍼스 분위기) 호스팅 도메인

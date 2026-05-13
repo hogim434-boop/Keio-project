@@ -183,6 +183,63 @@
   }
 }
 
+/* ============================================================
+   View Transitions — PostCard → 상세 페이지 shared element morph
+
+   ▣ Group (사이즈·위치 변형): 600ms + iOS-spring easing
+   ▣ Old (사라지는 이미지): 점차 fade-out + 중간 blur
+   ▣ New (나타나는 이미지): 점차 fade-in + 중간 blur
+   → 단순 transform 보간이 아니라 두 이미지가 cross-fade 되며 크기·위치가
+     spring 곡선으로 변형되어 부드러운 morph 인상.
+
+   ⚠️ 이전 cubic-bezier(0.16, 1, 0.3, 1) 은 시작 직후 거의 완료되는 빠른 ease-out
+      이라 짧은 duration 에서는 velocity 변화가 안 보임 → 딱딱한 느낌.
+      iOS spring(0.32, 0.72, 0, 1) 은 시작 살짝 가속 → 중간 부드럽게 → 끝
+      자연스럽게 안착. Apple HIG 권장 morph 곡선.
+   ============================================================ */
+
+/* Group (transform 보간) — 사이즈·위치 변형 */
+::view-transition-group(.post-morph) {
+  animation-duration: 600ms;
+  animation-timing-function: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+/* Old (사라지는 이미지) — fade-out + 중간 blur */
+::view-transition-old(.post-morph) {
+  animation: post-morph-old 600ms cubic-bezier(0.32, 0.72, 0, 1) forwards;
+}
+
+@keyframes post-morph-old {
+  0%   { opacity: 1; filter: blur(0); }
+  40%  { opacity: 0.3; filter: blur(2px); }
+  100% { opacity: 0; filter: blur(0); }
+}
+
+/* New (나타나는 이미지) — fade-in + 중간 blur (살짝 지연 진입) */
+::view-transition-new(.post-morph) {
+  animation: post-morph-new 600ms cubic-bezier(0.32, 0.72, 0, 1) forwards;
+}
+
+@keyframes post-morph-new {
+  0%   { opacity: 0; filter: blur(2px); }
+  60%  { opacity: 0.6; filter: blur(1px); }
+  100% { opacity: 1; filter: blur(0); }
+}
+
+/* ============================================================
+   prefers-reduced-motion 가드 — View Transitions 모두 즉시 전환
+   motion sensitivity 사용자를 위한 필수 접근성 처리
+   ============================================================ */
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(*),
+  ::view-transition-new(*),
+  ::view-transition-group(*) {
+    /* 모든 duration을 0ms 로 설정 = 즉시 전환 (애니메이션 없음) */
+    animation-duration: 0s !important;
+    animation-delay: 0s !important;
+  }
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

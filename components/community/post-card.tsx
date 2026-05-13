@@ -1,20 +1,25 @@
 'use client'
 
+/// <reference types="react/canary" />
 /**
  * 게시글 카드 컴포넌트 — 인라인 ❤️ 추천 / 🔖 북마크 포함
  *
  * 기능:
- *  - 카드 본문 클릭 → /posts/[id] 이동 (router.push)
+ *  - 카드 본문 클릭 → /posts/[id] 이동 (router.push + transitionTypes)
  *  - ❤️ / 🔖 클릭은 e.stopPropagation() 으로 navigate 차단
  *  - 낙관적 업데이트 후 /api/reactions, /api/bookmarks 호출
  *  - 401 → /login 리다이렉트, 실패 시 롤백 + sonner toast
  *  - Framer Motion whileTap scale 0.92 (prefers-reduced-motion 대응)
  *  - ARIA: role=button / aria-label / aria-pressed / tabIndex / focus-visible
  *  - 터치 영역 min-h-[44px] (WCAG 2.5.5)
+ *  - View Transitions: 카드 → 상세 페이지 shared element morph
+ *    - <ViewTransition name={`post-card-${id}`}> 로 카드 제목/본문 영역을 감쌈
+ *    - 상세 페이지의 동일 name 과 자동 morph 연결
  */
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { ViewTransition } from 'react'
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
 import { Heart, MessageCircle, Bookmark, MoreHorizontal } from 'lucide-react'
 import { toast } from 'sonner'
@@ -158,9 +163,12 @@ export function PostCard({
     })
   }
 
-  /** 게시글 상세 페이지로 이동 */
+  /** 게시글 상세 페이지로 이동 — View Transition 트리거 포함 */
   function navigateToDetail() {
-    router.push(`/posts/${post.id}`)
+    // transitionTypes: ['nav-forward'] — 상세 페이지 진입 방향 태그
+    // next.config.ts 의 viewTransition: true 가 활성화된 경우에만 동작
+    // 미지원 브라우저에서는 일반 router.push 와 동일하게 fallback
+    router.push(`/posts/${post.id}`, { transitionTypes: ['nav-forward'] })
   }
 
   return (
@@ -197,11 +205,22 @@ export function PostCard({
         </button>
       </div>
 
-      {/* 제목 (1줄 클램프) */}
-      <h3 className="font-semibold mb-1 line-clamp-1">{post.title}</h3>
+      {/*
+       * View Transitions shared element — 카드 제목+본문 영역
+       * name: `post-content-${post.id}` — 상세 페이지와 동일한 name 으로 morph 연결
+       * share="post-morph" — globals.css 의 ::view-transition-image-pair(.post-morph) 로
+       *   400ms blur-via 애니메이션 적용
+       * default="none" — 관련 없는 전환(다른 카드 클릭, 탭 전환 등)에서는 애니메이션 없음
+       */}
+      <ViewTransition name={`post-content-${post.id}`} share="post-morph" default="none">
+        <div>
+          {/* 제목 (1줄 클램프) */}
+          <h3 className="font-semibold mb-1 line-clamp-1">{post.title}</h3>
 
-      {/* 본문 미리보기 (2줄 클램프) */}
-      <p className="text-sm text-muted-foreground line-clamp-2">{post.body}</p>
+          {/* 본문 미리보기 (2줄 클램프) */}
+          <p className="text-sm text-muted-foreground line-clamp-2">{post.body}</p>
+        </div>
+      </ViewTransition>
 
       {/* 인라인 액션 row: 추천 / 댓글 수 / 북마크 */}
       <div className="flex items-center gap-1 mt-3">

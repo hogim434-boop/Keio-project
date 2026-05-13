@@ -1,3 +1,4 @@
+/// <reference types="react/canary" />
 /**
  * 게시글 상세 페이지 — Server Component
  *
@@ -11,8 +12,13 @@
  *  - PostDetailActions: 반응/북마크/삭제 Client 컴포넌트
  *  - PostDetailThread: 댓글 목록 + 폼 Client 래퍼
  *  - 하단 spacer: fixed 댓글 폼 공간 확보
+ *
+ * View Transitions:
+ *  - <ViewTransition name={`post-content-${id}`}> — 카드의 제목/본문 영역과 morph 연결
+ *    PostCard 의 같은 name 과 매칭 → shared element morph 자동 실행
  */
 
+import { ViewTransition } from 'react'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { ChevronLeft } from 'lucide-react'
@@ -74,13 +80,26 @@ export default async function PostDetailPage({
           </span>
         </div>
 
-        {/* 제목 */}
-        <h1 className="text-xl font-bold">{post.title}</h1>
+        {/*
+         * View Transitions shared element — PostCard 와 동일한 name 으로 morph 연결
+         * name: `post-content-${id}` — PostCard 의 ViewTransition name 과 반드시 일치
+         * share="post-morph" — globals.css 의 blur-via 400ms 애니메이션 클래스
+         * default="none" — 뒤로가기 외 다른 전환에서는 이 요소가 독립 애니메이션 안 함
+         *
+         * 브라우저가 카드 위치/크기 → 상세 페이지 위치/크기로 자동 보간
+         * (FLIP: First-Last-Invert-Play 를 브라우저 네이티브로 처리)
+         */}
+        <ViewTransition name={`post-content-${id}`} share="post-morph" default="none">
+          <div>
+            {/* 제목 */}
+            <h1 className="text-xl font-bold">{post.title}</h1>
 
-        {/* 본문 — whitespace-pre-wrap 으로 개행 보존 */}
-        <p className="whitespace-pre-wrap text-sm leading-relaxed">
-          {post.body}
-        </p>
+            {/* 본문 — whitespace-pre-wrap 으로 개행 보존 */}
+            <p className="whitespace-pre-wrap text-sm leading-relaxed">
+              {post.body}
+            </p>
+          </div>
+        </ViewTransition>
       </article>
 
       {/* 액션 바: ❤ 좋아요 / 👎 싫어요 / 💬 댓글 / 🔖 북마크 / 🗑 삭제(본인) / ⋯ 더보기 */}
