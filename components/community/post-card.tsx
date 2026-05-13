@@ -15,7 +15,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { motion, useReducedMotion } from 'framer-motion'
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
 import { Heart, MessageCircle, Bookmark, MoreHorizontal } from 'lucide-react'
 import { toast } from 'sonner'
 import type { PostListItem } from '@/lib/community/posts'
@@ -24,6 +24,7 @@ import { getCategoryEmoji } from '@/lib/community/categories'
 import { usePostActionsSheet } from '@/lib/stores/post-actions-sheet-store'
 import { formatJstDate } from '@/lib/locale/date'
 import { cn } from '@/lib/utils'
+import { LikeParticles } from '@/components/community/like-particles'
 
 /** PostCard 컴포넌트 props */
 export interface PostCardProps {
@@ -57,6 +58,12 @@ export function PostCard({
   const [isReacting, setIsReacting] = useState(false)
   const [isBookmarking, setIsBookmarking] = useState(false)
 
+  /**
+   * 파티클 발사 트리거 — null → 'up' 첫 좋아요 클릭 시에만 true
+   * 600ms 후 자동으로 false 로 리셋되어 다음 클릭에서도 재발사 가능
+   */
+  const [showParticles, setShowParticles] = useState(false)
+
   /** ❤️ 추천 토글 핸들러 — 낙관적 업데이트 후 API 호출 */
   async function handleReaction(e: React.MouseEvent) {
     e.preventDefault()
@@ -78,6 +85,9 @@ export function PostCard({
     } else if (before === null && next === 'up') {
       // 추천 추가
       setReactionUp((c) => c + 1)
+      // ④ 파티클 발사: 처음으로 좋아요를 누른 순간에만
+      setShowParticles(true)
+      setTimeout(() => setShowParticles(false), 650)
     }
 
     setIsReacting(true)
@@ -195,7 +205,8 @@ export function PostCard({
 
       {/* 인라인 액션 row: 추천 / 댓글 수 / 북마크 */}
       <div className="flex items-center gap-1 mt-3">
-        {/* 추천 버튼 — whileTap 0.92 */}
+        {/* 추천 버튼 — 4단계 choreography */}
+        {/* relative: LikeParticles 의 absolute 기준점 */}
         <motion.button
           type="button"
           onClick={handleReaction}
@@ -204,14 +215,57 @@ export function PostCard({
           aria-label="推薦する"
           aria-pressed={myReaction === 'up'}
           className={cn(
-            'flex items-center gap-1.5 px-3 py-2 min-h-[44px] rounded-full text-xs transition-colors disabled:opacity-50',
+            'relative flex items-center gap-1.5 px-3 py-2 min-h-[44px] rounded-full text-xs transition-colors disabled:opacity-50',
             myReaction === 'up'
               ? 'text-red-500 bg-red-50'
               : 'text-muted-foreground hover:bg-muted',
           )}
         >
-          <Heart className={cn('size-4', myReaction === 'up' && 'fill-current')} />
-          {reactionUp}
+          {/* ④ 파티클: trigger=true 일 때 흩날림 (null→'up' 첫 클릭만) */}
+          <LikeParticles trigger={showParticles} />
+
+          {/* ② 하트 pop: key 전환으로 컴포넌트가 remount → animate 재실행
+               liked/unliked 두 상태 각각 별도 motion.span으로 처리 */}
+          <motion.span
+            key={myReaction === 'up' ? 'liked' : 'unliked'}
+            animate={
+              reduce
+                ? undefined
+                : myReaction === 'up'
+                  ? { scale: [1, 1.45, 1] }
+                  : { scale: 1 }
+            }
+            transition={{
+              duration: 0.35,
+              // back-out 스프링 — 1.45x 오버슈팅 후 1x 로 안착
+              ease: [0.34, 1.56, 0.64, 1],
+            }}
+            className="flex items-center"
+          >
+            {/* ① 색 전환: transition-colors 150ms (CSS) */}
+            <Heart
+              className={cn(
+                'size-4 transition-colors duration-150',
+                myReaction === 'up' && 'fill-current',
+              )}
+            />
+          </motion.span>
+
+          {/* ③ 숫자 ticker: reactionUp 바뀔 때마다 옛 숫자 fade-up out → 새 숫자 fade-down in */}
+          <span className="relative inline-block min-w-[1ch] tabular-nums overflow-hidden">
+            <AnimatePresence mode="popLayout" initial={false}>
+              <motion.span
+                key={reactionUp}
+                initial={reduce ? {} : { y: 8, opacity: 0 }}
+                animate={reduce ? {} : { y: 0, opacity: 1 }}
+                exit={reduce ? {} : { y: -8, opacity: 0 }}
+                transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
+                className="inline-block"
+              >
+                {reactionUp}
+              </motion.span>
+            </AnimatePresence>
+          </span>
         </motion.button>
 
         {/* 댓글 수 (클릭 불필요 — 카드 전체 클릭으로 상세 이동) */}

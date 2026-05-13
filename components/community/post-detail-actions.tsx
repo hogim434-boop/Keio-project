@@ -12,7 +12,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { motion, useReducedMotion } from 'framer-motion'
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
 import {
   Heart,
   ThumbsDown,
@@ -25,6 +25,7 @@ import { toast } from 'sonner'
 import type { ReactionKind } from '@/types/community'
 import { cn } from '@/lib/utils'
 import { usePostActionsSheet } from '@/lib/stores/post-actions-sheet-store'
+import { LikeParticles } from '@/components/community/like-particles'
 
 export interface PostDetailActionsProps {
   postId: string
@@ -65,6 +66,12 @@ export function PostDetailActions({
   const [isReacting, setIsReacting] = useState(false)
   const [isBookmarking, setIsBookmarking] = useState(false)
 
+  /**
+   * 파티클 발사 트리거 — null → 'up' 첫 좋아요 클릭 시에만 true
+   * 650ms 후 자동 false 리셋 (LikeParticles duration 600ms + 여유 50ms)
+   */
+  const [showParticles, setShowParticles] = useState(false)
+
   // 게시글 액션 시트 열기 핸들러
   const openActions = usePostActionsSheet((s) => s.open)
 
@@ -89,6 +96,9 @@ export function PostDetailActions({
 
     if (before === null && next === 'up') {
       setReactionUp((v) => v + 1)
+      // ④ 파티클 발사: 처음으로 좋아요를 누른 순간에만
+      setShowParticles(true)
+      setTimeout(() => setShowParticles(false), 650)
     } else if (before === null && next === 'down') {
       setReactionDown((v) => v + 1)
     } else if (before === 'up' && next === null) {
@@ -192,7 +202,8 @@ export function PostDetailActions({
     <div className="flex items-center gap-1 px-4 py-3 border-y bg-background">
       {/* 좌측 그룹: 좋아요 / 싫어요 / 댓글 수 */}
       <div className="flex items-center gap-1">
-        {/* 좋아요 버튼 */}
+        {/* 좋아요 버튼 — 4단계 choreography */}
+        {/* relative: LikeParticles 의 absolute 기준점 */}
         <motion.button
           whileTap={tapScale}
           onClick={() => handleReaction('up')}
@@ -200,21 +211,60 @@ export function PostDetailActions({
           aria-label={`いいね ${reactionUp}件`}
           aria-pressed={myReaction === 'up'}
           className={cn(
-            'min-h-[44px] px-3 py-2 rounded-full text-xs flex items-center gap-1.5 transition-colors',
+            'relative min-h-[44px] px-3 py-2 rounded-full text-xs flex items-center gap-1.5 transition-colors',
             myReaction === 'up'
               ? 'text-red-500 bg-red-50 dark:bg-red-950'
               : 'text-muted-foreground hover:bg-muted',
             isReacting && 'opacity-50',
           )}
         >
+          {/* ④ 파티클: trigger=true 일 때 흩날림 (null→'up' 첫 클릭만) */}
+          <LikeParticles trigger={showParticles} />
+
           {isReacting && myReaction === 'up' ? (
             <Loader2 className="size-4 animate-spin" />
           ) : (
-            <Heart
-              className={cn('size-4', myReaction === 'up' && 'fill-red-500')}
-            />
+            /* ② 하트 pop: key 전환으로 remount → animate 재실행 */
+            <motion.span
+              key={myReaction === 'up' ? 'liked' : 'unliked'}
+              animate={
+                shouldReduceMotion
+                  ? undefined
+                  : myReaction === 'up'
+                    ? { scale: [1, 1.45, 1] }
+                    : { scale: 1 }
+              }
+              transition={{
+                duration: 0.35,
+                ease: [0.34, 1.56, 0.64, 1],
+              }}
+              className="flex items-center"
+            >
+              {/* ① 색 전환: transition-colors 150ms (CSS) */}
+              <Heart
+                className={cn(
+                  'size-4 transition-colors duration-150',
+                  myReaction === 'up' && 'fill-red-500',
+                )}
+              />
+            </motion.span>
           )}
-          <span>{reactionUp}</span>
+
+          {/* ③ 숫자 ticker: reactionUp 바뀔 때마다 슬롯처럼 스크롤 */}
+          <span className="relative inline-block min-w-[1ch] tabular-nums overflow-hidden">
+            <AnimatePresence mode="popLayout" initial={false}>
+              <motion.span
+                key={reactionUp}
+                initial={shouldReduceMotion ? {} : { y: 8, opacity: 0 }}
+                animate={shouldReduceMotion ? {} : { y: 0, opacity: 1 }}
+                exit={shouldReduceMotion ? {} : { y: -8, opacity: 0 }}
+                transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
+                className="inline-block"
+              >
+                {reactionUp}
+              </motion.span>
+            </AnimatePresence>
+          </span>
         </motion.button>
 
         {/* 싫어요 버튼 */}
