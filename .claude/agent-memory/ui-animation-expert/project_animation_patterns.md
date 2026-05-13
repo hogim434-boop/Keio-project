@@ -323,6 +323,58 @@ function wait(ms: number): Promise<void> { return new Promise(r => setTimeout(r,
 - 빈 상태 🌸: `motion.span animate={{ y:[0,-3,0] }}` duration:3s, repeat:Infinity
 - SkeletonRow: `animationDelay: ${index * 100}ms` CSS prop 추가
 
+## View Transitions API 패턴 (Pro Phase 1 Day 2, 2026-05-13)
+
+### 설정
+
+`next.config.ts`:
+```ts
+experimental: { viewTransition: true }
+```
+
+TypeScript 타입 해제 (React 19.2.4에 없고 canary에만 있음):
+```ts
+/// <reference types="react/canary" />
+```
+각 파일 최상단에 추가 (Server + Client 컴포넌트 모두).
+
+### PostCard → 상세 페이지 shared element morph
+
+- **PostCard** (`'use client'`): `import { ViewTransition } from 'react'`
+  - 제목+본문 미리보기 영역을 `<ViewTransition name={`post-content-${post.id}`} share="post-morph" default="none">` 으로 래핑
+  - `navigateToDetail()`: `router.push(url, { transitionTypes: ['nav-forward'] })` — morph 트리거
+- **상세 페이지** (Server Component): 동일하게 `import { ViewTransition } from 'react'`
+  - 제목+본문 영역을 동일한 `name={`post-content-${id}`}` 으로 래핑 → 자동 morph 연결
+
+### CSS (globals.css)
+
+```css
+::view-transition-group(.post-morph) {
+  animation-duration: 400ms;
+  animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+}
+::view-transition-image-pair(.post-morph) {
+  animation-name: post-morph-via-blur;
+}
+@keyframes post-morph-via-blur { 30% { filter: blur(2px); } }
+
+/* prefers-reduced-motion 가드 */
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(*), ::view-transition-new(*), ::view-transition-group(*) {
+    animation-duration: 0s !important;
+    animation-delay: 0s !important;
+  }
+}
+```
+
+### 핵심 주의사항
+- `'use client'` 파일에서도 `ViewTransition` import 가능 (Server Component 전용 아님)
+- `default="none"` 필수: 없으면 모든 transition 에서 이 요소가 독립 애니메이션 실행
+- `share="post-morph"` 는 CSS 클래스명으로 `::view-transition-image-pair(.post-morph)` 에 대응
+- 미지원 브라우저 (Firefox, 구 Safari): graceful degradation — 일반 라우팅, 에러 없음
+- Next.js 16 runtime: `compiled/react` (canary 19.3.0) 를 사용 → ViewTransition 실제 동작
+- TypeScript: 설치된 `react@19.2.4` 에는 타입 없음 → `react/canary` 레퍼런스 필요
+
 ## body 제약사항
 
 ```css
